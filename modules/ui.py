@@ -8,7 +8,7 @@ from PyQt5.QtWidgets import (
     QTextEdit, QProgressBar, QMessageBox, QDialog, QListWidget, QListWidgetItem,
     QGroupBox, QSizePolicy, QSpacerItem
 )
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer
 from PyQt5.QtGui import QFont, QIcon, QColor, QTextCursor, QPixmap
 from .constants import (
     WINDOW_TITLE, WINDOW_ICON, WINDOW_SIZE, STORY_LINEAR_FILE,
@@ -106,6 +106,17 @@ class TaskRPG(QWidget):
 
         # Initialize and start global hotkeys listener
         self.init_hotkeys()
+
+        # Initialize Shaking Animation
+        self.shake_animation = QPropertyAnimation(self, b"geometry")
+        self.shake_animation.setDuration(100)  # Duration per shake
+        self.shake_animation.setLoopCount(4)  # Number of shakes
+        self.shake_animation.setEasingCurve(QEasingCurve.Linear)
+
+        # Dynamic Font Scaling Timer
+        self.font_scaling_timer = QTimer()
+        self.font_scaling_timer.timeout.connect(self.adjust_fonts)
+        self.font_scaling_timer.start(500)  # Adjust fonts every 500ms
 
         # Prompt story selection
         self.select_story()
@@ -460,34 +471,41 @@ class TaskRPG(QWidget):
         :param task_name: The name of the task.
         :param task_amount: The number of attacks required to defeat the enemy.
         """
-        # Validate task_name and task_amount
-        if not task_name or not isinstance(task_amount, int):
-            logging.error("Invalid task data for enemy generation.")
-            QMessageBox.critical(self, "Error", "Invalid task data for enemy generation.")
-            return
+        try:
+            # Validate task_name and task_amount
+            if not task_name or not isinstance(task_amount, int):
+                logging.error("Invalid task data for enemy generation.")
+                QMessageBox.critical(self, "Error", "Invalid task data for enemy generation.")
+                return
 
-        # Create Enemy with attacks required
-        self.current_enemy = Enemy(name=task_name, hp=task_amount)
-        self.update_status()
+            # Create Enemy with attacks required
+            self.current_enemy = Enemy(name=task_name, hp=task_amount)
+            self.update_status()
 
-        # Load enemy image from assets/images/enemy/enemy.png
-        image_path = os.path.join(ASSETS_DIR, "images", "enemy", "enemy.png")
-        if os.path.exists(image_path):
-            pixmap = QPixmap(image_path).scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
-            self.enemy_image_label.setPixmap(pixmap)
-        else:
-            logging.warning(f"Enemy image not found at {image_path}.")
-            self.enemy_image_label.clear()
+            # Load enemy image from assets/images/enemy/enemy.png
+            image_path = os.path.join(ASSETS_DIR, "images", "enemy", "enemy.png")
+            if os.path.exists(image_path):
+                pixmap = QPixmap(image_path).scaled(300, 300, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                self.enemy_image_label.setPixmap(pixmap)
+            else:
+                logging.warning(f"Enemy image not found at {image_path}.")
+                self.enemy_image_label.clear()
 
-        # Show Attack and Heavy Attack buttons, hide Next button
-        self.next_button.hide()
-        self.attack_button.show()
-        self.heavy_attack_button.show()
+            # Show Attack and Heavy Attack buttons, hide Next button
+            self.next_button.hide()
+            self.attack_button.show()
+            self.heavy_attack_button.show()
 
-        # Display task information without the number
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(f"<br>Do the following task to defeat it:<br><b>{task_name}</b><br>")
-        self.scroll_to_end()
+            # Display task information without the number
+            self.story_text.moveCursor(QTextCursor.End)
+            self.story_text.insertHtml(f"<br>Do the following task to defeat it:<br><b>{task_name}</b><br>")
+            self.scroll_to_end()
+
+            # Trigger shaking animation if enabled
+            self.trigger_shake_animation()
+        except Exception as e:
+            logging.error(f"Failed to generate enemy. Error: {e}")
+            QMessageBox.critical(self, "Error", "An unexpected error occurred while generating the enemy.")
 
     def next_story_segment(self):
         """Proceeds to the next segment of the story or notifies if in battle."""
@@ -498,82 +516,131 @@ class TaskRPG(QWidget):
 
     def player_attack(self):
         """Performs a regular attack on the enemy."""
-        if self.paused or not self.current_enemy:
-            return
+        try:
+            if self.paused or not self.current_enemy:
+                return
 
-        # Player attacks enemy
-        player_damage = 1  # Each attack reduces attacks left by 1
-        self.current_enemy.take_damage(player_damage)
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(f"You attack the <b>{self.current_enemy.name}</b> and deal <b>{player_damage}</b> damage!<br>")
-        self.scroll_to_end()
-        self.update_status()
-
-        if self.current_enemy.is_defeated():
-            self.display_victory()
-            defeated_node = f"{self.current_enemy.name.lower()}_defeated"
-            self.current_enemy = None
+            # Player attacks enemy
+            player_damage = 1  # Each attack reduces attacks left by 1
+            self.current_enemy.take_damage(player_damage)
+            self.story_text.moveCursor(QTextCursor.End)
+            self.story_text.insertHtml(f"You attack the <b>{self.current_enemy.name}</b> and deal <b>{player_damage}</b> damage!<br>")
+            self.scroll_to_end()
             self.update_status()
-            # Move to the node corresponding to victory
-            if defeated_node in self.story_manager.story_data:
-                self.story_manager.set_current_node(defeated_node)
-                self.display_story_segment()
-            else:
-                self.story_text.moveCursor(QTextCursor.End)
-                self.story_text.insertHtml("Victory! Press 'G' or click 'Next' to continue your journey.<br>")
-                self.scroll_to_end()
-            # Hide Attack and Heavy Attack buttons, show Next button
-            self.attack_button.hide()
-            self.heavy_attack_button.hide()
-            self.next_button.show()
+
+            # Trigger shaking animation if enabled
+            self.trigger_shake_animation()
+
+            if self.current_enemy.is_defeated():
+                self.display_victory()
+                defeated_node = f"{self.current_enemy.name.lower()}_defeated"
+                self.current_enemy = None
+                self.update_status()
+                # Move to the node corresponding to victory
+                if defeated_node in self.story_manager.story_data:
+                    self.story_manager.set_current_node(defeated_node)
+                    self.display_story_segment()
+                else:
+                    self.story_text.moveCursor(QTextCursor.End)
+                    self.story_text.insertHtml("Victory! Press 'G' or click 'Next' to continue your journey.<br>")
+                    self.scroll_to_end()
+                # Hide Attack and Heavy Attack buttons, show Next button
+                self.attack_button.hide()
+                self.heavy_attack_button.hide()
+                self.next_button.show()
+        except Exception as e:
+            logging.error(f"Error during attack: {e}")
+            QMessageBox.critical(self, "Error", "An unexpected error occurred during your attack.")
 
     def player_heavy_attack(self):
         """Performs a heavy attack on the enemy."""
-        if self.paused or not self.current_enemy:
-            return
+        try:
+            if self.paused or not self.current_enemy:
+                return
 
-        # Player performs heavy attack
-        player_damage = 2  # Each heavy attack reduces attacks left by 2
-        self.current_enemy.take_damage(player_damage)
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(f"You perform a heavy attack on the <b>{self.current_enemy.name}</b> dealing <b>{player_damage}</b> damage!<br>")
-        self.scroll_to_end()
-        self.update_status()
-
-        if self.current_enemy.is_defeated():
-            self.display_victory()
-            defeated_node = f"{self.current_enemy.name.lower()}_defeated"
-            self.current_enemy = None
+            # Player performs heavy attack
+            player_damage = 2  # Each heavy attack reduces attacks left by 2
+            self.current_enemy.take_damage(player_damage)
+            self.story_text.moveCursor(QTextCursor.End)
+            self.story_text.insertHtml(f"You perform a heavy attack on the <b>{self.current_enemy.name}</b> dealing <b>{player_damage}</b> damage!<br>")
+            self.scroll_to_end()
             self.update_status()
-            # Move to the node corresponding to victory
-            if defeated_node in self.story_manager.story_data:
-                self.story_manager.set_current_node(defeated_node)
-                self.display_story_segment()
-            else:
-                self.story_text.moveCursor(QTextCursor.End)
-                self.story_text.insertHtml("Victory! Press 'G' or click 'Next' to continue your journey.<br>")
-                self.scroll_to_end()
-            # Hide Attack and Heavy Attack buttons, show Next button
-            self.attack_button.hide()
-            self.heavy_attack_button.hide()
-            self.next_button.show()
+
+            # Trigger shaking animation if enabled
+            self.trigger_shake_animation()
+
+            if self.current_enemy.is_defeated():
+                self.display_victory()
+                defeated_node = f"{self.current_enemy.name.lower()}_defeated"
+                self.current_enemy = None
+                self.update_status()
+                # Move to the node corresponding to victory
+                if defeated_node in self.story_manager.story_data:
+                    self.story_manager.set_current_node(defeated_node)
+                    self.display_story_segment()
+                else:
+                    self.story_text.moveCursor(QTextCursor.End)
+                    self.story_text.insertHtml("Victory! Press 'G' or click 'Next' to continue your journey.<br>")
+                    self.scroll_to_end()
+                # Hide Attack and Heavy Attack buttons, show Next button
+                self.attack_button.hide()
+                self.heavy_attack_button.hide()
+                self.next_button.show()
+        except Exception as e:
+            logging.error(f"Error during heavy attack: {e}")
+            QMessageBox.critical(self, "Error", "An unexpected error occurred during your heavy attack.")
 
     def display_victory(self):
         """Displays victory message and awards experience points."""
-        victory_messages = [
-            f"You have defeated the <b>{self.current_enemy.name}</b>!",
-            f"The <b>{self.current_enemy.name}</b> has been vanquished!",
-            f"Victory! The <b>{self.current_enemy.name}</b> is no more.",
-            f"You emerge triumphant over the <b>{self.current_enemy.name}</b>!"
-        ]
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(random.choice(victory_messages) + "<br>")
-        self.scroll_to_end()
-        xp_gained = max(10, self.current_enemy.max_hp // 2)  # Ensure minimum XP
-        self.player.gain_experience(xp_gained)
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(f"You gained <b>{xp_gained}</b> experience points!<br>")
-        self.scroll_to_end()
+        try:
+            victory_messages = [
+                f"You have defeated the <b>{self.current_enemy.name}</b>!",
+                f"The <b>{self.current_enemy.name}</b> has been vanquished!",
+                f"Victory! The <b>{self.current_enemy.name}</b> is no more.",
+                f"You emerge triumphant over the <b>{self.current_enemy.name}</b>!"
+            ]
+            self.story_text.moveCursor(QTextCursor.End)
+            self.story_text.insertHtml(random.choice(victory_messages) + "<br>")
+            self.scroll_to_end()
+            xp_gained = max(10, self.current_enemy.max_hp // 2)  # Ensure minimum XP
+            self.player.gain_experience(xp_gained)
+            self.story_text.moveCursor(QTextCursor.End)
+            self.story_text.insertHtml(f"You gained <b>{xp_gained}</b> experience points!<br>")
+            self.scroll_to_end()
+        except Exception as e:
+            logging.error(f"Error during victory display: {e}")
+            QMessageBox.critical(self, "Error", "An unexpected error occurred during victory display.")
+
+    def trigger_shake_animation(self):
+        """Triggers the shaking animation if enabled in settings."""
+        try:
+            settings_file = os.path.join(os.path.dirname(self.task_manager.filepath), 'settings.json')
+            shake_enabled = True  # Default to True
+            if os.path.exists(settings_file):
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                shake_enabled = settings.get('shake_animation', True)
+
+            if shake_enabled and self.shake_animation.state() != QPropertyAnimation.Running:
+                original_geometry = self.geometry()
+                offset = 10  # Shake offset in pixels
+
+                # Define keyframes for shaking
+                keyframes = [
+                    (0.0, QRect(original_geometry.x(), original_geometry.y(), original_geometry.width(), original_geometry.height())),
+                    (0.25, QRect(original_geometry.x() + offset, original_geometry.y(), original_geometry.width(), original_geometry.height())),
+                    (0.5, QRect(original_geometry.x() - offset, original_geometry.y(), original_geometry.width(), original_geometry.height())),
+                    (0.75, QRect(original_geometry.x() + offset, original_geometry.y(), original_geometry.width(), original_geometry.height())),
+                    (1.0, QRect(original_geometry.x(), original_geometry.y(), original_geometry.width(), original_geometry.height()))
+                ]
+
+                self.shake_animation.stop()  # Stop any ongoing animation
+                self.shake_animation.setStartValue(keyframes[0][1])
+                for fraction, rect in keyframes[1:]:
+                    self.shake_animation.setKeyValueAt(fraction, rect)
+                self.shake_animation.start()
+        except Exception as e:
+            logging.error(f"Error during shaking animation: {e}")
 
     def toggle_pause(self):
         """Pauses or resumes the game."""
@@ -588,12 +655,26 @@ class TaskRPG(QWidget):
             self.scroll_to_end()
 
     def open_settings(self):
-        """Opens the settings dialog to edit tasks."""
+        """Opens the settings dialog to edit tasks and settings."""
         settings_dialog = SettingsDialog(self.task_manager, self)
         if settings_dialog.exec_() == QDialog.Accepted:
             if settings_dialog.saved:
                 self.task_manager = settings_dialog.task_manager
                 self.task_manager.save_tasks()
+                # Reload settings
+                settings_file = os.path.join(self.task_manager.filepath, 'settings.json')
+                if os.path.exists(settings_file):
+                    try:
+                        with open(settings_file, 'r') as f:
+                            settings = json.load(f)
+                        shake_enabled = settings.get('shake_animation', True)
+                        # Notify the user about the change
+                        status = "enabled" if shake_enabled else "disabled"
+                        self.story_text.moveCursor(QTextCursor.End)
+                        self.story_text.insertHtml(f"Shaking animation has been <b>{status}</b>.<br>")
+                        self.scroll_to_end()
+                    except Exception as e:
+                        logging.error(f"Failed to load settings after saving. Error: {e}")
                 self.story_text.moveCursor(QTextCursor.End)
                 self.story_text.insertHtml("Settings updated successfully.<br>")
                 self.scroll_to_end()
@@ -606,3 +687,27 @@ class TaskRPG(QWidget):
         self.hotkey_listener.stop()
         self.hotkey_listener.wait()
         event.accept()
+
+    def adjust_fonts(self):
+        """Adjusts font sizes based on window size for better readability."""
+        try:
+            width = self.width()
+            if width < 800:
+                font_size = 12
+            elif width < 1200:
+                font_size = 14
+            else:
+                font_size = 16
+
+            # Update fonts
+            self.player_level_label.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.player_xp_label.setFont(QFont("Arial", font_size))
+            self.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
+            self.tasks_left_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
+            self.story_text.setFont(QFont("Times New Roman", font_size))
+            self.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.heavy_attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.settings_button.setFont(QFont("Arial", font_size))
+        except Exception as e:
+            logging.error(f"Error during font adjustment: {e}")

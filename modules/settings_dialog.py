@@ -1,22 +1,26 @@
 # modules/settings_dialog.py
 
+import os
+import logging
 from PyQt5.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QTableWidget,
+    QDialog, QVBoxLayout, QHBoxLayout, QGroupBox, QPushButton, QTableWidget,
     QTableWidgetItem, QLabel, QLineEdit, QSpinBox, QCheckBox, QMessageBox,
     QHeaderView
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from .game_logic import TaskManager
+import json
 
 class SettingsDialog(QDialog):
     def __init__(self, task_manager: TaskManager, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setFixedSize(700, 500)
+        self.setFixedSize(700, 550)  # Increased height to accommodate new settings
         self.task_manager = task_manager
         self.saved = False
         self.init_ui()
+        self.load_additional_settings()
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -51,6 +55,17 @@ class SettingsDialog(QDialog):
             btn.clicked.connect(btn_slot)
             buttons_layout.addWidget(btn)
         layout.addLayout(buttons_layout)
+
+        # Additional Settings
+        additional_settings_group = QGroupBox("Additional Settings")
+        additional_layout = QVBoxLayout()
+
+        self.shake_animation_checkbox = QCheckBox("Enable Shaking Animation on Attack")
+        self.shake_animation_checkbox.setFont(QFont("Arial", 12))
+        additional_layout.addWidget(self.shake_animation_checkbox)
+
+        additional_settings_group.setLayout(additional_layout)
+        layout.addWidget(additional_settings_group)
 
         # Save and Cancel Buttons
         save_cancel_layout = QHBoxLayout()
@@ -134,8 +149,8 @@ class SettingsDialog(QDialog):
         old_task = self.task_manager.tasks.get(task_name, {})
         old_min, old_max = old_task.get('min'), old_task.get('max')
         
-        if (old_min is not None and new_min is not None and abs(new_min - old_min) > old_min * 0.5) or \
-           (old_max is not None and new_max is not None and abs(new_max - old_max) > old_max * 0.5):
+        if (old_min is not None and new_min is not None and abs(new_min - old_min) > (old_min * 0.5 if old_min else 0)) or \
+           (old_max is not None and new_max is not None and abs(new_max - old_max) > (old_max * 0.5 if old_max else 0)):
             return QMessageBox.question(self, "Confirm Change", 
                                         f"You're making a significant change to the task '{task_name}'. Are you sure?",
                                         QMessageBox.Yes | QMessageBox.No) == QMessageBox.Yes
@@ -147,6 +162,9 @@ class SettingsDialog(QDialog):
             name, min_hp, max_hp, active, no_number = dialog.get_task_data()
             if not name:
                 QMessageBox.warning(self, "Invalid Input", "Task name cannot be empty.")
+                return
+            if not no_number and (min_hp is None or max_hp is None):
+                QMessageBox.warning(self, "Invalid Input", "Both Min and Max must be set unless 'No Numbering' is selected.")
                 return
             if not no_number and min_hp > max_hp:
                 QMessageBox.warning(self, "Invalid Input", "Minimum attacks cannot exceed maximum attacks.")
@@ -180,6 +198,9 @@ class SettingsDialog(QDialog):
             new_name, new_min_hp, new_max_hp, new_active, new_no_number = dialog.get_task_data()
             if not new_name:
                 QMessageBox.warning(self, "Invalid Input", "Task name cannot be empty.")
+                return
+            if not new_no_number and (new_min_hp is None or new_max_hp is None):
+                QMessageBox.warning(self, "Invalid Input", "Both Min and Max must be set unless 'No Numbering' is selected.")
                 return
             if not new_no_number and new_min_hp > new_max_hp:
                 QMessageBox.warning(self, "Invalid Input", "Minimum attacks cannot exceed maximum attacks.")
@@ -215,95 +236,39 @@ class SettingsDialog(QDialog):
             self.task_manager.reset_to_default()
             self.refresh_task_table()
 
+    def load_additional_settings(self):
+        """Loads additional settings from a settings file."""
+        settings_dir = os.path.dirname(self.task_manager.filepath)
+        settings_file = os.path.join(settings_dir, 'settings.json')
+        if os.path.exists(settings_file):
+            try:
+                with open(settings_file, 'r') as f:
+                    settings = json.load(f)
+                shake_enabled = settings.get('shake_animation', True)
+                self.shake_animation_checkbox.setChecked(shake_enabled)
+            except Exception as e:
+                logging.error(f"Failed to load additional settings. Using defaults. Error: {e}")
+                self.shake_animation_checkbox.setChecked(True)
+        else:
+            self.shake_animation_checkbox.setChecked(True)
+
+    def save_additional_settings(self):
+        """Saves additional settings to a settings file."""
+        settings = {
+            'shake_animation': self.shake_animation_checkbox.isChecked()
+        }
+        # Use os.path.dirname to get the directory of the tasks.json file
+        settings_dir = os.path.dirname(self.task_manager.filepath)
+        settings_file = os.path.join(settings_dir, 'settings.json')
+        try:
+            with open(settings_file, 'w') as f:
+                json.dump(settings, f, indent=4)
+            logging.info(f"Additional settings saved to {settings_file}.")
+        except Exception as e:
+            logging.error(f"Failed to save additional settings. Error: {e}")
+
     def save_and_close(self):
+        self.save_additional_settings()
         self.task_manager.save_tasks()
         self.saved = True
         self.accept()
-
-class TaskEditDialog(QDialog):
-    def __init__(self, parent=None, name="", min_hp=1, max_hp=1, active=True, no_number=False):
-        super().__init__(parent)
-        self.setWindowTitle("Task Editor")
-        self.setFixedSize(400, 350)
-        self.init_ui(name, min_hp, max_hp, active, no_number)
-
-    def init_ui(self, name, min_hp, max_hp, active, no_number):
-        layout = QVBoxLayout()
-
-        # Task Name
-        name_label = QLabel("Task Name:")
-        name_label.setFont(QFont("Arial", 12))
-        layout.addWidget(name_label)
-        self.name_input = QLineEdit()
-        self.name_input.setText(name)
-        layout.addWidget(self.name_input)
-
-        # No Numbering Checkbox
-        self.no_number_checkbox = QCheckBox("No Numbering (Ignore Min and Max)")
-        self.no_number_checkbox.setChecked(no_number)
-        self.no_number_checkbox.setFont(QFont("Arial", 12))
-        self.no_number_checkbox.stateChanged.connect(self.toggle_numbering)
-        layout.addWidget(self.no_number_checkbox)
-
-        # Minimum Attacks
-        min_label = QLabel("Minimum Attacks:")
-        min_label.setFont(QFont("Arial", 12))
-        layout.addWidget(min_label)
-        self.min_hp_input = QSpinBox()
-        self.min_hp_input.setRange(0, 1000)
-        self.min_hp_input.setValue(min_hp if min_hp is not None else 0)
-        layout.addWidget(self.min_hp_input)
-
-        # Maximum Attacks
-        max_label = QLabel("Maximum Attacks:")
-        max_label.setFont(QFont("Arial", 12))
-        layout.addWidget(max_label)
-        self.max_hp_input = QSpinBox()
-        self.max_hp_input.setRange(0, 1000)
-        self.max_hp_input.setValue(max_hp if max_hp is not None else 0)
-        layout.addWidget(self.max_hp_input)
-
-        # Active Checkbox
-        self.active_checkbox = QCheckBox("Active")
-        self.active_checkbox.setChecked(active)
-        self.active_checkbox.setFont(QFont("Arial", 12))
-        layout.addWidget(self.active_checkbox)
-
-        # Buttons
-        buttons_layout = QHBoxLayout()
-        save_btn = QPushButton("Save")
-        save_btn.setFont(QFont("Arial", 10))
-        save_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFont(QFont("Arial", 10))
-        cancel_btn.clicked.connect(self.reject)
-        buttons_layout.addWidget(save_btn)
-        buttons_layout.addWidget(cancel_btn)
-        layout.addLayout(buttons_layout)
-
-        self.setLayout(layout)
-
-
-        # Initialize numbering state
-        if no_number:
-            self.toggle_numbering()
-
-    def toggle_numbering(self):
-        """Enables or disables the min and max inputs based on the 'No Numbering' checkbox."""
-        if self.no_number_checkbox.isChecked():
-            self.min_hp_input.setEnabled(False)
-            self.max_hp_input.setEnabled(False)
-            self.min_hp_input.setValue(0)
-            self.max_hp_input.setValue(0)
-        else:
-            self.min_hp_input.setEnabled(True)
-            self.max_hp_input.setEnabled(True)
-
-    def get_task_data(self):
-        """Retrieves the entered task data."""
-        name = self.name_input.text().strip()
-        no_number = self.no_number_checkbox.isChecked()
-        min_hp = self.min_hp_input.value() if not no_number else None
-        max_hp = self.max_hp_input.value() if not no_number else None
-        active = self.active_checkbox.isChecked()
-        return name, min_hp, max_hp, active, no_number
