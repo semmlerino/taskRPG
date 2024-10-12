@@ -29,7 +29,7 @@ class Player:
         self.level = 1
         self.experience = 0
         self.experience_to_next_level = 100
-        logging.info(f"Player created: Level {self.level}, XP: {self.experience}")
+        logging.info(f"Player created: Levesl {self.level}, XP: {self.experience}")
 
     def gain_experience(self, amount: int):
         self.experience += amount

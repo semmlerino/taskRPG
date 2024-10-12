@@ -86,43 +86,7 @@ class TaskRPG(QWidget):
         self.setWindowIcon(QIcon(WINDOW_ICON))  # Ensure the icon exists
         self.setFixedSize(*WINDOW_SIZE)
         
-        # Apply Light Theme Stylesheet with Softer Colors
-        self.setStyleSheet("""
-            QWidget {
-                background-color: #E8E8E8;  /* Even softer light grey background */
-                color: #000000;
-                font-family: 'Arial';
-                font-size: 18px;  /* Further increased global font size */
-            }
-            QPushButton {
-                background-color: #CCCCCC;
-                border: 1px solid #999999;
-                padding: 14px;  /* Further increased padding */
-                border-radius: 5px;
-                font-size: 18px;  /* Further increased button font size */
-            }
-            QPushButton:hover {
-                background-color: #B3B3B3;
-            }
-            QProgressBar {
-                border: 1px solid #000000;
-                border-radius: 5px;
-                text-align: center;
-                height: 30px;  /* Further increased height */
-            }
-            QProgressBar::chunk {
-                background-color: #76FF03;
-            }
-            QTextEdit {
-                font-size: 18px;  /* Further increased text area font size */
-                background-color: #FAFAFA;  /* Slightly darker to reduce brightness */
-                color: #000000;
-            }
-            QLabel {
-                font-size: 18px;  /* Further increased label font size */
-            }
-        """)
-
+       
         # Make the window always on top
         self.setWindowFlags(self.windowFlags() | Qt.WindowStaysOnTopHint)
 
