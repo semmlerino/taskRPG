@@ -210,36 +210,17 @@ class TaskRPG(QWidget):
         self.choices_layout = QHBoxLayout()
         main_layout.addLayout(self.choices_layout)
 
-        # Action Buttons Layout
-        action_buttons_layout = QHBoxLayout()
-
-        # Normal Attack Button
-        self.normal_attack_button = QPushButton("Attack (D)")
-        self.normal_attack_button.setFont(QFont("Arial", 22))
-        self.normal_attack_button.setStyleSheet("background-color: #90CAF9; color: white;")
-        self.normal_attack_button.clicked.connect(self.player_attack)
-        action_buttons_layout.addWidget(self.normal_attack_button)
-
-        # Heavy Attack Button
-        self.heavy_attack_button = QPushButton("Heavy Attack (Shift+D)")
-        self.heavy_attack_button.setFont(QFont("Arial", 22))
-        self.heavy_attack_button.setStyleSheet("background-color: #FF9800; color: white;")
-        self.heavy_attack_button.clicked.connect(self.player_heavy_attack)
-        action_buttons_layout.addWidget(self.heavy_attack_button)
-
-        # Add this new button
+        # Single Button for "Next" or "Attack"
         self.action_button = QPushButton("Next (G)")
-        self.action_button.setFont(QFont("Arial", 22))
-        self.action_button.setStyleSheet("background-color: #4CAF50; color: white;")
+        self.action_button.setFont(QFont("Arial", 22))  # Further increased font size
+        self.action_button.setStyleSheet("background-color: #90CAF9; color: white;")  # Light Blue
         self.action_button.clicked.connect(self.next_story_segment)
-        action_buttons_layout.addWidget(self.action_button)
-
-        main_layout.addLayout(action_buttons_layout)
+        main_layout.addWidget(self.action_button)
 
         # Settings Button
         self.settings_button = QPushButton("Settings")
-        self.settings_button.setFont(QFont("Arial", 22))
-        self.settings_button.setStyleSheet("background-color: #FFCC80; color: black;")
+        self.settings_button.setFont(QFont("Arial", 22))  # Further increased font size
+        self.settings_button.setStyleSheet("background-color: #FFCC80; color: black;")  # Light Orange
         self.settings_button.clicked.connect(self.open_settings)
         main_layout.addWidget(self.settings_button)
 
@@ -358,9 +339,7 @@ class TaskRPG(QWidget):
 
     def display_choices(self, choices):
         """Displays choice buttons to the player."""
-        # Hide action buttons when choices are present
-        self.normal_attack_button.hide()
-        self.heavy_attack_button.hide()
+        # Hide action button when choices are present
         self.action_button.hide()
 
         # Clear previous choices
@@ -386,16 +365,14 @@ class TaskRPG(QWidget):
             self.display_story_segment()
 
     def clear_choices(self):
-        """Clears the choice buttons and shows the action buttons."""
+        """Clears the choice buttons and shows the action button."""
         # Clear choice buttons
         for i in reversed(range(self.choices_layout.count())):
             widget_to_remove = self.choices_layout.itemAt(i).widget()
             self.choices_layout.removeWidget(widget_to_remove)
             widget_to_remove.setParent(None)
 
-        # Show action buttons
-        self.normal_attack_button.show()
-        self.heavy_attack_button.show()
+        # Show action button
         self.action_button.show()
 
     def generate_enemy(self, task_name: str, task_amount: int):
@@ -423,11 +400,13 @@ class TaskRPG(QWidget):
             logging.warning(f"Enemy image not found at {image_path}.")
             self.enemy_image_label.clear()
 
-        # Update both attack buttons
-        self.normal_attack_button.setText("Attack (D)")
-        self.heavy_attack_button.setText("Heavy Attack (Shift+D)")
-        self.normal_attack_button.setEnabled(True)
-        self.heavy_attack_button.setEnabled(True)
+        # Set action button to "Attack"
+        self.action_button.setText("Attack (D)")
+        try:
+            self.action_button.clicked.disconnect()
+        except Exception:
+            pass  # Ignore if no connection exists
+        self.action_button.clicked.connect(self.player_attack)
 
         # Display task information without the number
         self.story_text.append(f"\nDo the following task to defeat it:\n{task_name}")
@@ -440,10 +419,6 @@ class TaskRPG(QWidget):
         else:
             self.story_text.append("You must defeat the current enemy before proceeding!")
             self.highlight_last_text()
-
-        # Disable attack buttons when not in battle
-        self.normal_attack_button.setEnabled(False)
-        self.heavy_attack_button.setEnabled(False)
 
     def player_attack(self):
         """Performs a normal attack on the enemy."""
@@ -469,9 +444,13 @@ class TaskRPG(QWidget):
             else:
                 self.story_text.append("Victory! Press 'G' or click 'Next' to continue your journey.")
                 self.highlight_last_text()
-            # Disable attack buttons after victory
-            self.normal_attack_button.setEnabled(False)
-            self.heavy_attack_button.setEnabled(False)
+            # Restore action button to "Next"
+            self.action_button.setText("Next (G)")
+            try:
+                self.action_button.clicked.disconnect()
+            except Exception:
+                pass  # Ignore if no connection exists
+            self.action_button.clicked.connect(self.next_story_segment)
 
     def player_heavy_attack(self):
         """Performs a heavy attack on the enemy."""
@@ -497,9 +476,13 @@ class TaskRPG(QWidget):
             else:
                 self.story_text.append("Victory! Press 'G' or click 'Next' to continue your journey.")
                 self.highlight_last_text()
-            # Disable attack buttons after victory
-            self.normal_attack_button.setEnabled(False)
-            self.heavy_attack_button.setEnabled(False)
+            # Restore action button to "Next"
+            self.action_button.setText("Next (G)")
+            try:
+                self.action_button.clicked.disconnect()
+            except Exception:
+                pass  # Ignore if no connection exists
+            self.action_button.clicked.connect(self.next_story_segment)
 
     def display_victory(self):
         """Displays victory message and awards experience points."""

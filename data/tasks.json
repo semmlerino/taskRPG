@@ -1,6 +1,6 @@
 {
     "Mails": {
-        "min": 8,
+        "min": 6,
         "max": 15,
         "active": true
     },
@@ -10,7 +10,7 @@
         "active": false
     },
     "ToDo": {
-        "min": 1,
+        "min": 3,
         "max": 3,
         "active": false
     },
