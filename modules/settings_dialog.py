@@ -1,4 +1,4 @@
-# modules/settings_dialog.py
+# dir: modules/settings_dialog.py
 
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QListWidget,
