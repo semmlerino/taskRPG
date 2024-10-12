@@ -1,0 +1,72 @@
+{
+    "Mails": {
+        "min": 8,
+        "max": 15,
+        "active": true
+    },
+    "Clean Room": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "ToDo": {
+        "min": 1,
+        "max": 3,
+        "active": false
+    },
+    "Gym": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "Tabs": {
+        "min": 4,
+        "max": 10,
+        "active": true
+    },
+    "GPTs": {
+        "min": 5,
+        "max": 25,
+        "active": true
+    },
+    "Perplexities": {
+        "min": 2,
+        "max": 4,
+        "active": true
+    },
+    "Claudes": {
+        "min": 3,
+        "max": 7,
+        "active": true
+    },
+    "Gemini": {
+        "min": 2,
+        "max": 5,
+        "active": true
+    },
+    "FitRPG": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "KanaRPG": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "3DE scripting": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "SG scripting": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "Clean Room (1 Thema des Tages)": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    }
+}

@@ -1,0 +1,30 @@
+{
+    "start": {
+        "text": "You wake up in a mysterious land with no memory of how you got there.",
+        "choices": [
+            {
+                "text": "Explore the surrounding area",
+                "next": "explore_area"
+            }
+        ]
+    },
+    "explore_area": {
+        "text": "As you explore, you encounter a Wild Wolf.",
+        "battle": {
+            "message": "A wild Wolf growls at you, preparing to attack!"
+        }
+    },
+    "wolf_defeated": {
+        "text": "You have defeated the Wolf and feel a sense of accomplishment.",
+        "choices": [
+            {
+                "text": "Press 'G' or click 'Next' to continue your journey.",
+                "next": "start"
+            }
+        ]
+    },
+    "end": {
+        "text": "Your journey continues beyond this point. Thank you for playing!",
+        "choices": []
+    }
+}
