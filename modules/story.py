@@ -8,6 +8,7 @@ import uuid
 from typing import Dict, Any, Optional, List
 from urllib import request as urllib_request
 from urllib.error import URLError, HTTPError
+from urllib.parse import urlencode  # Corrected import
 import requests
 from PIL import Image
 from io import BytesIO
@@ -470,7 +471,7 @@ class StoryManager:
                 'subfolder': subfolder,
                 'type': folder_type
             }
-            query_string = urllib_request.urlencode(params)
+            query_string = urlencode(params)  # Correctly using urlencode from urllib.parse
             url = f"http://{server_address}/view?{query_string}"
             with urllib_request.urlopen(url) as response:
                 return response.read()
