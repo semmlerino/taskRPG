@@ -7,7 +7,7 @@ import json
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QTextEdit, QProgressBar, QMessageBox, QDialog, QListWidget, QListWidgetItem,
-    QGroupBox, QSizePolicy, QStatusBar, QAbstractItemView
+    QGroupBox, QSizePolicy, QStatusBar, QAbstractItemView, QProgressDialog
 )
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QTextCursor, QPixmap
@@ -18,12 +18,16 @@ from .game_logic import Player, Enemy, TaskManager
 from .story import StoryManager
 from .hotkeys import GlobalHotkeys
 from .settings_dialog import SettingsDialog
+from .image_generator import ImageGenerator
+from .ui_components import (
+    PlayerPanel, EnemyPanel, StoryDisplay, ActionButtons, ChoicesPanel
+)
+from typing import Dict, Any
 
 from PIL import Image
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 class StorySelectionDialog(QDialog):
     """
@@ -124,20 +128,43 @@ class StorySelectionDialog(QDialog):
                 ]
             },
             "forest": {
-                "text": "You venture into the forest and encounter a mysterious stranger.",
+                "text": "You venture into the forest and encounter a mystical stag.",
                 "battle": {
                     "enemy": "Forest Troll",
                     "message": "A Forest Troll blocks your path with a menacing glare!"
                 },
-                "next": "victory"
+                "choices": [
+                    {
+                        "text": "Attack the Troll",
+                        "next": "victory"
+                    },
+                    {
+                        "text": "Run away",
+                        "next": "retreat"
+                    }
+                ]
             },
             "victory": {
                 "text": "You have defeated the Forest Troll and continue your journey.",
-                "end": True
+                "choices": [
+                    {
+                        "text": "Press 'G' or click 'Next' to continue your journey.",
+                        "next": "end"
+                    }
+                ]
+            },
+            "retreat": {
+                "text": "You decide it's best not to meddle with mystical forces and head back home.",
+                "choices": [
+                    {
+                        "text": "Press 'G' or click 'Next' to conclude your adventure.",
+                        "next": "end"
+                    }
+                ]
             },
             "end": {
                 "text": "Thank you for playing the Default Story!",
-                "end": True
+                "choices": []
             }
         }
         default_story_path = os.path.join(STORIES_DIR, "default_story.json")
@@ -162,22 +189,20 @@ class StorySelectionDialog(QDialog):
         else:
             QMessageBox.warning(self, "No Selection", "Please select a story to load.")
 
-
 class ImageGenerationThread(QThread):
     """
     Thread class for generating images without freezing the UI.
     """
     image_generated = pyqtSignal(str)
 
-    def __init__(self, story_manager, prompt):
+    def __init__(self, image_generator: ImageGenerator, prompt: str):
         super().__init__()
-        self.story_manager = story_manager
+        self.image_generator = image_generator
         self.prompt = prompt
 
     def run(self):
-        image_path = self.story_manager.generate_image(self.prompt)
+        image_path = self.image_generator.generate_image(self.prompt)
         self.image_generated.emit(image_path)
-
 
 class TaskRPG(QWidget):
     """
@@ -201,7 +226,8 @@ class TaskRPG(QWidget):
         self.paused = False
         self.story_in_battle = False
 
-        # Initialize Story Manager
+        # Initialize ImageGenerator and StoryManager
+        self.image_generator = ImageGenerator()
         self.story_manager = None  # Will be initialized after story selection
 
         # Initialize Status Bar before init_ui to prevent AttributeError
@@ -240,61 +266,13 @@ class TaskRPG(QWidget):
         top_layout = QHBoxLayout()
         top_layout.setSpacing(30)
 
-        # Player Info Group
-        player_group = QGroupBox("Player Stats")
-        player_layout = QVBoxLayout()
+        # Player Panel
+        self.player_panel = PlayerPanel(self.player)
+        top_layout.addWidget(self.player_panel)
 
-        self.player_level_label = QLabel(f"Level: {self.player.level}")
-        self.player_level_label.setFont(QFont("Arial", 14, QFont.Bold))
-        self.player_xp_label = QLabel(f"XP: {self.player.experience}/{self.player.experience_to_next_level}")
-        self.player_xp_label.setFont(QFont("Arial", 14))
-
-        player_layout.addWidget(self.player_level_label)
-        player_layout.addWidget(self.player_xp_label)
-
-        # Inventory Label
-        self.inventory_label = QLabel("Inventory: Empty")
-        self.inventory_label.setFont(QFont("Arial", 12))
-        self.inventory_label.setWordWrap(True)
-        player_layout.addWidget(self.inventory_label)
-
-        player_group.setLayout(player_layout)
-
-        # Enemy Info Group
-        enemy_group = QGroupBox("Enemy Stats")
-        enemy_layout = QVBoxLayout()
-
-        self.enemy_label = QLabel("No Enemy")
-        self.enemy_label.setFont(QFont("Arial", 16, QFont.Bold))
-        self.enemy_label.setAlignment(Qt.AlignCenter)
-
-        self.task_label = QLabel("")  # New label for Task Name
-        self.task_label.setFont(QFont("Arial", 12, italic=True))
-        self.task_label.setAlignment(Qt.AlignCenter)
-        self.task_label.setStyleSheet("color: #616161;")  # Dark Grey
-
-        self.enemy_hp_bar = QProgressBar()
-        self.enemy_hp_bar.setMaximum(100)
-        self.enemy_hp_bar.setValue(0)
-        self.enemy_hp_bar.setFormat("%p%")
-        self.enemy_hp_bar.setAlignment(Qt.AlignCenter)
-        self.enemy_hp_bar.setTextVisible(True)
-        self.enemy_hp_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid grey;
-                border-radius: 5px;
-                text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #76FF03;
-                width: 20px;
-            }
-        """)
-
-        enemy_layout.addWidget(self.enemy_label)
-        enemy_layout.addWidget(self.task_label)  # Add Task Label below Enemy Name
-        enemy_layout.addWidget(self.enemy_hp_bar)
-        enemy_group.setLayout(enemy_layout)
+        # Enemy Panel
+        self.enemy_panel = EnemyPanel()
+        top_layout.addWidget(self.enemy_panel)
 
         # Tasks Left Group
         tasks_group = QGroupBox("Tasks Left")
@@ -308,104 +286,25 @@ class TaskRPG(QWidget):
         tasks_layout.addWidget(self.tasks_left_label)
         tasks_group.setLayout(tasks_layout)
 
-        top_layout.addWidget(player_group)
-        top_layout.addWidget(enemy_group)
         top_layout.addWidget(tasks_group)
         main_layout.addLayout(top_layout)
 
-        # Enemy Image / Story Image
-        self.image_label = QLabel()
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.image_label.setStyleSheet("background-color: #E0E0E0; border: 1px solid #BDBDBD; border-radius: 10px;")
-        main_layout.addWidget(self.image_label)
+        # Story Display
+        self.story_display = StoryDisplay()
+        main_layout.addWidget(self.story_display)
 
-        # Story Display Area (Text Log)
-        self.story_text = QTextEdit()
-        self.story_text.setReadOnly(True)
-        self.story_text.setFont(QFont("Times New Roman", 16))
-        self.story_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #FAFAFA;
-                color: #212121;
-                border: 2px solid #BDBDBD;
-                border-radius: 5px;
-            }
-        """)
-        main_layout.addWidget(self.story_text)
+        # Choices Panel
+        self.choices_panel = ChoicesPanel()
+        main_layout.addWidget(self.choices_panel)
 
-        # Choices Layout
-        self.choices_layout = QHBoxLayout()
-        self.choices_layout.setSpacing(20)
-        main_layout.addLayout(self.choices_layout)
-
-        # Action Buttons Layout
-        action_buttons_layout = QHBoxLayout()
-        action_buttons_layout.setSpacing(20)
-
-        # Next Button
-        self.next_button = QPushButton("Next (G)")
-        self.next_button.setFont(QFont("Arial", 14, QFont.Bold))
-        self.next_button.setStyleSheet("""
-            QPushButton {
-                background-color: #42A5F5;
-                color: white;
-                padding: 10px 20px;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #1E88E5;
-            }
-        """)
-        self.next_button.clicked.connect(self.next_story_segment)
-        self.next_button.setFixedHeight(50)
-        self.next_button.setToolTip("Proceed to the next story segment (Shortcut: G)")
-        action_buttons_layout.addWidget(self.next_button)
-
-        # Attack Button
-        self.attack_button = QPushButton("Attack (D)")
-        self.attack_button.setFont(QFont("Arial", 14, QFont.Bold))
-        self.attack_button.setStyleSheet("""
-            QPushButton {
-                background-color: #66BB6A;
-                color: white;
-                padding: 10px 20px;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #43A047;
-            }
-        """)
-        self.attack_button.clicked.connect(self.player_attack)
-        self.attack_button.setFixedHeight(50)
-        self.attack_button.setToolTip("Perform a regular attack (Shortcut: D)")
-        self.attack_button.hide()  # Initially hidden
-        action_buttons_layout.addWidget(self.attack_button)
-
-        # Heavy Attack Button
-        self.heavy_attack_button = QPushButton("Heavy Attack (Shift+D)")
-        self.heavy_attack_button.setFont(QFont("Arial", 14, QFont.Bold))
-        self.heavy_attack_button.setStyleSheet("""
-            QPushButton {
-                background-color: #EF5350;
-                color: white;
-                padding: 10px 20px;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #E53935;
-            }
-        """)
-        self.heavy_attack_button.clicked.connect(self.player_heavy_attack)
-        self.heavy_attack_button.setFixedHeight(50)
-        self.heavy_attack_button.setToolTip("Perform a heavy attack (Shortcut: Shift+D)")
-        self.heavy_attack_button.hide()  # Initially hidden
-        action_buttons_layout.addWidget(self.heavy_attack_button)
-
-        main_layout.addLayout(action_buttons_layout)
+        # Action Buttons
+        self.action_buttons = ActionButtons()
+        self.action_buttons.connect_buttons(
+            next_func=self.next_story_segment,
+            attack_func=self.player_attack,
+            heavy_attack_func=self.player_heavy_attack
+        )
+        main_layout.addWidget(self.action_buttons)
 
         # Settings Button
         self.settings_button = QPushButton("Settings")
@@ -450,20 +349,34 @@ class TaskRPG(QWidget):
         dialog = StorySelectionDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             selected_story = dialog.selected_story
-            self.story_manager = StoryManager(selected_story)
+            self.story_manager = StoryManager(selected_story, image_generator=self.image_generator)
             logging.info(f"Story loaded from {selected_story}.")
+            self.generate_all_images()
             self.display_story_segment()
         else:
             # If no story selected, exit the application
             QMessageBox.information(self, "No Story Selected", "No story selected. Exiting the game.")
             self.close()
 
-    def append_story_text(self, html_content: str):
-        """Appends HTML content to the story text area with proper formatting."""
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(html_content)
-        self.story_text.insertHtml("<br>")
-        self.scroll_to_end()
+    def generate_all_images(self):
+        """Generates all images for the story at the beginning."""
+        image_prompts = self.story_manager.get_all_image_prompts()
+        total_images = len(image_prompts)
+        
+        progress_dialog = QProgressDialog("Generating images...", "Cancel", 0, total_images, self)
+        progress_dialog.setWindowModality(Qt.WindowModal)
+        
+        for i, (node_key, prompt) in enumerate(image_prompts.items()):
+            if progress_dialog.wasCanceled():
+                break
+            
+            image_path = self.image_generator.generate_image(prompt)
+            if image_path:
+                self.story_manager.set_generated_image(node_key, image_path)
+            
+            progress_dialog.setValue(i + 1)
+        
+        progress_dialog.close()
 
     def display_story_segment(self):
         """Displays the current segment of the story."""
@@ -475,41 +388,38 @@ class TaskRPG(QWidget):
         items = self.story_manager.get_items()
         battle_info = self.story_manager.get_battle_info()
         choices = self.story_manager.get_choices()
-        image_prompt = self.story_manager.get_image_prompt()
-
+        
         # Display main narrative text
-        self.append_story_text(f"<p>{text}</p>")
+        self.story_display.append_text(f"<p>{text}</p>")
 
-        # Generate and display image if available
-        if image_prompt:
-            self.image_label.setText("Generating image...")
-            self.image_thread = ImageGenerationThread(self.story_manager, image_prompt)
-            self.image_thread.image_generated.connect(self.display_generated_image)
-            self.image_thread.start()
+        # Display pre-generated image if available
+        image_path = self.story_manager.get_generated_image(self.story_manager.current_node_key)
+        if image_path:
+            self.story_display.display_image(image_path)
         else:
-            self.image_label.clear()
+            self.story_display.display_image("")  # Clear image
 
         # Display environment description if available
         if environment:
-            self.append_story_text(f"<p><i>Environment:</i> {environment}</p>")
+            self.story_display.append_text(f"<p><i>Environment:</i> {environment}</p>")
 
         # Display event description if available
         if event:
-            self.append_story_text(f"<p><i>Event:</i> {event}</p>")
+            self.story_display.append_text(f"<p><i>Event:</i> {event}</p>")
 
         # Display NPC dialogue if available
         if npc_info:
             npc_name = npc_info.get("name", "Unknown NPC")
             dialogue = npc_info.get("dialogue", "")
-            self.append_story_text(f"<p><b>{npc_name} says:</b> \"{dialogue}\"</p>")
+            self.story_display.append_text(f"<p><b>{npc_name} says:</b> \"{dialogue}\"</p>")
 
         # Display items found if available
         if items:
             items_list = ', '.join(items)
-            self.append_story_text(f"<p><i>You have acquired:</i> {items_list}</p>")
+            self.story_display.append_text(f"<p><i>You have acquired:</i> {items_list}</p>")
             for item in items:
                 self.player.inventory.add_item(item)
-            self.update_inventory_display()
+            self.player_panel.update_panel()
 
         if battle_info:
             # Initiate battle with a random task from tasks.json
@@ -522,7 +432,7 @@ class TaskRPG(QWidget):
                 task_max = task['max']
                 task_amount = random.randint(task_min, task_max)
                 # Insert both messages together within paragraphs
-                self.append_story_text(
+                self.story_display.append_text(
                     f"<p><i>{message}</i></p>"
                     f"<p>To defeat the <b>{enemy_name}</b>, you need to complete the task: <b>{task_name}</b></p>"
                 )
@@ -533,147 +443,27 @@ class TaskRPG(QWidget):
                 QMessageBox.critical(self, "Error", "No active tasks available to assign to enemy.")
         elif choices:
             # Display choices
-            self.display_choices(choices)
+            self.choices_panel.display_choices(choices, self.make_choice)
         else:
             # End of story or continue to next node
             if self.story_manager.is_end():
-                self.append_story_text("<br><b>The End.</b><br>")
-                self.next_button.hide()
-                self.attack_button.hide()
-                self.heavy_attack_button.hide()
+                self.story_display.append_text("<br><b>The End.</b><br>")
+                self.action_buttons.hide_attack_buttons()
                 self.settings_button.setEnabled(False)
                 self.status_bar.showMessage("Story concluded.")
             else:
-                self.append_story_text("<br>Press 'G' or click 'Next' to continue.<br>")
-                self.next_button.show()
+                self.story_display.append_text("<br>Press 'G' or click 'Next' to continue.<br>")
+                self.action_buttons.show_attack_buttons()  # Ensure correct button visibility
+                self.action_buttons.next_button.show()
                 self.status_bar.showMessage("Awaiting your next move.")
 
-    def display_generated_image(self, image_path):
-        """Displays the generated image."""
-        if image_path and os.path.exists(image_path):
-            pixmap = QPixmap(image_path).scaled(
-                self.image_label.width(),
-                self.image_label.height(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.image_label.setPixmap(pixmap)
-        else:
-            self.image_label.clear()
-
-    def scroll_to_end(self):
-        """Scrolls the QTextEdit to the end."""
-        cursor = self.story_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.story_text.setTextCursor(cursor)
-
-    def update_status(self):
-        """Updates the status displays for the enemy and player."""
-        if self.current_enemy:
-            # Update "Tasks Left" to show enemy's remaining attacks
-            self.tasks_left_label.setText(str(self.current_enemy.current_hp))
-
-            # Update Enemy Info
-            self.enemy_label.setText(f"{self.current_enemy.name}")
-            self.task_label.setText(f"Task: {self.current_enemy.task_name}")  # Set Task Name
-            if self.current_enemy.max_hp > 0:
-                self.enemy_hp_bar.setMaximum(self.current_enemy.max_hp)
-                self.enemy_hp_bar.setValue(self.current_enemy.current_hp)
-
-                # Update HP Bar Color
-                hp_percentage = (self.current_enemy.current_hp / self.current_enemy.max_hp) * 100
-                if hp_percentage > 60:
-                    color = "#76FF03"  # Green
-                elif hp_percentage > 30:
-                    color = "#FF9800"  # Orange
-                else:
-                    color = "#F44336"  # Red
-
-                self.enemy_hp_bar.setStyleSheet(f"""
-                    QProgressBar::chunk {{
-                        background-color: {color};
-                    }}
-                """)
-            else:
-                self.enemy_hp_bar.setValue(0)
-                self.enemy_hp_bar.setStyleSheet("QProgressBar::chunk { background-color: #F44336; }")
-        else:
-            # Reset "Tasks Left" to show number of active tasks
-            tasks_left = self.task_manager.get_active_tasks_count()
-            self.tasks_left_label.setText(str(tasks_left))
-
-            # Reset Enemy Info
-            self.enemy_label.setText("No Enemy")
-            self.task_label.setText("")  # Clear Task Name
-            self.enemy_hp_bar.setValue(0)
-            self.enemy_hp_bar.setStyleSheet("QProgressBar::chunk { background-color: #76FF03; }")
-            # Clear enemy image if no enemy
-            self.image_label.clear()
-
-        # Update Player Info
-        self.player_level_label.setText(f"Level: {self.player.level}")
-        self.player_xp_label.setText(f"XP: {self.player.experience}/{self.player.experience_to_next_level}")
-
-        # Update Inventory Display
-        self.update_inventory_display()
-
-    def update_inventory_display(self):
-        """Updates the inventory display in the UI."""
-        inventory_items = self.player.inventory.get_items()
-        if inventory_items:
-            items_text = ', '.join(inventory_items)
-            self.inventory_label.setText(f"Inventory: {items_text}")
-        else:
-            self.inventory_label.setText("Inventory: Empty")
-
-    def display_choices(self, choices):
-        """Displays choice buttons to the player."""
-        # Hide action buttons when choices are present
-        self.next_button.hide()
-        self.attack_button.hide()
-        self.heavy_attack_button.hide()
-
-        # Clear previous choices
-        self.clear_choices()
-
-        # Create new choice buttons
-        for choice in choices:
-            btn = QPushButton(choice['text'])
-            btn.setFont(QFont("Arial", 12))
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #81A1C1;
-                    color: white;
-                    padding: 10px 20px;
-                    border: none;
-                    border-radius: 5px;
-                }
-                QPushButton:hover {
-                    background-color: #5E81AC;
-                }
-            """)
-            btn.setToolTip(f"Choose this option")
-            btn.clicked.connect(lambda checked, c=choice: self.make_choice(c))
-            self.choices_layout.addWidget(btn)
-
-        # Add stretch to push buttons to the left
-        self.choices_layout.addStretch()
-
-    def make_choice(self, choice):
+    def make_choice(self, choice: Dict[str, Any]):
         """Handles the player's choice."""
         next_node = choice.get('next')
         if next_node:
             self.story_manager.set_current_node(next_node)
-            self.clear_choices()
+            self.choices_panel.clear_choices()
             self.display_story_segment()
-
-    def clear_choices(self):
-        """Clears the choice buttons."""
-        # Clear choice buttons
-        while self.choices_layout.count():
-            child = self.choices_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
 
     def generate_enemy(self, enemy_name: str, task_name: str, task_amount: int):
         """
@@ -688,19 +478,11 @@ class TaskRPG(QWidget):
 
             # Create Enemy with attacks required
             self.current_enemy = Enemy(name=enemy_name, hp=task_amount, task_name=task_name)
-            self.update_status()
-
-            # Generate image for the enemy using Stable Diffusion
-            enemy_image_prompt = f"A depiction of {enemy_name}, an enemy in an RPG game."
-            self.image_label.setText("Generating enemy image...")
-            self.image_thread = ImageGenerationThread(self.story_manager, enemy_image_prompt)
-            self.image_thread.image_generated.connect(self.display_generated_image)
-            self.image_thread.start()
+            self.enemy_panel.update_panel(self.current_enemy)
+            self.update_tasks_left()
 
             # Show Attack and Heavy Attack buttons, hide Next button
-            self.next_button.hide()
-            self.attack_button.show()
-            self.heavy_attack_button.show()
+            self.action_buttons.show_attack_buttons()
 
             # Update status bar
             self.status_bar.showMessage(f"A {self.current_enemy.name} appears! Complete the task '{self.current_enemy.task_name}' to defeat it.")
@@ -710,6 +492,14 @@ class TaskRPG(QWidget):
         except Exception as e:
             logging.error(f"Failed to generate enemy. Error: {e}")
             QMessageBox.critical(self, "Error", "An unexpected error occurred while generating the enemy.")
+
+    def update_tasks_left(self):
+        """Updates the 'Tasks Left' display."""
+        if self.current_enemy:
+            self.tasks_left_label.setText(str(self.current_enemy.current_hp))
+        else:
+            tasks_left = self.task_manager.get_active_tasks_count()
+            self.tasks_left_label.setText(str(tasks_left))
 
     def next_story_segment(self):
         """Proceeds to the next segment of the story or notifies if in battle."""
@@ -734,8 +524,9 @@ class TaskRPG(QWidget):
             # Player attacks enemy
             player_damage = 1  # Each attack reduces attacks left by 1
             self.current_enemy.take_damage(player_damage)
-            self.append_story_text(f"<p>You attack the <b>{self.current_enemy.name}</b> and deal <b>{player_damage}</b> damage!</p>")
-            self.update_status()
+            self.story_display.append_text(f"<p>You attack the <b>{self.current_enemy.name}</b> and deal <b>{player_damage}</b> damage!</p>")
+            self.enemy_panel.update_panel(self.current_enemy)
+            self.update_tasks_left()
 
             # Trigger shaking animation if enabled
             self.trigger_shake_animation()
@@ -744,17 +535,17 @@ class TaskRPG(QWidget):
                 self.display_victory()
                 defeated_node = f"{self.current_enemy.name.lower()}_defeated"
                 self.current_enemy = None
-                self.update_status()
+                self.enemy_panel.update_panel(None)
+                self.update_tasks_left()
                 # Move to the node corresponding to victory
                 if defeated_node in self.story_manager.story_data:
                     self.story_manager.set_current_node(defeated_node)
                     self.display_story_segment()
                 else:
-                    self.append_story_text("<p>Victory! Press 'G' or click 'Next' to continue your journey.</p>")
+                    self.story_display.append_text("<p>Victory! Press 'G' or click 'Next' to continue your journey.</p>")
                 # Hide Attack and Heavy Attack buttons, show Next button
-                self.attack_button.hide()
-                self.heavy_attack_button.hide()
-                self.next_button.show()
+                self.action_buttons.hide_attack_buttons()
+                self.action_buttons.next_button.show()
                 self.status_bar.showMessage("Enemy defeated! Proceeding to next segment.")
         except Exception as e:
             logging.error(f"Error during attack: {e}")
@@ -769,8 +560,9 @@ class TaskRPG(QWidget):
             # Player performs heavy attack
             player_damage = 2  # Each heavy attack reduces attacks left by 2
             self.current_enemy.take_damage(player_damage)
-            self.append_story_text(f"<p>You perform a heavy attack on the <b>{self.current_enemy.name}</b> dealing <b>{player_damage}</b> damage!</p>")
-            self.update_status()
+            self.story_display.append_text(f"<p>You perform a heavy attack on the <b>{self.current_enemy.name}</b> dealing <b>{player_damage}</b> damage!</p>")
+            self.enemy_panel.update_panel(self.current_enemy)
+            self.update_tasks_left()
 
             # Trigger shaking animation if enabled
             self.trigger_shake_animation()
@@ -779,17 +571,17 @@ class TaskRPG(QWidget):
                 self.display_victory()
                 defeated_node = f"{self.current_enemy.name.lower()}_defeated"
                 self.current_enemy = None
-                self.update_status()
+                self.enemy_panel.update_panel(None)
+                self.update_tasks_left()
                 # Move to the node corresponding to victory
                 if defeated_node in self.story_manager.story_data:
                     self.story_manager.set_current_node(defeated_node)
                     self.display_story_segment()
                 else:
-                    self.append_story_text("<p>Victory! Press 'G' or click 'Next' to continue your journey.</p>")
+                    self.story_display.append_text("<p>Victory! Press 'G' or click 'Next' to continue your journey.</p>")
                 # Hide Attack and Heavy Attack buttons, show Next button
-                self.attack_button.hide()
-                self.heavy_attack_button.hide()
-                self.next_button.show()
+                self.action_buttons.hide_attack_buttons()
+                self.action_buttons.next_button.show()
                 self.status_bar.showMessage("Enemy defeated! Proceeding to next segment.")
         except Exception as e:
             logging.error(f"Error during heavy attack: {e}")
@@ -804,10 +596,10 @@ class TaskRPG(QWidget):
                 f"Victory! The <b>{self.current_enemy.name}</b> is no more.",
                 f"You emerge triumphant over the <b>{self.current_enemy.name}</b>!"
             ]
-            self.append_story_text(f"<p>{random.choice(victory_messages)}</p>")
+            self.story_display.append_text(f"<p>{random.choice(victory_messages)}</p>")
             xp_gained = max(10, self.current_enemy.max_hp // 2)  # Ensure minimum XP
             self.player.gain_experience(xp_gained)
-            self.append_story_text(f"<p>You gained <b>{xp_gained}</b> experience points!</p>")
+            self.story_display.append_text(f"<p>You gained <b>{xp_gained}</b> experience points!</p>")
 
             # Update status bar
             self.status_bar.showMessage(f"You gained {xp_gained} XP!")
@@ -851,10 +643,10 @@ class TaskRPG(QWidget):
         """Pauses or resumes the game."""
         self.paused = not self.paused
         if self.paused:
-            self.append_story_text("<p><i>Game paused.</i></p>")
+            self.story_display.append_text("<p><i>Game paused.</i></p>")
             self.status_bar.showMessage("Game paused.")
         else:
-            self.append_story_text("<p><i>Game resumed.</i></p>")
+            self.story_display.append_text("<p><i>Game resumed.</i></p>")
             self.status_bar.showMessage("Game resumed.")
 
     def open_settings(self):
@@ -873,16 +665,15 @@ class TaskRPG(QWidget):
                         shake_enabled = settings.get('shake_animation', True)
                         # Notify the user about the change
                         status = "enabled" if shake_enabled else "disabled"
-                        self.append_story_text(f"<p>Shaking animation has been <b>{status}</b>.</p>")
+                        self.story_display.append_text(f"<p>Shaking animation has been <b>{status}</b>.</p>")
                         self.status_bar.showMessage(f"Shaking animation {status}.")
                     except Exception as e:
                         logging.error(f"Failed to load settings after saving. Error: {e}")
-                self.append_story_text("<p>Settings updated successfully.</p>")
+                self.story_display.append_text("<p>Settings updated successfully.</p>")
                 self.status_bar.showMessage("Settings updated successfully.")
                 # Update "Tasks Left" if not in battle
                 if not self.current_enemy:
-                    self.update_status()
-
+                    self.update_tasks_left()
     def closeEvent(self, event):
         """Handles the window close event. Stops hotkey listener thread."""
         self.hotkey_listener.stop()
@@ -900,17 +691,34 @@ class TaskRPG(QWidget):
             else:
                 font_size = 16
 
-            # Update fonts
-            self.player_level_label.setFont(QFont("Arial", font_size, QFont.Bold))
-            self.player_xp_label.setFont(QFont("Arial", font_size))
-            self.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
-            self.task_label.setFont(QFont("Arial", font_size, italic=True))
-            self.tasks_left_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
-            self.inventory_label.setFont(QFont("Arial", font_size))
-            self.story_text.setFont(QFont("Times New Roman", font_size))
-            self.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
-            self.attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
-            self.heavy_attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            # Update fonts in Player Panel
+            self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.player_panel.xp_label.setFont(QFont("Arial", font_size))
+            self.player_panel.inventory_label.setFont(QFont("Arial", font_size))
+
+            # Update fonts in Enemy Panel
+            self.enemy_panel.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
+            self.enemy_panel.task_label.setFont(QFont("Arial", font_size, italic=True))
+            self.enemy_panel.hp_bar.setFont(QFont("Arial", font_size))
+
+            # Update fonts in Story Display
+            self.story_display.story_text.setFont(QFont("Times New Roman", font_size))
+            self.story_display.image_label.setFont(QFont("Arial", font_size))
+
+            # Update fonts in Action Buttons
+            self.action_buttons.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.action_buttons.attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            self.action_buttons.heavy_attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+
+            # Update fonts in Settings Button
             self.settings_button.setFont(QFont("Arial", font_size))
+
+            # Update fonts in Choices Panel
+            for i in range(self.choices_panel.layout.count()):
+                item = self.choices_panel.layout.itemAt(i)
+                if item.widget():
+                    item.widget().setFont(QFont("Arial", font_size))
         except Exception as e:
             logging.error(f"Error during font adjustment: {e}")
+
+# End of TaskRPG class
