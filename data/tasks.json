@@ -29,11 +29,6 @@
         "max": 25,
         "active": true
     },
-    "Perplexities": {
-        "min": 2,
-        "max": 4,
-        "active": true
-    },
     "Gemini": {
         "min": 2,
         "max": 5,
@@ -67,6 +62,11 @@
     "Claude": {
         "min": 3,
         "max": 7,
+        "active": true
+    },
+    "Perplexity": {
+        "min": 2,
+        "max": 4,
         "active": true
     }
 }

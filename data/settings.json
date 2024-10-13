@@ -1,3 +1,4 @@
 {
-    "shake_animation": false
+    "shake_animation": true,
+    "enable_image_generation": true
 }

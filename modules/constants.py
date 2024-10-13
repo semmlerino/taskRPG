@@ -11,10 +11,15 @@ DATA_DIR = os.path.join(BASE_DIR, 'data')
 # Assets directory
 ASSETS_DIR = os.path.join(BASE_DIR, 'assets')
 
+# Stories directory
+STORIES_DIR = os.path.join(BASE_DIR, 'stories')  # New line added
+
 # Paths to JSON files
 TASKS_FILE = os.path.join(DATA_DIR, 'tasks.json')
-STORY_LINEAR_FILE = os.path.join(DATA_DIR, 'story_linear.json')
-STORY_ADVANCED_FILE = os.path.join(DATA_DIR, 'story_advanced.json')
+# Removed static story file paths for dynamic detection
+# STORY_LINEAR_FILE = os.path.join(DATA_DIR, 'story_linear.json')
+# STORY_ADVANCED_FILE = os.path.join(DATA_DIR, 'story_advanced.json')
+STORY_DEFAULT_FILE = os.path.join(DATA_DIR, 'story_linear.json')  # Optional: default story
 
 # Default tasks in case tasks.json fails to load
 DEFAULT_TASKS = {

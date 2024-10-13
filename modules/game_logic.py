@@ -9,13 +9,15 @@ from .constants import TASKS_FILE, DEFAULT_TASKS
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+
 class Enemy:
-    def __init__(self, name: str, hp: int, image_path: str = None):
+    def __init__(self, name: str, hp: int, task_name: str, image_path: str = None):
         self.name = name
         self.max_hp = hp
         self.current_hp = hp
+        self.task_name = task_name  # New attribute for Task Name
         self.image_path = image_path
-        logging.info(f"Enemy created: {self.name} with HP: {self.max_hp}")
+        logging.info(f"Enemy created: {self.name} with HP: {self.max_hp} for Task: {self.task_name}")
 
     def take_damage(self, amount: int):
         self.current_hp = max(0, self.current_hp - amount)
@@ -24,12 +26,34 @@ class Enemy:
     def is_defeated(self) -> bool:
         return self.current_hp <= 0
 
+
+class Inventory:
+    def __init__(self):
+        self.items = []
+
+    def add_item(self, item_name: str):
+        self.items.append(item_name)
+        logging.info(f"Item added to inventory: {item_name}")
+
+    def remove_item(self, item_name: str):
+        if item_name in self.items:
+            self.items.remove(item_name)
+            logging.info(f"Item removed from inventory: {item_name}")
+
+    def has_item(self, item_name: str) -> bool:
+        return item_name in self.items
+
+    def get_items(self) -> List[str]:
+        return self.items.copy()
+
+
 class Player:
     def __init__(self):
         self.level = 1
         self.experience = 0
         self.experience_to_next_level = 100
-        logging.info(f"Player created: Levesl {self.level}, XP: {self.experience}")
+        self.inventory = Inventory()  # Ensure this line exists
+        logging.info(f"Player created: Level {self.level}, XP: {self.experience}")
 
     def gain_experience(self, amount: int):
         self.experience += amount
@@ -48,6 +72,7 @@ class Player:
 
     def is_defeated(self) -> bool:
         return False
+
 
 class TaskManager:
     def __init__(self, filepath: str = TASKS_FILE):

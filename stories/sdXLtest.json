@@ -1,0 +1,95 @@
+{
+    "title": "The Enchanted Forest",
+    "start": {
+        "text": "You find yourself at the entrance of the Enchanted Forest, where the trees whisper ancient secrets.",
+        "image_prompt": "An epic fantasy scene of an enchanted forest entrance with towering ancient trees whose branches twist into elaborate patterns, bioluminescent flora illuminating the path, ethereal mist, highly detailed, ultra-realistic, 8k resolution, in the style of Greg Rutkowski and Alphonse Mucha, cinematic lighting",
+        "choices": [
+            {
+                "text": "Enter the forest",
+                "next": "deep_forest"
+            },
+            {
+                "text": "Walk along the forest edge",
+                "next": "forest_edge"
+            }
+        ]
+    },
+    "deep_forest": {
+        "text": "As you venture deeper, the forest comes alive with magical creatures. A mystical stag with antlers adorned by glowing crystals appears.",
+        "image_prompt": "A majestic mystical stag with crystalline antlers emitting a soft glow, surrounded by enchanted forest creatures, intricate details, photorealistic, 8k, dramatic backlighting, by artgerm and wlop",
+        "npc": {
+            "name": "Mystical Stag",
+            "dialogue": "Welcome, traveler. To proceed, you must prove your wisdom."
+        },
+        "choices": [
+            {
+                "text": "Accept the challenge",
+                "next": "riddle_challenge"
+            },
+            {
+                "text": "Decline and retreat",
+                "next": "retreat"
+            }
+        ]
+    },
+    "riddle_challenge": {
+        "text": "The stag asks, 'I speak without a mouth and hear without ears. I have nobody, but I come alive with the wind. What am I?'",
+        "image_prompt": "An abstract representation of a riddle in the enchanted forest, with swirling winds forming whispering voices, high detail, fantasy art, 8k, mystical atmosphere",
+        "battle": {
+            "enemy": "Riddle",
+            "message": "Solve the riddle to proceed."
+        },
+        "next": "riddle_solved"
+    },
+    "riddle_solved": {
+        "text": "You answer correctly. The stag nods and grants you a magical artifact.",
+        "image_prompt": "A close-up of an ancient magical amulet glowing with runes, intricate designs, ultra-detailed, photorealistic, 8k, soft ambient light",
+        "items": ["Amulet of Whispering Winds"],
+        "next": "forest_clearing"
+    },
+    "forest_clearing": {
+        "text": "You arrive at a serene clearing where a tranquil pond reflects the starry night sky.",
+        "image_prompt": "A tranquil forest clearing with a crystal-clear pond reflecting a sky filled with stars and galaxies, ethereal glow, ultra-high detail, 8k resolution, breathtaking beauty, by Ivan Aivazovsky",
+        "end": true
+    },
+    "forest_edge": {
+        "text": "Walking along the edge, you find an old map carved into a stone.",
+        "image_prompt": "An ancient stone tablet with a map etched into it, moss-covered, surrounded by forest foliage, high detail, photorealistic, 8k, natural lighting",
+        "items": ["Stone Map"],
+        "next": "decipher_map"
+    },
+    "decipher_map": {
+        "text": "You study the map and it points toward a hidden treasure within the forest.",
+        "image_prompt": "A close-up of the stone map highlighting a hidden path leading to treasure, intricate engravings, ultra-detailed, 8k, soft sunlight filtering through leaves",
+        "choices": [
+            {
+                "text": "Follow the hidden path",
+                "next": "treasure_hunt"
+            },
+            {
+                "text": "Ignore the map and continue",
+                "next": "forest_clearing"
+            }
+        ]
+    },
+    "treasure_hunt": {
+        "text": "Following the hidden path, you're confronted by a guardian spirit.",
+        "image_prompt": "An ethereal guardian spirit materializing in the forest, glowing aura, otherworldly appearance, ultra-high detail, 8k, dynamic lighting",
+        "battle": {
+            "enemy": "Guardian Spirit",
+            "message": "The Guardian Spirit challenges your intentions!"
+        },
+        "next": "guardian_defeated"
+    },
+    "guardian_defeated": {
+        "text": "You have overcome the Guardian Spirit and discovered the hidden treasure.",
+        "image_prompt": "A hidden treasure chest overflowing with ancient gold and jewels, nestled within tree roots, ultra-detailed, photorealistic, 8k, golden light emanating from within",
+        "items": ["Chest of Ancient Riches"],
+        "end": true
+    },
+    "retreat": {
+        "text": "You decide it's best not to meddle with mystical forces and head back home.",
+        "image_prompt": "A silhouette of a traveler walking away from the mysterious forest under a twilight sky, high detail, 8k, melancholic atmosphere",
+        "end": true
+    }
+}

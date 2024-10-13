@@ -1,0 +1,92 @@
+{
+  "start": {
+    "text": "You awaken in a mystical forest, surrounded by towering trees with glowing leaves. A sense of adventure fills the air as you hear distant whispers.",
+    "environment": "Mystical forest",
+    "battle": {
+      "enemy": "Goblin scout",
+      "message": "A goblin scout leaps from behind a bush, brandishing a crude dagger!"
+    },
+    "npc": {
+      "name": "Wise Sage",
+      "dialogue": "Greetings, young adventurer. The forest is restless, and dark forces are at work. Seek the Ancient Scroll in the haunted castle to the north."
+    },
+    "event": "A magical butterfly lands on your shoulder, granting you a temporary boost in agility.",
+    "items": ["Short sword", "Health potion"],
+    "next": "node1"
+  },
+  "node1": {
+    "text": "You arrive at the edge of a haunted castle. Its spires loom ominously against the twilight sky.",
+    "environment": "Haunted castle",
+    "battle": {
+      "enemy": "Undead warrior",
+      "message": "An undead warrior emerges from the shadows, its rusty blade thirsting for your blood!"
+    },
+    "event": "You trigger a hidden trap, narrowly avoiding a pit of spikes.",
+    "items": ["Shield", "Torch"],
+    "next": "node2"
+  },
+  "node2": {
+    "text": "Deep within the castle, you find a room filled with ancient artifacts and dusty tomes.",
+    "environment": "Haunted castle",
+    "npc": {
+      "name": "Mysterious Stranger",
+      "dialogue": "The Ancient Scroll you seek is guarded by the Dark Sorcerer in his tower. But beware, for he is merely a pawn of the true evil that lurks beneath the mountains."
+    },
+    "event": "You solve a magical puzzle, revealing a hidden passage.",
+    "items": ["Ancient Scroll", "Mana potion"],
+    "next": "node3"
+  },
+  "node3": {
+    "text": "You emerge from the castle into a bustling city, its streets alive with merchants and travelers.",
+    "environment": "Bustling city",
+    "npc": {
+      "name": "Merchant",
+      "dialogue": "Ah, a brave adventurer! I have just the thing you need for your journey to the icy mountains. This enchanted cloak will protect you from the biting cold."
+    },
+    "event": "You overhear rumors of a dragon terrorizing villages in the north.",
+    "items": ["Enchanted cloak", "Fire arrows"],
+    "next": "node4"
+  },
+  "node4": {
+    "text": "The icy winds howl as you ascend the treacherous mountain path. Snow-capped peaks surround you.",
+    "environment": "Icy mountains",
+    "battle": {
+      "enemy": "Frost troll",
+      "message": "A massive frost troll blocks your path, its icy breath freezing the air around you!"
+    },
+    "event": "An avalanche forces you to seek shelter in a nearby cave.",
+    "items": ["Climbing gear", "Frost resistance potion"],
+    "next": "node5"
+  },
+  "node5": {
+    "text": "The cave opens into a vast network of dark caverns. Strange echoes and eerie lights dance in the distance.",
+    "environment": "Dark caverns",
+    "battle": {
+      "enemy": "Shadow Beast",
+      "message": "A terrifying Shadow Beast materializes from the darkness, its red eyes fixed upon you!"
+    },
+    "npc": {
+      "name": "Village Elder",
+      "dialogue": "You've come far, hero. The Dragon King awaits in his lair beyond these caverns. Use the Ancient Scroll to unveil his true weakness."
+    },
+    "event": "A magical crystal illuminates the path ahead, revealing ancient dwarven runes.",
+    "items": ["Dwarven axe", "Dragon-slaying arrows"],
+    "next": "node6"
+  },
+  "node6": {
+    "text": "You enter a massive chamber filled with mountains of gold and jewels. At its center, the Dragon King awaits.",
+    "environment": "Dragon's lair",
+    "battle": {
+      "enemy": "Dragon King",
+      "message": "The Dragon King roars, shaking the very foundations of the mountain. The final battle begins!"
+    },
+    "event": "You use the Ancient Scroll, revealing the Dragon King's hidden vulnerability.",
+    "items": ["Dragon scale armor", "Legendary sword"],
+    "next": "end"
+  },
+  "end": {
+    "text": "With a mighty blow, you vanquish the Dragon King. As his reign of terror ends, peace returns to the land. Your name will be sung in ballads for generations to come.",
+    "event": "You are hailed as the realm's greatest hero, and the grateful citizens build a statue in your honor.",
+    "end": true
+  }
+}
