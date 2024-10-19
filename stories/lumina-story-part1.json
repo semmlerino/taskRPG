@@ -1,6 +1,6 @@
 {
   "start": {
-    "text": "The whole arrangement is kept in check by a complicated system of light distribution, magical tariffs, and an unspoken agreement that what goes up really shouldn't come down, lest it upset the delicate balance of a society where one's postcode is directly proportional to one's thaumaturgical potential.",
+    "text": "The whole arrangement is kept in check by a complicated system of light distribution, magical tariffs, and an unspoken agreement that what goes up really shouldn't come down, lest it upset the delicate balance of a society where ones postcode is directly proportional to one's thaumaturgical potential.",
     "event": "Explanation of Lumina's socio-magical structure",
     "image_prompt": "A complex magical mechanism visualizing Lumina's social structure. Beams of light flow from the upper levels to the lower, regulated by ethereal gears and levers. Shadowy figures in business attire oversee the process. Style: Steampunk meets magic, 8k resolution, inspired by the intricate machines of 'The City of Lost Children' and the magical infrastructure in 'Monsters Inc.'.",
     "next": "node7"
@@ -112,7 +112,6 @@
     "image_prompt": "A crowded, luminous café. In the foreground, a silver-haired detective meets with an elegant, radiant woman whose aura visibly pulses with light. The contrast between the detective's practical attire and the client's upper-class elegance is stark. Style: High-society meets noir, 8k resolution, inspired by the glamour of Art Deco and the character design of Final Fantasy games.",
     "next": "node20"
   },
-  "node20": {
   "node20": {
     "text": "Zephyr slides into the seat across from her, trying not to look too impressed by the table's built-in light show. 'Well, when someone offers to triple my fee, I tend to develop a sudden interest in cardio. Now, about your brother...'",
     "npc": {
@@ -376,5 +375,4 @@
     "image_prompt": "A fantastical bar in complete chaos. Patrons in light-emitting clothing stumble about, magical drinks float through the air, and light-based spells ricochet off surfaces. In the center, a woman in a living bioluminescent dress dances unwillingly. A man's hair explodes into shooting stars. Style: Vibrant magical realism, 8k resolution, inspired by the whimsical chaos of a Dr. Seuss book mixed with the sci-fi elements of 'The Fifth Element'.",
     "next": "node52"
   }
-}
 }

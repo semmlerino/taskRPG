@@ -1,237 +1,32 @@
-# modules/ui.py
+# modules/ui/main_window.py
 
 import os
-import random
-import logging
 import json
+import logging
+import random
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QTextEdit, QProgressBar, QMessageBox, QDialog, QListWidget, QListWidgetItem,
-    QGroupBox, QSizePolicy, QStatusBar, QAbstractItemView, QProgressDialog, QApplication
+    QProgressBar, QMessageBox, QDialog, QGroupBox, QSizePolicy,
+    QStatusBar, QProgressDialog, QApplication
 )
-from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QThread, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QTextCursor, QPixmap
-from .constants import (
-    WINDOW_TITLE, WINDOW_ICON, WINDOW_SIZE, STORIES_DIR, ASSETS_DIR
-)
-from .game_logic import Player, Enemy, TaskManager
-from .story import StoryManager
-from .hotkeys import GlobalHotkeys
-from .settings_dialog import SettingsDialog
-from .image_generator import ImageGenerator
-from .ui_components import (
-    PlayerPanel, EnemyPanel, StoryDisplay, ActionButtons, ChoicesPanel
-)
+from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer
+from PyQt5.QtGui import QFont, QIcon, QTextCursor
+from modules.constants import WINDOW_TITLE, WINDOW_ICON, WINDOW_SIZE, ASSETS_DIR
+from modules.game_logic import Player, Enemy, TaskManager
+from modules.story import StoryManager
+from modules.hotkeys import GlobalHotkeys
+from modules.image_generator import ImageGenerator
+from modules.ui.components.player_panel import PlayerPanel
+from modules.ui.components.enemy_panel import EnemyPanel
+from modules.ui.components.story_display import StoryDisplay
+from modules.ui.components.action_buttons import ActionButtons
+from modules.ui.dialogs.settings_dialog import SettingsDialog
+from modules.ui.components.choices_panel import ChoicesPanel
+from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from typing import Dict, Any, List
-
-from PIL import Image
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-class StorySelectionDialog(QDialog):
-    """
-    Dialog for selecting which story to load.
-    Dynamically scans the /stories folder for available stories.
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Select Story")
-        self.setFixedSize(500, 400)  # Increased size for better UI
-        self.selected_story = None
-        # Initialize tasks attribute if needed
-        self.task_manager = TaskManager()  # Initialize TaskManager here
-        self.init_ui()
-
-    def init_ui(self):
-        layout = QVBoxLayout()
-
-        label = QLabel("Choose a story to load:")
-        label.setFont(QFont("Arial", 16))
-        label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(label)
-
-        self.list_widget = QListWidget()
-        self.list_widget.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.load_stories()
-        layout.addWidget(self.list_widget)
-
-        # Buttons
-        buttons_layout = QHBoxLayout()
-        select_button = QPushButton("Select")
-        select_button.setFont(QFont("Arial", 14))
-        select_button.clicked.connect(self.select_story)
-        cancel_button = QPushButton("Cancel")
-        cancel_button.setFont(QFont("Arial", 14))
-        cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(select_button)
-        buttons_layout.addWidget(cancel_button)
-
-        layout.addLayout(buttons_layout)
-
-        # Settings Button
-        settings_button = QPushButton("Settings")  # Added settings button
-        settings_button.setFont(QFont("Arial", 14))
-        settings_button.setStyleSheet("""  # Added styling for settings button
-            QPushButton {
-                background-color: #FFB74D;
-                color: white;
-                padding: 8px 16px;
-                border: none;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #FFA726;
-            }
-        """)
-        settings_button.clicked.connect(self.open_settings)  # Connect to settings function
-        settings_button.setFixedHeight(40)
-        settings_button.setToolTip("Open settings dialog")
-        layout.addWidget(settings_button, alignment=Qt.AlignRight)  # Added to layout
-
-        self.setLayout(layout)
-
-    def open_settings(self):
-        """Opens the settings dialog to edit tasks and settings."""
-        settings_dialog = SettingsDialog(self.task_manager, self)
-        settings_dialog.exec_()  # Show the settings dialog
-
-
-    def load_stories(self):
-        """Scans the /stories directory for JSON story files and populates the list."""
-        if not os.path.exists(STORIES_DIR):
-            os.makedirs(STORIES_DIR)
-            logging.info(f"Created stories directory at {STORIES_DIR} as it did not exist.")
-
-        story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-        if not story_files:
-            reply = QMessageBox.question(
-                self, "No Stories Found",
-                f"No story files found in {STORIES_DIR}. Would you like to create a default story?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-            )
-            if reply == QMessageBox.Yes:
-                self.create_default_story()
-                story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-            else:
-                QMessageBox.warning(self, "No Stories Available", "Please add JSON story files to the /stories folder and restart the application.")
-                self.close()
-                return
-
-        for story_file in story_files:
-            story_path = os.path.join(STORIES_DIR, story_file)
-            story_title = self.extract_story_title(story_path) or story_file
-            item = QListWidgetItem(story_title)
-            item.setData(Qt.UserRole, story_path)  # Store the path for later use
-            self.list_widget.addItem(item)
-
-    def extract_story_title(self, story_path):
-        """
-        Extracts a user-friendly title from the story JSON file.
-        Assumes each story JSON has a 'title' field.
-        """
-        try:
-            with open(story_path, 'r', encoding='utf-8') as f:
-                story_data = json.load(f)
-            title = story_data.get('title')
-            if title:
-                return title
-            else:
-                # If no title field, use the filename without extension
-                return os.path.splitext(os.path.basename(story_path))[0]
-        except Exception as e:
-            logging.error(f"Failed to extract title from {story_path}. Error: {e}")
-            return None
-
-    def create_default_story(self):
-        """Creates a default story JSON file in the /stories directory."""
-        default_story = {
-            "title": "Default Story",
-            "start": {
-                "text": "Welcome to the Default Story. This is where your adventure begins.",
-                "choices": [
-                    {
-                        "text": "Proceed to the Forest",
-                        "next": "forest"
-                    }
-                ]
-            },
-            "forest": {
-                "text": "You venture into the forest and encounter a mystical stag.",
-                "battle": {
-                    "enemy": "Forest Troll",
-                    "message": "A Forest Troll blocks your path with a menacing glare!"
-                },
-                "choices": [
-                    {
-                        "text": "Attack the Troll",
-                        "next": "victory"
-                    },
-                    {
-                        "text": "Run away",
-                        "next": "retreat"
-                    }
-                ]
-            },
-            "victory": {
-                "text": "You have defeated the Forest Troll and continue your journey.",
-                "choices": [
-                    {
-                        "text": "Press 'G' or click 'Next' to continue your journey.",
-                        "next": "end"
-                    }
-                ]
-            },
-            "retreat": {
-                "text": "You decide it's best not to meddle with mystical forces and head back home.",
-                "choices": [
-                    {
-                        "text": "Press 'G' or click 'Next' to conclude your adventure.",
-                        "next": "end"
-                    }
-                ]
-            },
-            "end": {
-                "text": "Thank you for playing the Default Story!",
-                "choices": []
-            }
-        }
-        default_story_path = os.path.join(STORIES_DIR, "default_story.json")
-        try:
-            with open(default_story_path, 'w', encoding='utf-8') as f:
-                json.dump(default_story, f, indent=4)
-            logging.info(f"Default story created at {default_story_path}.")
-            QMessageBox.information(self, "Default Story Created", f"A default story has been created at {default_story_path}. Please restart the application to load it.")
-            self.close()
-        except Exception as e:
-            logging.error(f"Failed to create default story. Error: {e}")
-            QMessageBox.critical(self, "Error", "Failed to create a default story.")
-
-    def select_story(self):
-        """Handles the selection of a story."""
-        selected_items = self.list_widget.selectedItems()
-        if selected_items:
-            selected_item = selected_items[0]
-            story_path = selected_item.data(Qt.UserRole)
-            self.selected_story = story_path
-            self.accept()
-        else:
-            QMessageBox.warning(self, "No Selection", "Please select a story to load.")
-
-class ImageGenerationThread(QThread):
-    """
-    Thread class for generating images without freezing the UI.
-    """
-    image_generated = pyqtSignal(str)
-
-    def __init__(self, image_generator: ImageGenerator, prompt: str):
-        super().__init__()
-        self.image_generator = image_generator
-        self.prompt = prompt
-
-    def run(self):
-        image_path = self.image_generator.generate_image(self.prompt)
-        self.image_generated.emit(image_path)
 
 class TaskRPG(QWidget):
     """
@@ -251,14 +46,13 @@ class TaskRPG(QWidget):
 
         # Initialize Player and Game State
         self.player = Player()
-        # Removed inventory initialization since items are no longer used
         self.current_enemy = None
         self.paused = False
-        self.story_in_battle = False
 
         # Initialize ImageGenerator and StoryManager
         self.image_generator = ImageGenerator()
         self.story_manager = None  # Will be initialized after story selection
+        self.story_image_folder = None
 
         # Initialize Status Bar before init_ui to prevent AttributeError
         self.status_bar = QStatusBar()
@@ -337,9 +131,9 @@ class TaskRPG(QWidget):
         main_layout.addWidget(self.action_buttons)
 
         # Settings Button
-        self.settings_button = QPushButton("Settings")  # Added settings button
+        self.settings_button = QPushButton("Settings")
         self.settings_button.setFont(QFont("Arial", 14))
-        self.settings_button.setStyleSheet("""  # Added styling for settings button
+        self.settings_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFB74D;
                 color: white;
@@ -351,10 +145,10 @@ class TaskRPG(QWidget):
                 background-color: #FFA726;
             }
         """)
-        self.settings_button.clicked.connect(self.open_settings)  # Connect to settings function
+        self.settings_button.clicked.connect(self.open_settings)
         self.settings_button.setFixedHeight(40)
         self.settings_button.setToolTip("Open settings dialog")
-        main_layout.addWidget(self.settings_button, alignment=Qt.AlignRight)  # Added to layout
+        main_layout.addWidget(self.settings_button, alignment=Qt.AlignRight)
 
         # Add Status Bar
         main_layout.addWidget(self.status_bar)
@@ -378,11 +172,21 @@ class TaskRPG(QWidget):
         """Prompts the user to select a story to load."""
         dialog = StorySelectionDialog(self)
         if dialog.exec_() == QDialog.Accepted:
-            selected_story = dialog.selected_story
-            self.story_manager = StoryManager(selected_story, image_generator=self.image_generator)
-            logging.info(f"Story loaded from {selected_story}.")
-            self.generate_all_images()
-            self.display_story_segment()
+            try:
+                selected_story = dialog.selected_story
+                story_name = os.path.splitext(os.path.basename(selected_story))[0]
+                self.story_image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
+                
+                # Create story image folder if it doesn't exist
+                os.makedirs(self.story_image_folder, exist_ok=True)
+
+                self.story_manager = StoryManager(selected_story, image_generator=self.image_generator, image_folder=self.story_image_folder)
+                logging.info(f"Story loaded from {selected_story}.")
+                self.generate_all_images()
+                self.display_story_segment()
+            except Exception as e:
+                logging.error(f"Error loading story: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to load story: {e}")
         else:
             # If no story selected, exit the application
             QMessageBox.information(self, "No Story Selected", "No story selected. Exiting the game.")
@@ -390,31 +194,45 @@ class TaskRPG(QWidget):
 
     def generate_all_images(self):
         """Generates all images for the story at the beginning."""
-        image_prompts = self.story_manager.get_all_image_prompts()
-        total_images = len(image_prompts)
-        
-        if total_images == 0:
-            logging.info("No images to generate for the selected story.")
-            return
+        try:
+            image_prompts = self.story_manager.get_all_image_prompts()
+            total_images = len(image_prompts)
+            
+            if total_images == 0:
+                logging.info("No images to generate for the selected story.")
+                return
 
-        progress_dialog = QProgressDialog("Generating images...", "Cancel", 0, total_images, self)
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumDuration(0)
-        progress_dialog.setValue(0)
-        
-        for i, (node_key, prompt) in enumerate(image_prompts.items()):
-            if progress_dialog.wasCanceled():
-                logging.info("Image generation canceled by user.")
-                break
+            progress_dialog = QProgressDialog("Generating/Loading images...", "Cancel", 0, total_images, self)
+            progress_dialog.setWindowModality(Qt.WindowModal)
+            progress_dialog.setMinimumDuration(0)
+            progress_dialog.setValue(0)
             
-            image_path = self.image_generator.generate_image(prompt)
-            if image_path:
-                self.story_manager.set_generated_image(node_key, image_path)
+            for i, (node_key, prompt) in enumerate(image_prompts.items()):
+                if progress_dialog.wasCanceled():
+                    logging.info("Image generation canceled by user.")
+                    break
+                
+                image_filename = f"{node_key}.png"
+                image_path = os.path.join(self.story_image_folder, image_filename)
+                
+                try:
+                    if os.path.exists(image_path):
+                        logging.info(f"Image for {node_key} already exists. Skipping generation.")
+                    else:
+                        image_path = self.image_generator.generate_image(prompt, save_path=image_path)
+                    
+                    if image_path:
+                        self.story_manager.set_generated_image(node_key, image_path)
+                except Exception as e:
+                    logging.error(f"Error generating/loading image for {node_key}: {e}")
+                
+                progress_dialog.setValue(i + 1)
+                QApplication.processEvents()
             
-            progress_dialog.setValue(i + 1)
-            QApplication.processEvents()  # Keep the UI responsive
-        
-        progress_dialog.close()
+            progress_dialog.close()
+        except Exception as e:
+            logging.error(f"Error in generate_all_images: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to generate/load images: {e}")
 
     def display_story_segment(self):
         """Displays the current segment of the story."""
@@ -423,7 +241,6 @@ class TaskRPG(QWidget):
         environment = self.story_manager.get_environment()
         npc_info = self.story_manager.get_npc()
         event = self.story_manager.get_event()
-        # items = self.story_manager.get_items()  # Removed items handling
         battle_info = self.story_manager.get_battle_info()
         choices = self.story_manager.get_choices()
         
@@ -432,7 +249,7 @@ class TaskRPG(QWidget):
 
         # Display pre-generated image if available
         image_path = self.story_manager.get_generated_image(self.story_manager.current_node_key)
-        if image_path:
+        if image_path and os.path.exists(image_path):
             self.story_display.display_image(image_path)
         else:
             self.story_display.display_image("")  # Clear image
@@ -450,15 +267,6 @@ class TaskRPG(QWidget):
             npc_name = npc_info.get("name", "Unknown NPC")
             dialogue = npc_info.get("dialogue", "")
             self.story_display.append_text(f"<p><b>{npc_name} says:</b> \"{dialogue}\"</p>")
-
-        # Removed items handling
-        # if items:
-        #     # Assuming items are strings
-        #     items_list = ', '.join(items)
-        #     self.story_display.append_text(f"<p><i>You have acquired:</i> {items_list}</p>")
-        #     for item in items:
-        #         self.player.inventory.add_item(item)
-        #     self.player_panel.update_panel()
 
         if battle_info:
             # Initiate battle with a random task from tasks.json
@@ -734,7 +542,6 @@ class TaskRPG(QWidget):
             # Update fonts in Player Panel
             self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
             self.player_panel.xp_label.setFont(QFont("Arial", font_size))
-            # Removed inventory_label updates
 
             # Update fonts in Enemy Panel
             self.enemy_panel.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
@@ -760,5 +567,3 @@ class TaskRPG(QWidget):
                     item.widget().setFont(QFont("Arial", font_size))
         except Exception as e:
             logging.error(f"Error during font adjustment: {e}")
-
-# End of ui.py

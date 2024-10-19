@@ -4,30 +4,25 @@ import os
 import json
 import logging
 import random
-import uuid
 from typing import Dict, Any, Optional, List
 from PIL import Image
-from io import BytesIO
 
-from .constants import STORIES_DIR, ASSETS_DIR
-from .image_generator import ImageGenerator  # Import the ImageGenerator class
+from modules.constants import STORIES_DIR, ASSETS_DIR
+from modules.image_generator import ImageGenerator
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 class StoryManager:
-    def __init__(self, filepath: str, image_generator: Optional[ImageGenerator] = None):
+    def __init__(self, filepath: str, image_generator: Optional[ImageGenerator] = None, image_folder: str = None):
         self.filepath = filepath
         self.story_data = self.load_story()
         self.current_node_key = 'start'
         self.current_node = self.story_data.get(self.current_node_key, {})
         self.image_cache = {}  # Cache generated images
+        self.image_folder = image_folder
 
         # Initialize ImageGenerator
         self.image_generator = image_generator or ImageGenerator()
-
-    # --------------------- Story Management Methods ---------------------
 
     def load_story(self) -> Dict[str, Any]:
         """
@@ -95,12 +90,6 @@ class StoryManager:
         """
         return self.current_node.get('event')
 
-    def get_items(self) -> Optional[List[Dict[str, Any]]]:
-        """
-        Retrieves the list of items from the current node, if available.
-        """
-        return self.current_node.get('items')
-
     def get_battle_info(self) -> Optional[Dict[str, Any]]:
         """
         Retrieves battle information from the current node, if available.
@@ -128,7 +117,7 @@ class StoryManager:
     def get_all_image_prompts(self) -> Dict[str, str]:
         """
         Extracts all image prompts from the story.
-        
+
         Returns:
             A dictionary where keys are node keys and values are image prompts.
         """
@@ -149,12 +138,13 @@ class StoryManager:
         """
         Gets the generated image path for a specific node.
         """
-        return self.story_data.get(node_key, {}).get('generated_image')
+        image_path = self.story_data.get(node_key, {}).get('generated_image')
+        if image_path and self.image_folder:
+            return os.path.join(self.image_folder, os.path.basename(image_path))
+        return image_path
 
     def is_end(self) -> bool:
         """
         Checks if the current node is an end node.
         """
         return self.current_node.get('end', False)
-
-    # You can add more methods here as needed for your application

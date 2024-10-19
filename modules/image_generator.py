@@ -365,7 +365,7 @@ class ImageGenerator:
             logging.error(f"Error uploading image: {e}")
             return None
 
-    def generate_image(self, prompt: str) -> Optional[str]:
+    def generate_image(self, prompt: str, save_path: Optional[str] = None) -> Optional[str]:
         if not self.is_image_generation_enabled():
             logging.info("Image generation is disabled in settings.")
             return None
@@ -390,7 +390,7 @@ class ImageGenerator:
 
             self.track_progress(ws, prompt_id)
             images = self.get_images(prompt_id, server_address)
-            image_path = self.save_image(images, prompt)
+            image_path = self.save_image(images, prompt, save_path)
             ws.close()
 
             if image_path:
@@ -403,6 +403,39 @@ class ImageGenerator:
 
         except Exception as e:
             logging.error(f"Failed to generate image for prompt '{prompt}'. Error: {e}")
+            return None
+
+    def save_image(self, images: List[Dict[str, Any]], prompt: str, save_path: Optional[str] = None) -> Optional[str]:
+        try:
+            if not images:
+                logging.error("No images to save.")
+                return None
+
+            image_info = images[0]
+            image_data = image_info.get('image_data')
+            image_type = image_info.get('type')
+            filename = image_info.get('filename')
+
+            if image_data:
+                image = Image.open(BytesIO(image_data))
+
+                if save_path:
+                    image_path = save_path
+                else:
+                    image_dir = os.path.join(ASSETS_DIR, 'images', 'generated')
+                    os.makedirs(image_dir, exist_ok=True)
+                    image_filename = f"{hash(prompt)}_{filename}"
+                    image_path = os.path.join(image_dir, image_filename)
+
+                image.save(image_path)
+                logging.info(f"Image saved at {image_path}")
+                return image_path
+            else:
+                logging.error("No image data found.")
+                return None
+
+        except Exception as e:
+            logging.error(f"Failed to save image. Error: {e}")
             return None
 
     def is_image_generation_enabled(self) -> bool:
