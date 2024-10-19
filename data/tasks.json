@@ -1,13 +1,8 @@
 {
     "Mails": {
-        "min": 6,
-        "max": 15,
+        "min": 4,
+        "max": 6,
         "active": true
-    },
-    "Clean Room": {
-        "min": 1,
-        "max": 1,
-        "active": false
     },
     "ToDo": {
         "min": 3,
@@ -20,18 +15,13 @@
         "active": false
     },
     "Tabs": {
-        "min": 4,
-        "max": 10,
+        "min": 7,
+        "max": 14,
         "active": true
     },
     "GPTs": {
-        "min": 5,
-        "max": 25,
-        "active": true
-    },
-    "Gemini": {
         "min": 2,
-        "max": 5,
+        "max": 7,
         "active": true
     },
     "FitRPG": {
@@ -52,7 +42,7 @@
     "SG scripting": {
         "min": 1,
         "max": 1,
-        "active": true
+        "active": false
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
@@ -64,9 +54,19 @@
         "max": 7,
         "active": true
     },
+    "Bubble": {
+        "min": 0,
+        "max": 1,
+        "active": true
+    },
     "Perplexity": {
+        "min": 5,
+        "max": 9,
+        "active": true
+    },
+    "Gemini": {
         "min": 2,
-        "max": 4,
+        "max": 5,
         "active": true
     }
 }

@@ -1,0 +1,59 @@
+{
+  "start": {
+    "text": "You are Zara Vex, a struggling private investigator with a minor talent for divination magic. Your office in the Lowtown district of Neo-Ankh is dimly lit by the glow of neon signs outside. A holographic notification blinks insistently, alerting you to an incoming call.",
+    "environment": "A cluttered office in Lowtown, filled with a mix of magical artifacts and outdated tech. The air smells of ozone and stale coffee.",
+    "image_prompt": "Cyberpunk detective office, neon lights, magical artifacts, high detail, 8k resolution, inspired by Blade Runner",
+    "next": "node1"
+  },
+  "node1": {
+    "text": "You answer the call. A frantic woman appears on the holo-display. 'My name is Lyra Starling. My brother, Cassius, has gone missing. He works for MagiTech Industries. Please, you're my last hope.'",
+    "npc": {
+      "name": "Lyra Starling",
+      "dialogue": "I haven't heard from Cassius in days. It's not like him. He was working on something big, but he wouldn't tell me what. Can you help?"
+    },
+    "image_prompt": "Holographic display of a worried woman, cyberpunk style, high detail, 8k resolution, inspired by Blade Runner 2049",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "You agree to take the case. As you step out of your office, the bustling streets of Neo-Ankh greet you. Hover-cars zoom overhead while street vendors peddle a mix of tech gadgets and magical charms.",
+    "environment": "Crowded streets of Lowtown, a blend of high-tech and mystical elements.",
+    "image_prompt": "Cyberpunk city street, hover-cars, magical charms, street vendors, high detail, 8k resolution, inspired by Blade Runner and Shadowrun",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "You arrive at the towering headquarters of MagiTech Industries. The building seems to defy physics, its architecture a blend of gleaming metal and shimmering magical fields.",
+    "environment": "MagiTech Industries HQ, a massive structure in the Corporate District that radiates both technological and magical power.",
+    "image_prompt": "Futuristic corporate tower, magical energy fields, imposing entrance, high detail, 8k resolution, inspired by Inception and Doctor Strange",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "As you attempt to bluff your way past reception, alarms suddenly blare. Security drones descend, their magical sensors having detected your investigator's badge.",
+    "battle": {
+      "enemy": "Security Drones",
+      "message": "Intruder detected. Engaging defense protocols."
+    },
+    "image_prompt": "Cyberpunk lobby battle, detective vs hovering security drones, magical energy flashes, high detail, 8k resolution, inspired by The Matrix",
+    "next": "node5"
+  },
+  "node5": {
+    "text": "After dispatching the drones, you make your way to the upper floors. You overhear a conversation mentioning 'Project Nexus' and realize it may be connected to Cassius's disappearance.",
+    "environment": "Dimly lit corporate hallways with holographic displays and scattered employees.",
+    "image_prompt": "Futuristic office corridor, detective eavesdropping, holographic screens, high detail, 8k resolution, inspired by Minority Report",
+    "next": "node6"
+  },
+  "node6": {
+    "text": "You locate the data center, hoping to access files on Cassius and Project Nexus. As you begin the hack, the AI security system activates, manifesting as a digital entity intent on stopping you.",
+    "battle": {
+      "enemy": "Corrupted AI System",
+      "message": "Unauthorized access detected. Initiating countermeasures."
+    },
+    "image_prompt": "Cyberpunk data center, detective interfacing with holographic controls, malevolent AI face on screens, chaotic energy pulses, high detail, 8k resolution, inspired by Tron and The Matrix",
+    "next": "node7"
+  },
+  "node7": {
+    "text": "Victorious but shaken, you escape with crucial data about Project Nexus and a possible location for Cassius in Neo-Ankh's undercity. You realize this case is far bigger and more dangerous than you initially thought.",
+    "environment": "Rain-soaked streets outside MagiTech Industries, the cityscape of Neo-Ankh stretching into the smoggy distance.",
+    "image_prompt": "Detective exiting corporate tower at night, city lights reflecting off rain-soaked streets, determined expression, holding glowing data device, high detail, 8k resolution, inspired by Blade Runner 2049",
+    "next": "chapter2"
+  }
+}

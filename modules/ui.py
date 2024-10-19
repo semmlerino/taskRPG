@@ -7,7 +7,7 @@ import json
 from PyQt5.QtWidgets import (
     QWidget, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QTextEdit, QProgressBar, QMessageBox, QDialog, QListWidget, QListWidgetItem,
-    QGroupBox, QSizePolicy, QStatusBar, QAbstractItemView, QProgressDialog
+    QGroupBox, QSizePolicy, QStatusBar, QAbstractItemView, QProgressDialog, QApplication
 )
 from PyQt5.QtCore import Qt, QPropertyAnimation, QRect, QEasingCurve, QTimer, QThread, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QTextCursor, QPixmap
@@ -22,7 +22,7 @@ from .image_generator import ImageGenerator
 from .ui_components import (
     PlayerPanel, EnemyPanel, StoryDisplay, ActionButtons, ChoicesPanel
 )
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 from PIL import Image
 
@@ -39,6 +39,8 @@ class StorySelectionDialog(QDialog):
         self.setWindowTitle("Select Story")
         self.setFixedSize(500, 400)  # Increased size for better UI
         self.selected_story = None
+        # Initialize tasks attribute if needed
+        self.task_manager = TaskManager()  # Initialize TaskManager here
         self.init_ui()
 
     def init_ui(self):
@@ -66,7 +68,34 @@ class StorySelectionDialog(QDialog):
         buttons_layout.addWidget(cancel_button)
 
         layout.addLayout(buttons_layout)
+
+        # Settings Button
+        settings_button = QPushButton("Settings")  # Added settings button
+        settings_button.setFont(QFont("Arial", 14))
+        settings_button.setStyleSheet("""  # Added styling for settings button
+            QPushButton {
+                background-color: #FFB74D;
+                color: white;
+                padding: 8px 16px;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #FFA726;
+            }
+        """)
+        settings_button.clicked.connect(self.open_settings)  # Connect to settings function
+        settings_button.setFixedHeight(40)
+        settings_button.setToolTip("Open settings dialog")
+        layout.addWidget(settings_button, alignment=Qt.AlignRight)  # Added to layout
+
         self.setLayout(layout)
+
+    def open_settings(self):
+        """Opens the settings dialog to edit tasks and settings."""
+        settings_dialog = SettingsDialog(self.task_manager, self)
+        settings_dialog.exec_()  # Show the settings dialog
+
 
     def load_stories(self):
         """Scans the /stories directory for JSON story files and populates the list."""
@@ -222,6 +251,7 @@ class TaskRPG(QWidget):
 
         # Initialize Player and Game State
         self.player = Player()
+        # Removed inventory initialization since items are no longer used
         self.current_enemy = None
         self.paused = False
         self.story_in_battle = False
@@ -307,9 +337,9 @@ class TaskRPG(QWidget):
         main_layout.addWidget(self.action_buttons)
 
         # Settings Button
-        self.settings_button = QPushButton("Settings")
+        self.settings_button = QPushButton("Settings")  # Added settings button
         self.settings_button.setFont(QFont("Arial", 14))
-        self.settings_button.setStyleSheet("""
+        self.settings_button.setStyleSheet("""  # Added styling for settings button
             QPushButton {
                 background-color: #FFB74D;
                 color: white;
@@ -321,10 +351,10 @@ class TaskRPG(QWidget):
                 background-color: #FFA726;
             }
         """)
-        self.settings_button.clicked.connect(self.open_settings)
+        self.settings_button.clicked.connect(self.open_settings)  # Connect to settings function
         self.settings_button.setFixedHeight(40)
         self.settings_button.setToolTip("Open settings dialog")
-        main_layout.addWidget(self.settings_button, alignment=Qt.AlignRight)
+        main_layout.addWidget(self.settings_button, alignment=Qt.AlignRight)  # Added to layout
 
         # Add Status Bar
         main_layout.addWidget(self.status_bar)
@@ -363,11 +393,18 @@ class TaskRPG(QWidget):
         image_prompts = self.story_manager.get_all_image_prompts()
         total_images = len(image_prompts)
         
+        if total_images == 0:
+            logging.info("No images to generate for the selected story.")
+            return
+
         progress_dialog = QProgressDialog("Generating images...", "Cancel", 0, total_images, self)
         progress_dialog.setWindowModality(Qt.WindowModal)
+        progress_dialog.setMinimumDuration(0)
+        progress_dialog.setValue(0)
         
         for i, (node_key, prompt) in enumerate(image_prompts.items()):
             if progress_dialog.wasCanceled():
+                logging.info("Image generation canceled by user.")
                 break
             
             image_path = self.image_generator.generate_image(prompt)
@@ -375,6 +412,7 @@ class TaskRPG(QWidget):
                 self.story_manager.set_generated_image(node_key, image_path)
             
             progress_dialog.setValue(i + 1)
+            QApplication.processEvents()  # Keep the UI responsive
         
         progress_dialog.close()
 
@@ -385,7 +423,7 @@ class TaskRPG(QWidget):
         environment = self.story_manager.get_environment()
         npc_info = self.story_manager.get_npc()
         event = self.story_manager.get_event()
-        items = self.story_manager.get_items()
+        # items = self.story_manager.get_items()  # Removed items handling
         battle_info = self.story_manager.get_battle_info()
         choices = self.story_manager.get_choices()
         
@@ -413,13 +451,14 @@ class TaskRPG(QWidget):
             dialogue = npc_info.get("dialogue", "")
             self.story_display.append_text(f"<p><b>{npc_name} says:</b> \"{dialogue}\"</p>")
 
-        # Display items found if available
-        if items:
-            items_list = ', '.join(items)
-            self.story_display.append_text(f"<p><i>You have acquired:</i> {items_list}</p>")
-            for item in items:
-                self.player.inventory.add_item(item)
-            self.player_panel.update_panel()
+        # Removed items handling
+        # if items:
+        #     # Assuming items are strings
+        #     items_list = ', '.join(items)
+        #     self.story_display.append_text(f"<p><i>You have acquired:</i> {items_list}</p>")
+        #     for item in items:
+        #         self.player.inventory.add_item(item)
+        #     self.player_panel.update_panel()
 
         if battle_info:
             # Initiate battle with a random task from tasks.json
@@ -674,6 +713,7 @@ class TaskRPG(QWidget):
                 # Update "Tasks Left" if not in battle
                 if not self.current_enemy:
                     self.update_tasks_left()
+
     def closeEvent(self, event):
         """Handles the window close event. Stops hotkey listener thread."""
         self.hotkey_listener.stop()
@@ -694,7 +734,7 @@ class TaskRPG(QWidget):
             # Update fonts in Player Panel
             self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
             self.player_panel.xp_label.setFont(QFont("Arial", font_size))
-            self.player_panel.inventory_label.setFont(QFont("Arial", font_size))
+            # Removed inventory_label updates
 
             # Update fonts in Enemy Panel
             self.enemy_panel.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
@@ -721,4 +761,4 @@ class TaskRPG(QWidget):
         except Exception as e:
             logging.error(f"Error during font adjustment: {e}")
 
-# End of TaskRPG class
+# End of ui.py

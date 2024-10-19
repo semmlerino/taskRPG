@@ -1,0 +1,71 @@
+{
+  "start": {
+    "text": "The interior of the Technomancer's Guild workshop is what you'd get if you threw a supercomputer, a magical library, and a mad scientist's lab into a blender, and then asked the resulting mixture to redecorate. Bubbling beakers of liquid code sit next to tomes of eldritch lore, while holographic displays showing complex magical formulas are projected from what appears to be a modified toaster.",
+    "environment": "A chaotic workshop where magic and technology intermingle in ways that make the laws of physics throw up their hands in despair. Every surface is covered with a mix of arcane artifacts, circuit boards, and at least three types of flora that definitely don't exist in nature's catalog.",
+    "image_prompt": "Cluttered technomancer workshop, swirling magical energies, holographic displays, bizarre hybrid tech-magic devices, high detail, 8k resolution, inspired by Harry Potter's Room of Requirement and Tony Stark's lab",
+    "next": "node1"
+  },
+  "node1": {
+    "text": "Arch-Technomancer Zyx ushers you and Gimble to a corner that looks marginally less likely to accidentally turn you into a sentient tugboat. He produces glasses that seem to fill themselves with a liquid that can't decide if it's a color or an existential crisis.",
+    "npc": {
+      "name": "Arch-Technomancer Zyx",
+      "dialogue": "Now then, about this Project Nexus business. I'm afraid you've stumbled upon something of a, shall we say, multidimensional pickle. MagiTech isn't just merging magic and technology; they're trying to rewrite the very source code of reality. Imagine if you could Ctrl+Alt+Delete the universe and then reboot it with admin privileges. Cassius discovered this and, well, let's just say MagiTech's retirement plan is more 'eternal digital imprisonment' than '401k'."
+    },
+    "image_prompt": "Eccentric technomancer explaining complex concept, detective and dwarf looking bewildered, strange diagrams floating in air, high detail, 8k resolution, inspired by Doctor Who and The Hitchhiker's Guide to the Galaxy",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "As you try to wrap your head around the implications of Zyx's revelation, Gimble's cyberdeck suddenly starts emitting a sound like a cat trying to hack up a particularly disagreeable hairball made of dial-up modem noises.",
+    "npc": {
+      "name": "Gimble",
+      "dialogue": "Uh-oh. That's not good. That's my 'someone's trying to digitally assassinate us' alarm. I knew I shouldn't have used 'password123' for my firewall's secret knockout question!"
+    },
+    "image_prompt": "Dwarf netrunner panicking over malfunctioning cyberdeck, detective and technomancer looking concerned, chaotic workshop in background, high detail, 8k resolution, inspired by The Matrix and Cryptonomicon",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "Before you can question Gimble's dubious cybersecurity practices, the workshop's door explodes inward in a shower of splinters and sparks. Through the smoke stride three figures that look like they were put together by a focus group tasked with designing the perfect corporate wetwork team.",
+    "environment": "The previously cluttered workshop is now also filled with smoke and debris. Magical wards flare to life, battling against high-tech scanning equipment employed by the intruders.",
+    "image_prompt": "Smoke-filled technomancer workshop, three menacing corporate agents entering, magical defenses activating, characters taking cover, high detail, 8k resolution, inspired by Shadowrun and Men in Black",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "The lead agent, a woman with more chrome than a vintage car show and eyes that glow with predatory AI algorithms, points a weapon at you that looks like it could start and end a small war before breakfast.",
+    "npc": {
+      "name": "Agent Obsidian",
+      "dialogue": "By the authority vested in me by MagiTech Industries' terms of service – which I know none of you actually read – you're all under arrest for corporate espionage, unlicensed reality manipulation, and possession of a sense of humor in a designated humorless zone. Please assume the position and prepare for immediate digital extraction and/or vaporization, whichever our lawyers deem more cost-effective."
+    },
+    "image_prompt": "Cybernetically enhanced corporate agent confronting characters, high-tech weapon aimed, two backup agents flanking, chaos of workshop in background, high detail, 8k resolution, inspired by Blade Runner and RoboCop",
+    "next": "node5"
+  },
+  "node5": {
+    "text": "As Agent Obsidian monologues about the various corporate policies you've violated (apparently, breathing non-MagiTech approved air is frowned upon), you lock eyes with Gimble and Zyx. A plan forms, communicated through a series of meaningful glances, subtle nods, and in Zyx's case, interpretive eyebrow wiggling.",
+    "battle": {
+      "enemy": "MagiTech Extraction Team",
+      "message": "Surrender now, and we promise your eternal digital incarceration will have an excellent customer satisfaction rating!"
+    },
+    "image_prompt": "Tense standoff in workshop, corporate agents vs detective, dwarf, and technomancer, magical and technological weapons primed, high detail, 8k resolution, inspired by The Dresden Files and Johnny Mnemonic",
+    "next": "node6"
+  },
+  "node6": {
+    "text": "Chaos erupts as you dive for cover, your magic flaring to life. Gimble's fingers fly over his cyberdeck, launching digital countermeasures, while Zyx begins an incantation that sounds like a mixture of Sanskrit, Python, and interpretive beat-boxing.",
+    "environment": "The workshop becomes a battleground of clashing magics and technologies. Spells ricochet off force fields, while rogue lines of code manifest as physical entities, tangling with nanobots and enchanted office supplies.",
+    "image_prompt": "Frantic battle in technomancer workshop, spells and bullets flying, digital effects clashing with magical energy, characters using environment creatively, high detail, 8k resolution, inspired by Doctor Strange and The Matrix",
+    "next": "node7"
+  },
+  "node7": {
+    "text": "As the dust settles and the last of Agent Obsidian's nanobots finds itself trapped in what appears to be an endless digital customer service queue (a fate worse than deletion), you stand victorious but with the sinking realization that your problems have just graduated from 'perilous' to 'apocalyptically inconvenient'.",
+    "npc": {
+      "name": "Arch-Technomancer Zyx",
+      "dialogue": "Well, that was bracing! Nothing like a little corporate assassination attempt to get the blood flowing, eh? But I'm afraid this complicates things rather spectacularly. MagiTech knows we know, which means we need to act fast. We need to find Cassius and shut down Project Nexus before they can rewrite reality. I don't know about you, but I rather like reality. I've just gotten it broken in, like a comfortable pair of quantum slippers."
+    },
+    "image_prompt": "Aftermath of workshop battle, defeated corporate agents unconscious, characters looking determined, holographic plans for next move forming, high detail, 8k resolution, inspired by Inception and Futurama",
+    "next": "node8"
+  },
+  "node8": {
+    "text": "With MagiTech now openly gunning for you, a race against time to save both Cassius and reality itself, and the unsettling feeling that the universe's source code is held together with the digital equivalent of duct tape and wishful thinking, you realize that this case has officially gone from 'routine missing person' to 'potential end of existence as we know it'. Just another Tuesday in Neo-Ankh.",
+    "environment": "The battered workshop hums with renewed purpose as plans are made. Magical sensors track MagiTech movements across the city, while Gimble's cyberdeck projects a 3D map of potential Project Nexus locations.",
+    "image_prompt": "Characters planning next move in damaged workshop, holographic city map, magical scrying devices active, sense of urgency and determination, high detail, 8k resolution, inspired by Ready Player One and Minority Report",
+    "next": "chapter5"
+  }
+}

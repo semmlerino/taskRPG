@@ -44,3 +44,4 @@ class GlobalHotkeys(QThread):
         self._running = False
         keyboard.unhook_all()
         logging.info("Global hotkeys unregistered.")
+

@@ -1,0 +1,77 @@
+{
+  "start": {
+    "text": "Neo-Ankh's skyline glitters like a circuit board dipped in fairy dust as you, Gimble, and Zyx make your way towards the MagiTech central tower. The plan, if one could dignify it with such a term, is a blend of desperation, audacity, and the kind of logic that only makes sense if you've had a few shots of quantum uncertainty.",
+    "environment": "The streets are a chaos of neon and shadow, magical wards flickering alongside holographic advertisements. The air thrums with an energy that suggests reality itself is holding its breath, waiting to see if it'll still exist in the morning.",
+    "image_prompt": "Cyberpunk city at night, three diverse characters approaching massive corporate tower, blend of magical and technological elements in environment, high detail, 8k resolution, inspired by Blade Runner and The Dresden Files",
+    "next": "node1"
+  },
+  "node1": {
+    "text": "As you approach the tower's base, a security checkpoint looms before you, bristling with enough firepower to make a small war feel inadequate. Gimble eyes the defenses, his cyberdeck humming ominously.",
+    "npc": {
+      "name": "Gimble",
+      "dialogue": "Right, so our options are: certain death, probable death, or the kind of death that'll have theoretical physicists arguing for decades. I don't suppose anyone brought a universal keycard? Or maybe a reality-altering McGuffin we forgot to mention for the past four chapters?"
+    },
+    "image_prompt": "High-tech security checkpoint, imposing guards and automated defenses, three protagonists hidden nearby planning approach, high detail, 8k resolution, inspired by Metal Gear Solid and Shadowrun",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "Before you can respond to Gimble's blend of sass and despair, Zyx pulls out what looks like a rubber duck crossed with a Rubik's Cube and a small supernova.",
+    "npc": {
+      "name": "Arch-Technomancer Zyx",
+      "dialogue": "As it happens, I did bring a reality-altering McGuffin. I call it the Quantum Quacker. It can rewrite local causality, but there's a slight chance it might turn us all into sentient mathematical equations. On the bright side, I hear being an irrational number is quite liberating."
+    },
+    "image_prompt": "Eccentric technomancer holding bizarre glowing device, detective and dwarf looking incredulous, futuristic city background, high detail, 8k resolution, inspired by Rick and Morty and The Hitchhiker's Guide to the Galaxy",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "With a sense of impending doom that's become uncomfortably familiar, you watch as Zyx activates the Quantum Quacker. Reality hiccups, and suddenly you find yourselves inside the tower, surrounded by very surprised-looking guards who seem to be questioning their career choices.",
+    "environment": "The sleek, high-tech interior of MagiTech tower, now with an inexplicable rubber duck motif. Alarms blare, but they sound suspiciously like quacks.",
+    "image_prompt": "Corporate tower interior with duck-themed alterations, confused guards, protagonists looking disoriented, high detail, 8k resolution, inspired by Inception and Monty Python",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "As the guards shake off their confusion, their leader steps forward, a woman whose cybernetic enhancements make her look like she arm-wrestles battle mechs for fun.",
+    "battle": {
+      "enemy": "Chief of MagiTech Security",
+      "message": "Intruder alert! Apprehend these reality hackers and someone please explain why everything tastes like duck sauce!"
+    },
+    "image_prompt": "Heavily augmented security chief confronting protagonists, duck-themed chaos in background, guards raising weapons, high detail, 8k resolution, inspired by Deus Ex and Terry Pratchett's Guards! Guards!",
+    "next": "node5"
+  },
+  "node5": {
+    "text": "The battle that ensues is a spectacle that would make physicists weep and ducks question their place in the universe. Your magic warps around the duck-infused reality, Gimble's hacking turns the tower's defenses into a symphony of poultry-based pandemonium, and Zyx... well, Zyx seems to be conducting the chaos like it's a particularly avant-garde orchestra.",
+    "environment": "Corporate lobby turned battlefield, spells colliding with bullets, holographic ducks providing cover, reality itself seeming to quack in protest.",
+    "image_prompt": "Chaotic battle in corporate lobby, magic and technology clashing, duck-themed reality warps, protagonists fighting creatively, high detail, 8k resolution, inspired by Doctor Strange and The Matrix",
+    "next": "node6"
+  },
+  "node6": {
+    "text": "With the security forces finally subdued (and possibly questioning their understanding of waterfowl), you make your way to the heart of Project Nexus. The massive door to the main lab slides open, revealing a scene that makes you wish, not for the first time today, that your detective agency specialized in lost cats instead of reality-threatening conspiracies.",
+    "environment": "A vast chamber dominated by a swirling vortex of data and magic, at the center of which floats Cassius, suspended in a state between digital and physical existence.",
+    "image_prompt": "Massive high-tech lab with central energy vortex, person suspended within, complex machinery and magical artifacts surrounding, protagonists entering dramatically, high detail, 8k resolution, inspired by Akira and 2001: A Space Odyssey",
+    "next": "node7"
+  },
+  "node7": {
+    "text": "As you take in the awe-inspiring and terrifying sight before you, a slow clap echoes through the chamber. From the shadows steps a figure that radiates the kind of smug villainy usually reserved for cartoon cats who've finally caught the canary.",
+    "npc": {
+      "name": "CEO Morgana Vex",
+      "dialogue": "Well, well, if it isn't my least favorite relative and her merry band of reality meddlers. I'd say I'm surprised to see you, Zara, but then, incompetence runs in the family, doesn't it? Though I must admit, your timing is impeccable. You're just in time to witness the birth of a new world order. One where MagiTech doesn't just rule the market, but reality itself!"
+    },
+    "image_prompt": "Imposing corporate CEO facing off against protagonists, massive reality-altering machine in background, suspended researcher visible, high detail, 8k resolution, inspired by Iron Man and Bioshock Infinite",
+    "next": "node8"
+  },
+  "node8": {
+    "text": "As Morgana monologues about power, destiny, and corporate quarterly goals, you exchange glances with Gimble and Zyx. The final battle for reality is at hand, and it promises to be as weird and wonderful as Neo-Ankh itself.",
+    "battle": {
+      "enemy": "CEO Morgana Vex and Project Nexus",
+      "message": "Witness the power of true corporate synergy! Reality itself will bend to the will of our shareholders!"
+    },
+    "image_prompt": "Epic confrontation in reality-warping lab, corporate villain wielding techno-magical powers, protagonists preparing for final battle, swirling vortex of energy threatening to engulf all, high detail, 8k resolution, inspired by Endgame and The Good Place",
+    "next": "conclusion"
+  },
+  "conclusion": {
+    "text": "In the aftermath of the reality-bending battle, as the dust settles and the laws of physics cautiously poke their heads out to see if it's safe to return, you stand victorious. Cassius is freed, Project Nexus is shut down, and Neo-Ankh is saved – albeit with a slight duck-based aftertaste that will linger for weeks.\n\nAs you leave the MagiTech tower, Gimble's cyberdeck finally decrypts the last of Project Nexus's files, revealing a conspiracy that goes far beyond a single corporation. It seems your adventure is far from over.\n\nBut for now, as the sun rises over Neo-Ankh, painting the cyberpunk skyline in hues of pink and gold, you allow yourself a moment of peace. You've saved reality, reunited a family, and only slightly violated the laws of nature. All in all, not a bad day's work for a down-on-her-luck detective with a talent for finding trouble.\n\nAs you walk into the new dawn, you can't help but smile. In a city where magic and technology dance a constant tango, where corporate conspiracies threaten the very fabric of existence, and where a well-placed rubber duck can save the universe, one thing is certain: life in Neo-Ankh is never, ever boring.",
+    "environment": "Neo-Ankh at dawn, the city awakening to a new day, blissfully unaware of how close it came to duck-flavored oblivion.",
+    "image_prompt": "Cyberpunk city at dawn, protagonists walking away from corporate tower, blend of relief and determination on faces, hints of duck-themed reality alterations in environment, high detail, 8k resolution, inspired by Blade Runner 2049 and Good Omens",
+    "next": "end"
+  }
+}

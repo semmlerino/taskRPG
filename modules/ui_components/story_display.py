@@ -1,7 +1,7 @@
-from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QTextEdit, QSizePolicy, QSplitter
-from PyQt5.QtGui import QFont, QPixmap, QTextCursor
+from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QTextBrowser, QSizePolicy, QSplitter, QScrollArea
+from PyQt5.QtGui import QFont, QPixmap, QTextCursor  # Added QTextCursor import
 from PyQt5.QtCore import Qt, QTimer
-import os
+from os import path  # Added import for os module
 
 class StoryDisplay(QWidget):
     def __init__(self, parent=None):
@@ -24,39 +24,36 @@ class StoryDisplay(QWidget):
         self.image_label.setStyleSheet("background-color: #E0E0E0; border: 1px solid #BDBDBD; border-radius: 10px;")
         self.splitter.addWidget(self.image_label)
         
-        # Story Text
-        self.story_text = QTextEdit()
-        self.story_text.setReadOnly(True)
-        self.story_text.setFont(QFont("Times New Roman", 16))
+        # Story Text using QTextBrowser
+        self.story_text = QTextBrowser()
+        self.story_text.setOpenExternalLinks(True)  # Enable hyperlink clicking
+        self.story_text.setFont(QFont("Georgia", 18))  # Increased font size for better readability
         self.story_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #FAFAFA;
-                color: #212121;
+            QTextBrowser {
+                background-color: #FFFFFF;
+                color: #333333;
                 border: 2px solid #BDBDBD;
                 border-radius: 5px;
+                padding: 10px;  /* Added padding for better aesthetics */
             }
         """)
         self.splitter.addWidget(self.story_text)
         
         # Set initial sizes (adjust as needed)
-        self.splitter.setSizes([300, 300])
+        self.splitter.setSizes([300, 400])
         
         layout.addWidget(self.splitter)
         self.setLayout(layout)
     
     def append_text(self, html_content: str):
-        self.story_text.moveCursor(QTextCursor.End)
-        self.story_text.insertHtml(html_content)
-        self.story_text.insertHtml("<br>")
+        self.story_text.append(html_content)
         self.scroll_to_end()
     
     def scroll_to_end(self):
-        cursor = self.story_text.textCursor()
-        cursor.movePosition(QTextCursor.End)
-        self.story_text.setTextCursor(cursor)
+        self.story_text.moveCursor(QTextCursor.End)
     
     def display_image(self, image_path: str):
-        if image_path and os.path.exists(image_path):
+        if image_path and path.exists(image_path):  # Updated to use path.exists
             self.current_image_path = image_path
             self.resize_timer.start(100)  # Delay resize by 100ms
         else:

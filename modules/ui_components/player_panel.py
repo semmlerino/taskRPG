@@ -44,7 +44,7 @@ class PlayerPanel(QWidget):
         self.xp_label.setText(f"XP: {self.player.experience}/{self.player.experience_to_next_level}")
         inventory_items = self.player.inventory.get_items()
         if inventory_items:
-            items_text = ', '.join(inventory_items)
+            items_text = ', '.join(item['name'] for item in inventory_items)
             self.inventory_label.setText(f"Inventory: {items_text}")
         else:
             self.inventory_label.setText("Inventory: Empty")

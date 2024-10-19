@@ -1,0 +1,85 @@
+{
+    "title": "The Lost Temple of Aztlanm no items",
+    "start": {
+        "text": "You stand at the entrance of the fabled Lost Temple of Aztlan, rumored to hold untold treasures and ancient secrets long forgotten by time.",
+        "image_prompt": "An ancient, overgrown temple entrance in the dense jungle, mist swirling around carved stone pillars, intricate Aztec patterns, high detail, photorealistic, 8k resolution, atmospheric lighting, by James Gurney and Jean-Baptiste Monge",
+        "environment": "Dense jungle surrounds you, the air thick with humidity and the sounds of distant wildlife.",
+        "next": "temple_entrance"
+    },
+    "temple_entrance": {
+        "text": "As you step inside, the darkness engulfs you, but soon your eyes adjust to the dim glow of ancient torches that flicker to life on their own.",
+        "image_prompt": "An ancient temple corridor lit by eerie, self-igniting torches, walls adorned with mysterious hieroglyphs, high detail, 8k, dramatic shadows, by Dan Mumford",
+        "event": "The entrance behind you seals shut with a thunderous boom.",
+        "next": "hall_of_whispers"
+    },
+    "hall_of_whispers": {
+        "text": "You find yourself in the Hall of Whispers, where faint voices echo around you, speaking in an ancient tongue.",
+        "environment": "The walls seem to be alive, their carvings shifting subtly as if whispering secrets.",
+        "image_prompt": "A grand hall with walls covered in shifting glyphs, ghostly whispers wafting through the air, high detail, ethereal glow, 8k resolution, by Yoann Lossel",
+        "npc": {
+            "name": "Mysterious Shade",
+            "dialogue": "Only those who understand the past may proceed."
+        },
+        "next": "decipher_glyphs"
+    },
+    "decipher_glyphs": {
+        "text": "You study the shifting glyphs, and they reveal a story of a lost civilization and a powerful artifact hidden within.",
+        "event": "Gained knowledge about the Temple's secret.",
+        "next": "trap_room"
+    },
+    "trap_room": {
+        "text": "You enter a room with a mosaic floor depicting a sun. As you step forward, arrows shoot from the walls!",
+        "image_prompt": "An ancient chamber with sun mosaic on the floor, walls suddenly firing arrows, high detail, dynamic action, 8k, by Peter Mohrbacher",
+        "event": "A trap has been triggered!",
+        "battle": {
+            "enemy": "Temple Trap",
+            "message": "Dodge the arrows to survive!"
+        },
+        "next": "underground_lake"
+    },
+    "underground_lake": {
+        "text": "After narrowly escaping the trap, you find yourself at the edge of an underground lake, its waters eerily still.",
+        "image_prompt": "An expansive underground lake with a mirror-like surface, illuminated by bioluminescent plants, high detail, 8k, serene atmosphere, by Ivan Aivazovsky",
+        "event": "A boat rests at the water's edge, seemingly waiting for you.",
+        "next": "lake_crossing"
+    },
+    "lake_crossing": {
+        "text": "As you paddle across the lake, a colossal serpent emerges from the depths!",
+        "image_prompt": "A colossal serpent rising from the dark waters of an underground lake, mouth open wide, high detail, dramatic lighting, 8k, by H.R. Giger",
+        "battle": {
+            "enemy": "Serpent Guardian",
+            "message": "Defeat the Serpent Guardian to proceed!"
+        },
+        "next": "sanctum_door"
+    },
+    "sanctum_door": {
+        "text": "You arrive at a massive door adorned with ancient symbols, pulsing with mystical energy.",
+        "image_prompt": "A colossal door with glowing ancient symbols, mystical energy swirling around, high detail, 8k, by Alex Grey",
+        "npc": {
+            "name": "Guardian Spirit",
+            "dialogue": "Prove your worth by solving the riddle, or face eternal damnation."
+        },
+        "next": "use_knowledge"
+    },
+    "use_knowledge": {
+        "text": "Using the knowledge gained earlier, you recite the incantations inscribed in the glyphs. The door slowly opens.",
+        "event": "Your wisdom has granted you passage.",
+        "next": "inner_sanctum"
+    },
+    "inner_sanctum": {
+        "text": "You step into the Inner Sanctum, where the legendary Sunstone rests upon an ornate pedestal.",
+        "image_prompt": "A grand chamber with a glowing Sunstone atop an ornate pedestal, rays of light illuminating the room, high detail, 8k, by John Harris",
+        "event": "As you approach, the final guardian emerges.",
+        "battle": {
+            "enemy": "Ancient Golem",
+            "message": "The Ancient Golem awakens! Defeat it to claim the Sunstone!"
+        },
+        "next": "conclusion"
+    },
+    "conclusion": {
+        "text": "With the Golem defeated, you claim the Sunstone, feeling its immense power coursing through you.",
+        "image_prompt": "A triumphant figure holding the radiant Sunstone, light emanating in all directions, high detail, 8k, by Greg Rutkowski",
+        "event": "You have become the master of the Lost Temple of Aztlan.",
+        "end": true
+    }
+}

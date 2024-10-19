@@ -1,0 +1,68 @@
+{
+  "start": {
+    "text": "The data chip burned a hole in your pocket as you trudged through the neon-soaked streets of Neo-Ankh's Lowtown. The information you'd pilfered from MagiTech's servers pointed to the undercity – a labyrinthine warren of forgotten tunnels, improvised dwellings, and the occasional eldritch horror that the tourism board conveniently forgot to mention in their brochures.",
+    "environment": "Rain-slicked streets of Lowtown, a cacophony of sounds and smells assaulting the senses. Holographic advertisements flicker weakly, their promises of a better life seeming particularly hollow down here.",
+    "image_prompt": "Grimy cyberpunk street, neon reflections in puddles, diverse crowd of humans and metahumans, looming undercity entrance visible, high detail, 8k resolution, inspired by Blade Runner and Shadowrun",
+    "next": "node1"
+  },
+  "node1": {
+    "text": "You needed a guide, someone who knew the undercity's twisted paths and could keep their mouth shut. That meant a visit to The Rusty Cog, a dive bar that catered to Neo-Ankh's more... colorful residents. As you approached, the muffled thump of synthrock and the occasional crash of breaking glassware suggested that the evening's entertainment was in full swing.",
+    "environment": "The Rusty Cog - a dimly lit bar with mismatched furniture, patrons of various species and cybernetic enhancements, and an atmosphere thick with smoke and secrets.",
+    "image_prompt": "Cyberpunk dive bar interior, diverse patrons, holographic bartender, smoke-filled air, high detail, 8k resolution, inspired by Star Wars cantina and Shadowrun",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "You sidled up to the bar, deftly avoiding a troll's swinging cybernetic arm as he gesticulated wildly about his latest heist. The bartender, a world-weary elf with more chrome than skin, raised an eyebrow at your approach.",
+    "npc": {
+      "name": "Zin",
+      "dialogue": "Well, well. If it isn't Zara Vex, Neo-Ankh's most stubborn P.I. What rock did you crawl out from under, and what manner of nightmare is chasing you this time?"
+    },
+    "image_prompt": "Close-up of cybernetically enhanced elven bartender, neon reflections on chrome parts, detective in foreground, diverse bar patrons in background, high detail, 8k resolution, inspired by Altered Carbon and Shadowrun",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "You were about to reply when a commotion erupted at the far end of the bar. A group of Rust Gang members, their bodies a patchwork of salvaged tech and corroded metal, had taken offense to something a dwarven netrunner had muttered into his synth-ale.",
+    "environment": "Chaotic bar fight breaking out, patrons diving for cover or eagerly joining the fray. The Rust Gang's improvised weapons spark and sputter ominously.",
+    "image_prompt": "Cyberpunk bar brawl, Rust Gang members with junkyard cybernetics vs dwarf netrunner, energy weapons and flying furniture, high detail, 8k resolution, inspired by Cyberpunk 2077 and Terry Pratchett's chaotic scenes",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "The lead Rust Ganger, a hulking brute with a mechanical jaw that clicked and whirred menacingly, advanced on the dwarf. 'You wanna run that by me again, short stack?'",
+    "battle": {
+      "enemy": "Rust Gang Brute",
+      "message": "Looks like we've got ourselves some fresh scraps for the junkyard, boys!"
+    },
+    "image_prompt": "Imposing cyborg gang leader looming over defiant dwarf netrunner, bar patrons watching tensely, detective considering intervention, high detail, 8k resolution, inspired by Shadowrun and Judge Dredd",
+    "next": "node5"
+  },
+  "node5": {
+    "text": "With a sigh that suggested this was not how you'd planned to spend your evening, you stepped between the Rust Ganger and his quarry. 'Now, now, gentlemen,' you said, your voice dripping with sarcasm, 'surely we can settle this like civilized denizens of our fair city's underworld?'",
+    "environment": "Tense standoff in the bar, patrons holding their breath, some quietly placing bets on the outcome.",
+    "image_prompt": "Detective standing between angry cyborg and nervous dwarf, bar patrons watching with mix of fear and excitement, neon lights casting dramatic shadows, high detail, 8k resolution, inspired by Sin City and Discworld",
+    "next": "node6"
+  },
+  "node6": {
+    "text": "The Rust Ganger's mechanical eye whirred as it focused on you, his grin revealing a mouthful of metal teeth that looked sharp enough to chew through the bar's notoriously tough synthsteak. 'Well, well. If it ain't the magic detective. Boys, looks like we got ourselves a two-for-one special tonight!'",
+    "battle": {
+      "enemy": "Rust Gang Squad",
+      "message": "Time to show this uppity PI what happens when you stick your nose where it don't belong!"
+    },
+    "image_prompt": "Cyberpunk bar battle, detective using minor magic against Rust Gang members with junk-tech weapons, dwarf netrunner providing tech support, chaotic environment, high detail, 8k resolution, inspired by Shadowrun and The Dresden Files",
+    "next": "node7"
+  },
+  "node7": {
+    "text": "As the dust settled and the last Rust Ganger slumped unconscious onto a bed of broken glass and spilled synth-ale, the dwarven netrunner approached you, his cyberdeck humming softly. 'Thanks for the save,' he said, extending a hand. 'Name's Gimble. Word is you're looking for a guide to the undercity. For what you just did, I'd be happy to volunteer my services.'",
+    "npc": {
+      "name": "Gimble",
+      "dialogue": "I know every data node and forgotten tunnel down there. Whatever you're after, I can help you find it. Just... promise me it won't involve any more run-ins with walking junkyard rejects, yeah?"
+    },
+    "image_prompt": "Aftermath of bar fight, detective and dwarf netrunner shaking hands, unconscious gang members scattered around, curious bar patrons in background, high detail, 8k resolution, inspired by Neuromancer and Discworld",
+    "next": "node8"
+  },
+  "node8": {
+    "text": "With Gimble as your newfound guide, you made your way to the entrance of the undercity. The massive steel doors, covered in warning signs and magical wards, groaned open to reveal a descending path into darkness. The air that wafted up carried the scent of damp earth, ozone, and something unidentifiably alien.",
+    "environment": "Imposing entrance to the undercity, a mix of high-tech security and ancient magical barriers. The path beyond is shrouded in shadows and swirling mists.",
+    "image_prompt": "Monumental doors to cyberpunk undercity, detective and dwarf entering, swirling mix of magical energy and tech interfaces, ominous dark passage beyond, high detail, 8k resolution, inspired by Neverwhere and Blade Runner",
+    "next": "chapter3"
+  }
+}

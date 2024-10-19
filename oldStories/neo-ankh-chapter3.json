@@ -1,0 +1,71 @@
+{
+  "start": {
+    "text": "The undercity of Neo-Ankh unfolds before you like a fever dream designed by a committee of mad architects, each with their own unique interpretation of the word 'habitable'. Gimble leads you through winding passages where the walls seem to breathe, and the floor occasionally offers unsolicited career advice.",
+    "environment": "A labyrinthine network of tunnels and caverns, lit by a haphazard array of bioluminescent fungi, jerry-rigged neon signs, and the occasional ball of magical fire trapped in a rusted cage. The air is thick with the scent of damp earth, ozone, and what you hope is just particularly ambitious mold.",
+    "image_prompt": "Vast cyberpunk undercity cavern, glowing fungi, makeshift dwellings, magical and technological elements intertwined, high detail, 8k resolution, inspired by China Miéville and Hayao Miyazaki",
+    "next": "node1"
+  },
+  "node1": {
+    "text": "As you navigate a particularly treacherous stretch of tunnel, where the ground alternates between squelching ominously and crackling with static electricity, Gimble regales you with the finer points of undercity etiquette.",
+    "npc": {
+      "name": "Gimble",
+      "dialogue": "Now remember, if you see a door marked with a glowing purple squid, that's not a trendy nightclub. It's the lair of Old Tentacular Pete. Lovely chap, but he does get a bit handsy. Or tentacly, I suppose. Oh, and if anyone offers you a 'Gnome's Delight' cocktail, just say no. Trust me on this one."
+    },
+    "image_prompt": "Dwarf netrunner gesticulating wildly, leading detective through bizarre undercity tunnel, glowing squid graffiti visible, high detail, 8k resolution, inspired by Terry Pratchett and The Nightmare Before Christmas",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "You're about to ask Gimble to elaborate on the apparently trauma-inducing 'Gnome's Delight' when a commotion up ahead catches your attention. A group of undercity dwellers are gathered around a street performer whose act seems to involve juggling balls of crackling energy while reciting what sounds suspiciously like corporate quarterly reports in iambic pentameter.",
+    "environment": "A makeshift plaza in the undercity, surrounded by ramshackle buildings cobbled together from scavenged materials. Magical lights float overhead, occasionally bumping into each other and changing colors with indignant squeaks.",
+    "image_prompt": "Cyberpunk undercity plaza, eccentric street performer juggling energy balls, diverse crowd of human and non-human spectators, buildings made of scrap tech and magical artifacts, high detail, 8k resolution, inspired by Terry Gilliam and Shadowrun",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "As you approach, the performer's finale goes spectacularly awry. One of the energy balls goes rogue, bouncing off the head of a particularly unimpressed troll before ricocheting towards an ornate door marked with the symbol of a gear wrapped in magical runes.",
+    "npc": {
+      "name": "Zap Dazzle",
+      "dialogue": "Ladies, gentlemen, and beings of indeterminate classification! I meant to do that! Truly, what is art if not a near-death experience shared among friends? And now, for my next trick, I shall make myself disappear before that rather large gentleman decides to rearrange my molecular structure!"
+    },
+    "image_prompt": "Flamboyant cyberpunk street performer mid-escape, energy ball bouncing chaotically, annoyed troll rubbing head, ornate technomancer door in background, high detail, 8k resolution, inspired by The Fifth Element and Discworld",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "The energy ball strikes the door, which flares to life with a kaleidoscope of magical defenses. For a moment, it seems the crisis is averted. Then, with a sound like a thousand computers sighing in existential despair, the door's defenses sputter and fail. The ground trembles, and from within the now-open doorway, a mechanical roar echoes.",
+    "environment": "The plaza descends into chaos as panicked onlookers flee. The ornate door, now hanging off its hinges, reveals a glimpse of a high-tech workshop beyond, where something large and unfriendly is stirring.",
+    "image_prompt": "Chaotic undercity scene, malfunctioning magical door, glimpse of advanced workshop within, panicked crowd fleeing, high detail, 8k resolution, inspired by Howl's Moving Castle and Blade Runner",
+    "next": "node5"
+  },
+  "node5": {
+    "text": "A massive construct of metal and magic lumbers out of the workshop. It appears to be a prototype gone wrong, its body a hodgepodge of miscalibrated tech and wild magic. Its eyes, a swirling vortex of code and mystical symbols, fix upon you and Gimble – the only two beings foolish enough not to run.",
+    "battle": {
+      "enemy": "Rogue Technomantic Golem",
+      "message": "INTRUDERS DETECTED. INITIATING EXPERIMENTAL DEFENSE PROTOCOLS. PLEASE FILL OUT SATISFACTION SURVEY AFTER TERMINATION."
+    },
+    "image_prompt": "Massive techno-magical golem emerging from workshop, detective and dwarf netrunner preparing to fight, chaos in undercity plaza, high detail, 8k resolution, inspired by Pacific Rim and Discworld's Golems",
+    "next": "node6"
+  },
+  "node6": {
+    "text": "As the golem bears down on you, Gimble frantically taps at his cyberdeck. 'I'm trying to hack its systems,' he shouts over the mechanical roar, 'but it's like trying to reason with a drunken vending machine that thinks it's a dragon! Your magic might be our best bet!'",
+    "environment": "The plaza has become a battlefield, the golem's heavy steps leaving imprints in the ground that immediately fill with a mixture of oil and glowing ectoplasm. Sparks fly as it tears through makeshift stalls and signs.",
+    "image_prompt": "Cyberpunk detective using magic against giant techno-magical golem, dwarf hacker providing support, destructive battle in undercity plaza, high detail, 8k resolution, inspired by Doctor Strange and Shadowrun",
+    "next": "node7"
+  },
+  "node7": {
+    "text": "With a combination of Gimble's frantic hacking and your own brand of magical intuition, you manage to confuse the golem's systems long enough to lead it into a wall of particularly stubborn fungus. As it struggles, entangled in glowing mushrooms that seem more annoyed than threatened by the intrusion, a group of robed figures emerges from the workshop.",
+    "npc": {
+      "name": "Arch-Technomancer Zyx",
+      "dialogue": "Oh dear. Oh dear, oh dear. I do apologize for this little... mishap. We were merely attempting to create a synthetic entity capable of filing taxes across multiple dimensional planes. I don't suppose we could persuade you to forget this little incident? We have some lovely Technomancer's Guild merchandise. How about a t-shirt that changes slogans based on your mood?"
+    },
+    "image_prompt": "Group of eccentric technomancers facing detective and dwarf, giant golem struggling with glowing mushrooms in background, chaotic undercity environment, high detail, 8k resolution, inspired by Harry Potter and Futurama",
+    "next": "node8"
+  },
+  "node8": {
+    "text": "As the Technomancers sheepishly attempt to wrangle their creation back into the workshop, you seize the opportunity to question them about Project Nexus and the missing researcher, Cassius. The Arch-Technomancer's eyes widen at your mention of MagiTech Industries.",
+    "npc": {
+      "name": "Arch-Technomancer Zyx",
+      "dialogue": "MagiTech? Oh my. I'm afraid you've stumbled onto something rather big and terribly inconvenient, haven't you? Very well, come inside. We have much to discuss, and I have a feeling we're going to need something stronger than our usual Mana Mocha. Gimble, be a dear and fetch the Antimatter Ale, would you? And do mind the quantum fluctuations near the refrigerator. Last week, someone opened it and found themselves face to face with their own great-grandfather. Terribly awkward."
+    },
+    "image_prompt": "Interior of whimsical technomancer workshop, detective and dwarf entering, bizarre magical and technological experiments everywhere, concerned technomancers in background, high detail, 8k resolution, inspired by Harry Potter's Room of Requirement and Rick and Morty's garage",
+    "next": "chapter4"
+  }
+}
