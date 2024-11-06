@@ -1,4 +1,4 @@
-# modules/ui_components/action_buttons.py
+# modules/ui/components/action_buttons.py
 
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout
 from PyQt5.QtGui import QFont
@@ -28,12 +28,17 @@ class ActionButtons(QWidget):
                 border: none;
                 border-radius: 5px;
             }
-            QPushButton:hover {
+            QPushButton:hover:enabled {
                 background-color: #1E88E5;
+            }
+            QPushButton:disabled {
+                background-color: #BDBDBD;
+                color: #757575;
             }
         """)
         self.next_button.setFixedHeight(50)
         self.next_button.setToolTip("Proceed to the next story segment (Shortcut: G)")
+        self.next_button.setEnabled(False)  # Disabled by default
         layout.addWidget(self.next_button)
         
         # Attack Button
@@ -87,6 +92,7 @@ class ActionButtons(QWidget):
     def show_attack_buttons(self):
         """Shows Attack and Heavy Attack buttons and hides Next button."""
         self.next_button.hide()
+        self.next_button.setEnabled(False)
         self.attack_button.show()
         self.heavy_attack_button.show()
     
@@ -95,3 +101,4 @@ class ActionButtons(QWidget):
         self.attack_button.hide()
         self.heavy_attack_button.hide()
         self.next_button.show()
+        self.next_button.setEnabled(True)  # Enable only when showing after combat

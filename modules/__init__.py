@@ -6,3 +6,4 @@ from .hotkeys import GlobalHotkeys
 from .story import StoryManager
 from .ui.dialogs.settings_dialog import SettingsDialog
 from .ui import TaskRPG
+from .image_generator import ImageGenerator

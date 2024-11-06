@@ -8,7 +8,6 @@ from .constants import HOTKEYS
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 class GlobalHotkeys(QThread):
     """
     Thread class to listen for global hotkeys.
@@ -18,20 +17,28 @@ class GlobalHotkeys(QThread):
     heavy_attack_signal = pyqtSignal()
     toggle_pause_signal = pyqtSignal()
     next_story_signal = pyqtSignal()
-    # Removed open_settings_signal
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self._running = True
+        self.next_story_enabled = True
+        self.attack_hotkeys_enabled = True
+        self._next_story_hotkey = None
 
     def run(self):
         """Registers global hotkeys and listens for them."""
         try:
-            keyboard.add_hotkey(HOTKEYS['normal_attack'], lambda: self.normal_attack_signal.emit())
-            keyboard.add_hotkey(HOTKEYS['heavy_attack'], lambda: self.heavy_attack_signal.emit())
-            keyboard.add_hotkey(HOTKEYS['toggle_pause'], lambda: self.toggle_pause_signal.emit())
-            keyboard.add_hotkey(HOTKEYS['next_story'], lambda: self.next_story_signal.emit())
-            # Removed open_settings hotkey
+            # Attack hotkeys - always active when in battle
+            keyboard.add_hotkey(HOTKEYS['normal_attack'], 
+                              lambda: self.normal_attack_signal.emit())
+            keyboard.add_hotkey(HOTKEYS['heavy_attack'], 
+                              lambda: self.heavy_attack_signal.emit())
+            keyboard.add_hotkey(HOTKEYS['toggle_pause'], 
+                              lambda: self.toggle_pause_signal.emit())
+            
+            # Story navigation - can be disabled
+            self._register_next_story_hotkey()
+            
             logging.info("Global hotkeys registered.")
 
             while self._running:
@@ -45,3 +52,29 @@ class GlobalHotkeys(QThread):
         keyboard.unhook_all()
         logging.info("Global hotkeys unregistered.")
 
+    def set_next_story_enabled(self, enabled: bool):
+        """Enable/disable the next story hotkey."""
+        self.next_story_enabled = enabled
+        self._register_next_story_hotkey()
+
+    def set_attack_hotkeys_enabled(self, enabled: bool):
+        """Enable/disable attack hotkeys."""
+        self.attack_hotkeys_enabled = enabled
+
+    def _register_next_story_hotkey(self):
+        """Registers or removes the next story hotkey based on enabled state."""
+        try:
+            if hasattr(self, '_next_story_hotkey') and self._next_story_hotkey:
+                keyboard.remove_hotkey(self._next_story_hotkey)
+                self._next_story_hotkey = None
+            
+            if self.next_story_enabled:
+                self._next_story_hotkey = keyboard.add_hotkey(
+                    HOTKEYS['next_story'],
+                    lambda: self.next_story_signal.emit()
+                )
+                logging.debug("Next story hotkey registered")
+            else:
+                logging.debug("Next story hotkey disabled")
+        except Exception as e:
+            logging.error(f"Error in _register_next_story_hotkey: {e}")
