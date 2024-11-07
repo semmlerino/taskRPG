@@ -1,0 +1,7 @@
+# Ignore all files in the directory
+__pycache__/
+repopack/
+
+assets/
+stories/
+oldstories/

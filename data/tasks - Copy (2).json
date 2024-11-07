@@ -1,0 +1,102 @@
+{
+    "Mails": {
+        "min": 4,
+        "max": 6,
+        "active": false
+    },
+    "ToDo": {
+        "min": 3,
+        "max": 3,
+        "active": false
+    },
+    "Gym": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "Tabs": {
+        "min": 11,
+        "max": 17,
+        "active": false
+    },
+    "GPTs": {
+        "min": 2,
+        "max": 7,
+        "active": true
+    },
+    "FitRPG": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "KanaRPG": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "3DE scripting": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "SG scripting": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "Clean Room (1 Thema des Tages)": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "Claude": {
+        "min": 5,
+        "max": 9,
+        "active": true
+    },
+    "Bubble": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "Perplexity": {
+        "min": 5,
+        "max": 9,
+        "active": true
+    },
+    "Gemini": {
+        "min": 2,
+        "max": 5,
+        "active": true
+    },
+    "Hair": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "LibreChat": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "taskRPG": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "Shop": {
+        "min": 1,
+        "max": 1,
+        "active": false
+    },
+    "Beard": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    },
+    "FTLjp": {
+        "min": 1,
+        "max": 1,
+        "active": true
+    }
+}
