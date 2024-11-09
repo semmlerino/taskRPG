@@ -5,6 +5,7 @@ from typing import Optional, Dict, Any, List, Union
 from enum import Enum, auto
 
 from core.story.story_content import StoryContent
+from core.story.story_node import StoryNode  # Newly added import
 from core.battle.battle_manager import BattleManager  # Imported BattleManager
 from .image_generator import ImageGenerator
 
@@ -19,6 +20,7 @@ class StoryManager:
     """
     Manages story progression, content, and state.
     """
+
     def __init__(
         self,
         filepath: str,
@@ -50,47 +52,102 @@ class StoryManager:
         logging.info(f"StoryManager initialized with filepath: {filepath}")
 
     def load_story(self) -> Dict[str, Any]:
-        """Load and parse the story JSON file."""
+        """
+        Load and validate the story JSON file.
+
+        Returns:
+            Dict[str, Any]: Validated story data
+        """
         try:
             with open(self.filepath, 'r', encoding='utf-8') as f:
-                story = json.load(f)
-            logging.info(f"Story loaded successfully from {self.filepath}")
-            return story
+                story_data = json.load(f)
+
+            # Validate story data structure
+            if not isinstance(story_data, dict):
+                raise ValueError("Story data must be a dictionary")
+
+            # Convert all string nodes to dict format for consistency
+            validated_data = {}
+            for key, node in story_data.items():
+                if isinstance(node, str):
+                    # Convert legacy string format to dict
+                    validated_data[key] = {
+                        "text": node,
+                        "next": None
+                    }
+                elif isinstance(node, dict):
+                    validated_data[key] = node
+                else:
+                    logging.warning(f"Invalid node type for key {key}: {type(node)}")
+                    continue
+
+            logging.info(f"Story loaded and validated: {len(validated_data)} nodes")
+            return validated_data
+
         except Exception as e:
             logging.error(f"Error loading story: {e}")
-            return {}
+            # Return minimal valid story data
+            return {
+                "start": {
+                    "text": "Error loading story. Please check story file format.",
+                    "end": True
+                }
+            }
 
     def get_initial_node(self) -> str:
-        """Get the initial node of the story."""
-        if not self.story_data:
-            raise ValueError("Story data is empty")
+        """
+        Get the initial node of the story with improved node detection.
+        
+        Returns:
+            str: Key of the first story node
+        """
+        try:
+            if not self.story_data:
+                raise ValueError("Story data is empty")
 
-        if 'start' in self.story_data:
-            return 'start'
-        elif 'node1' in self.story_data:
-            return 'node1'
-        else:
-            return next(iter(self.story_data))
+            # Check for standard start nodes
+            if 'start' in self.story_data:
+                return 'start'
+                
+            # Find the lowest numbered node if using nodeX format
+            numbered_nodes = [
+                node for node in self.story_data.keys() 
+                if node.startswith('node') and node[4:].isdigit()
+            ]
+            
+            if numbered_nodes:
+                # Sort by node number and get the lowest
+                lowest_node = sorted(
+                    numbered_nodes,
+                    key=lambda x: int(x[4:])  # Extract number from 'nodeX'
+                )[0]
+                logging.info(f"Starting with lowest numbered node: {lowest_node}")
+                return lowest_node
+
+            # Fallback to first available node
+            first_node = next(iter(self.story_data))
+            logging.info(f"Using first available node: {first_node}")
+            return first_node
+
+        except Exception as e:
+            logging.error(f"Error finding initial node: {e}")
+            raise ValueError("Could not determine initial story node")
 
     def display_story_segment(self) -> bool:
-        """Display the current segment of the story."""
+        """Display the current segment of the story with enhanced error handling."""
         try:
             if not self._validate_story_state():
                 return False
 
             node = self.get_current_node()
-
-            # Skip if this is a completed battle node
-            if "battle" in node and self.current_node_key in self.completed_battle_nodes:
-                next_node = node.get('next')
-                if next_node:
-                    self.current_node_key = next_node
-                    self.current_node = self.story_data[next_node]
-                    return self.display_story_segment()  # Recursively display the next segment
+            if not node:
+                logging.error(f"Invalid node data for key: {self.current_node_key}")
                 return False
 
+            # Create node content
             content = self._create_node_content(node)
             if not content:
+                logging.error("Failed to create node content")
                 return False
 
             self._current_content = content
@@ -102,12 +159,22 @@ class StoryManager:
 
             # Update UI if available
             if self.ui:
-                self._update_ui_display(content)
+                html_content = content.to_html()
+                self.ui.story_display.set_page(
+                    self.current_node_key,
+                    html_content,
+                    content.image_path
+                )
+                logging.info(f"Displayed story segment for node: {self.current_node_key}")
 
             return True
 
         except Exception as e:
             logging.error(f"Error displaying story segment: {e}")
+            if self.ui:
+                self.ui.story_display.append_text(
+                    "<p style='color: red;'>Error loading story content. Please check the story file.</p>"
+                )
             return False
 
     def _validate_story_state(self) -> bool:
@@ -116,28 +183,59 @@ class StoryManager:
             logging.error("No story data available")
             return False
 
-        if not self.current_node:
-            logging.error("No current node available")
+        if not self.current_node_key:
+            logging.error("No current node key set")
+            return False
+
+        if self.current_node_key not in self.story_data:
+            logging.error(f"Invalid node key: {self.current_node_key}")
             return False
 
         return True
 
-    def _create_node_content(self, node: Dict) -> Optional[StoryContent]:
-        """Create node content from node data."""
+    def _create_node_content(self, node_data: Any) -> Optional[StoryContent]:
+        """
+        Create node content from node data with proper type checking and error handling.
+
+        Args:
+            node_data: Node data from story file
+
+        Returns:
+            Optional[StoryContent]: Created content or None if invalid
+        """
         try:
+            # Verify node_data is a dictionary
+            if not isinstance(node_data, dict):
+                if isinstance(node_data, str):
+                    # Handle legacy format where node might be just text
+                    return StoryContent(
+                        text=node_data,
+                        node_key=self.current_node_key
+                    )
+                logging.error(f"Invalid node data type: {type(node_data)}")
+                return None
+
+            # Create StoryNode from dictionary data
+            node = StoryNode.from_dict(self.current_node_key, node_data)
+
             return StoryContent(
-                text=self.get_text(),
+                text=node.text,
                 node_key=self.current_node_key,
                 image_path=self.get_generated_image(self.current_node_key),
-                environment=self.get_environment(),
-                event=self.get_event(),
-                npc_info=self.get_npc(),
-                battle_info=self.get_battle_info(),
-                choices=self.get_choices()
+                environment=node.environment,
+                event=node.event,
+                npc_info=node.npc_info,
+                battle_info=node.battle_info,
+                choices=node.choices
             )
+
         except Exception as e:
             logging.error(f"Error creating node content: {e}")
-            return None
+            # Return a basic content object with error message
+            return StoryContent(
+                text="Error loading story content. Please contact support.",
+                node_key=self.current_node_key
+            )
 
     def _update_ui_display(self, content: StoryContent):
         """Update UI with node content."""
@@ -158,9 +256,9 @@ class StoryManager:
         """Navigate through story history."""
         try:
             logging.debug(f"Attempting navigation: direction={direction}, "
-                         f"history_index={self._history_index}, "
-                         f"history_length={len(self._history)}")
-            
+                          f"history_index={self._history_index}, "
+                          f"history_length={len(self._history)}")
+
             if not self._can_navigate(direction):
                 logging.debug("Cannot navigate in this direction")
                 return False
@@ -192,6 +290,7 @@ class StoryManager:
             return self._history_index > 0
 
     # Getter methods for node content
+
     def get_text(self) -> str:
         """Get narrative text from current node."""
         return self.current_node.get('text', '')
