@@ -718,8 +718,11 @@ class TaskRPG(QMainWindow):
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle key press events."""
-        # Let the story display handle its own key events
-        if self.story_display.hasFocus():
+        if event.key() == Qt.Key_Left:
+            self.navigate_back()
+        elif event.key() == Qt.Key_Right:
+            self.navigate_forward()
+        elif self.story_display.hasFocus():
             self.story_display.keyPressEvent(event)
         super().keyPressEvent(event)
 
