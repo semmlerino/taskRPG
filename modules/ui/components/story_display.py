@@ -1,49 +1,117 @@
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QTextBrowser, 
-    QSizePolicy, QSplitter, QScrollArea, QPushButton, QHBoxLayout, QMessageBox
+    QWidget, QLabel, QVBoxLayout, QTextBrowser, QSizePolicy, QSplitter, 
+    QScrollArea, QPushButton, QHBoxLayout, QMessageBox
 )
 from PyQt5.QtGui import QFont, QPixmap, QTextCursor, QKeyEvent
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from os import path
 from typing import Optional
 from .fullscreen_image_viewer import FullscreenImageViewer
-from modules.ui.components.story_text_browser import StoryTextBrowser
 import logging
 import traceback
 import os
 
+class StoryTextBrowser(QTextBrowser):
+    """Custom text browser with enhanced features for story display."""
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the UI."""
+        # Enable rich text
+        self.setAcceptRichText(True)
+        
+        # Set default font size
+        self.setFontPointSize(12)
+        
+        # Enable external links but handle them internally
+        self.setOpenExternalLinks(False)
+        
+        # Apply stylesheet
+        self.setStyleSheet("""
+            QTextBrowser {
+                background-color: #FFFFFF;
+                color: #333333;
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                padding: 8px;
+                selection-background-color: #2196F3;
+                selection-color: #FFFFFF;
+            }
+            QTextBrowser:focus {
+                border: 1px solid #2196F3;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #F5F5F5;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #CCCCCC;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #BBBBBB;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
+
 class StoryDisplay(QWidget):
-    """Displays story text and images."""
+    """Displays story text and images with fullscreen capability."""
     navigate_back_signal = pyqtSignal()
     navigate_forward_signal = pyqtSignal()
+    story_advance_signal = pyqtSignal()
     
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setFocusPolicy(Qt.StrongFocus)
         
-        # Define class attributes first
+        # Define class attributes
         self.image_min_height = 200
         self.text_min_height = 100
         self.current_image_path = None
+        self.current_node_key = None
+        self._fullscreen_viewer = None
         
         # Create widgets first
         self.create_widgets()
         # Then set up the layout
         self.init_ui()
         
-        self._fullscreen_viewer = None  # Single reference for the viewer
-    
+        # Connect internal signals
+        self._setup_connections()
+        
+        logging.info("StoryDisplay initialized")
+
     def create_widgets(self):
         """Create all widget instances."""
-        # Create existing widgets
+        # Story text browser
         self.story_text = StoryTextBrowser(self)
+        
+        # Image label
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignCenter)
-        self.splitter = QSplitter(Qt.Vertical)
+        self.image_label.setMinimumSize(100, 100)
+        self.image_label.setStyleSheet("""
+            QLabel {
+                background-color: #f0f0f0;
+                border: 1px solid #ddd;
+            }
+        """)
         
-        # Create navigation buttons
+        # Navigation buttons
         self.left_button = QPushButton("◀")
-        self.left_button.setStyleSheet("""
+        self.right_button = QPushButton("▶")
+        
+        # Style navigation buttons
+        nav_button_style = """
             QPushButton {
                 background: rgba(255, 255, 255, 180);
                 color: #333333;
@@ -63,20 +131,15 @@ class StoryDisplay(QWidget):
                 color: rgba(51, 51, 51, 60);
                 border: 1px solid rgba(33, 150, 243, 0.3);
             }
-        """)
-        
-        self.right_button = QPushButton("▶")
-        self.right_button.setStyleSheet(self.left_button.styleSheet())
+        """
+        self.left_button.setStyleSheet(nav_button_style)
+        self.right_button.setStyleSheet(nav_button_style)
 
     def init_ui(self):
         """Initialize the UI layout."""
         main_layout = QVBoxLayout(self)
         
-        # Set minimum sizes for splitter sections
-        self.image_min_height = 200
-        self.text_min_height = 150
-        
-        # Create splitter with proper size policies
+        # Create splitter
         self.splitter = QSplitter(Qt.Vertical)
         self.splitter.setChildrenCollapsible(False)
         
@@ -86,19 +149,10 @@ class StoryDisplay(QWidget):
         image_layout = QHBoxLayout(image_container)
         image_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create and configure image label
-        self.image_label = QLabel()
-        self.image_label.setMinimumSize(100, 100)  # Set minimum size
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setStyleSheet("""
-            QLabel {
-                background-color: #f0f0f0;
-                border: 1px solid #ddd;
-            }
-        """)
-        
-        # Add image label to image container
-        image_layout.addWidget(self.image_label)
+        # Add navigation buttons and image
+        image_layout.addWidget(self.left_button)
+        image_layout.addWidget(self.image_label, 1)  # 1 for stretch factor
+        image_layout.addWidget(self.right_button)
         
         # Story text section
         self.story_text.setMinimumHeight(self.text_min_height)
@@ -117,41 +171,62 @@ class StoryDisplay(QWidget):
         self.splitter.splitterMoved.connect(self.handle_splitter_moved)
         self.left_button.clicked.connect(self.navigate_back_signal.emit)
         self.right_button.clicked.connect(self.navigate_forward_signal.emit)
-    
+
+    def _setup_connections(self):
+        """Set up internal signal connections."""
+        self.left_button.clicked.connect(self.navigate_back_signal.emit)
+        self.right_button.clicked.connect(self.navigate_forward_signal.emit)
+
+    def set_page(self, node_key: str, html_content: str, image_path: Optional[str]):
+        """Set the content for the current story page."""
+        try:
+            self.current_node_key = node_key
+            self.clear()
+            
+            if image_path:
+                self.current_image_path = image_path
+                self.load_image()
+                
+            self.append_text(html_content)
+            
+            # Update fullscreen viewer if it exists
+            if self._fullscreen_viewer:
+                self._fullscreen_viewer.update_content(
+                    self.current_image_path,
+                    self.story_text.toPlainText()
+                )
+                
+            logging.debug(f"Page set for node: {node_key}")
+            
+        except Exception as e:
+            logging.error(f"Error setting page: {e}")
+            self.show_error("Failed to set page content")
+
     def append_text(self, html_content: str):
-        """Appends text to the story display."""
+        """Append text to the story display."""
         self.story_text.append(html_content)
         self.scroll_to_end()
-    
+
     def scroll_to_end(self):
-        """Scrolls to the end of the text display."""
+        """Scroll to the end of the text display."""
         self.story_text.moveCursor(QTextCursor.End)
-    
-    def display_image(self, image_path: str):
-        """Displays an image in the image label."""
-        if image_path and path.exists(image_path):
-            self.current_image_path = image_path
-            self.load_image()
-        else:
-            self.image_label.clear()
-            self.current_image_path = None
 
     def load_image(self):
         """Load and display the image, maintaining aspect ratio."""
-        if not hasattr(self, 'current_image_path') or not self.current_image_path:
+        if not self.current_image_path:
             return
 
         try:
-            # Load the image
             pixmap = QPixmap(self.current_image_path)
             if pixmap.isNull():
+                logging.error("Failed to load image")
                 return
 
-            # Get the available size for the image
+            # Get the available size
             available_width = self.image_label.width()
-            available_height = self.splitter.sizes()[0]  # Height of top splitter section
+            available_height = self.splitter.sizes()[0]
 
-            # Scale the image maintaining aspect ratio
+            # Scale the image
             scaled_pixmap = pixmap.scaled(
                 available_width,
                 available_height,
@@ -159,93 +234,24 @@ class StoryDisplay(QWidget):
                 Qt.SmoothTransformation
             )
             
-            # Set the scaled image
             self.image_label.setPixmap(scaled_pixmap)
             self.image_label.setAlignment(Qt.AlignCenter)
-
+            
         except Exception as e:
-            print(f"Error loading image: {e}")
+            logging.error(f"Error loading image: {e}")
+            self.show_error("Failed to load image")
 
     def resizeEvent(self, event):
-        """Handles resize events."""
+        """Handle resize events."""
         super().resizeEvent(event)
         self.load_image()
 
-    def set_page(self, node_key: str, html_content: str, image_path: Optional[str]):
-        """Updates display content."""
-        self.clear()
-        if image_path:
-            self.display_image(image_path)
-        self.append_text(html_content)
-        
-        # Update fullscreen viewer if it exists
-        if self._fullscreen_viewer:
-            self._fullscreen_viewer.update_content(image_path, self.story_text.toPlainText())
-    
-    def clear(self):
-        """Clears all content."""
-        self.story_text.clear()
-        self.image_label.clear()
-        
-    def clear_history(self):
-        """Clears display history."""
-        self.clear()
-
-    def cleanup_viewer(self):
-        """Clean up any existing fullscreen viewer."""
-        if self._fullscreen_viewer:
-            try:
-                self._fullscreen_viewer.close()
-                self._fullscreen_viewer.deleteLater()
-            except Exception as e:
-                logging.error(f"Error cleaning up viewer: {e}")
-            finally:
-                self._fullscreen_viewer = None
-
-    def keyPressEvent(self, event: QKeyEvent):
-        """Handle key press events."""
-        try:
-            if event.key() == Qt.Key_F and self.current_image_path:
-                logging.info(f"F key pressed, attempting to show fullscreen image: {self.current_image_path}")
-                
-                # Verify image exists
-                if not os.path.exists(self.current_image_path):
-                    logging.error(f"Image file does not exist: {self.current_image_path}")
-                    QMessageBox.warning(self, "Error", "Image file not found!")
-                    return
-
-                # Clean up any existing viewer
-                self.cleanup_viewer()
-                
-                # Create new viewer
-                try:
-                    self._fullscreen_viewer = FullscreenImageViewer(
-                        self.current_image_path,
-                        self.story_text.toPlainText()
-                    )
-                    self._fullscreen_viewer.showFullScreen()
-                    event.accept()
-                    logging.info("Fullscreen viewer created and displayed")
-                    
-                except Exception as e:
-                    logging.error(f"Failed to create viewer: {str(e)}\n{traceback.format_exc()}")
-                    QMessageBox.critical(self, "Error", f"Failed to show fullscreen image: {str(e)}")
-                    self.cleanup_viewer()
-                    
-            else:
-                super().keyPressEvent(event)
-                
-        except Exception as e:
-            logging.error(f"Error in keyPressEvent handling: {str(e)}\n{traceback.format_exc()}")
-            QMessageBox.critical(self, "Error", f"Failed to handle key press: {str(e)}")
-
     def handle_splitter_moved(self, pos, index):
-        """Handle splitter movement to prevent sections from disappearing and resize image"""
-        # Get current sizes
+        """Handle splitter movement."""
         sizes = self.splitter.sizes()
         total_height = sum(sizes)
         
-        # Calculate minimum heights as percentages of total height
+        # Calculate minimum heights as percentages
         min_image_percent = max(0.2, self.image_min_height / total_height)
         min_text_percent = max(0.2, self.text_min_height / total_height)
         
@@ -267,13 +273,77 @@ class StoryDisplay(QWidget):
         # Ensure image is resized properly
         QTimer.singleShot(50, self.load_image)
 
-    def set_content(self, text, image_path=None):
-        """Set the content of the display."""
-        self.story_text.setText(text)
-        
-        # Update image
-        self.current_image_path = image_path
-        if image_path:
-            self.load_image()
-        else:
-            self.image_label.clear()
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handle key press events."""
+        try:
+            if event.key() == Qt.Key_F and self.current_image_path:
+                self._show_fullscreen_viewer()
+            elif event.key() == Qt.Key_Left:
+                self.navigate_back_signal.emit()
+            elif event.key() == Qt.Key_Right:
+                self.navigate_forward_signal.emit()
+            elif event.key() == Qt.Key_G:
+                self.story_advance_signal.emit()
+            else:
+                super().keyPressEvent(event)
+                
+        except Exception as e:
+            logging.error(f"Error handling key press: {e}")
+            self.show_error("Failed to handle key press")
+
+    def _show_fullscreen_viewer(self):
+        """Show the fullscreen image viewer."""
+        try:
+            if not os.path.exists(self.current_image_path):
+                logging.error(f"Image file not found: {self.current_image_path}")
+                self.show_error("Image file not found")
+                return
+
+            self.cleanup_viewer()
+            
+            self._fullscreen_viewer = FullscreenImageViewer(
+                self.current_image_path,
+                self.story_text.toPlainText()
+            )
+            
+            # Connect story progression signal
+            self._fullscreen_viewer.story_advance_signal.connect(
+                self.story_advance_signal.emit
+            )
+            
+            self._fullscreen_viewer.showFullScreen()
+            logging.info("Fullscreen viewer displayed")
+            
+        except Exception as e:
+            logging.error(f"Error showing fullscreen viewer: {e}")
+            self.show_error("Failed to show fullscreen view")
+
+    def cleanup_viewer(self):
+        """Clean up any existing fullscreen viewer."""
+        if self._fullscreen_viewer:
+            try:
+                self._fullscreen_viewer.close()
+                self._fullscreen_viewer.deleteLater()
+            except Exception as e:
+                logging.error(f"Error cleaning up viewer: {e}")
+            finally:
+                self._fullscreen_viewer = None
+
+    def clear(self):
+        """Clear all content."""
+        self.story_text.clear()
+        self.image_label.clear()
+        self.current_image_path = None
+        self.current_node_key = None
+
+    def clear_history(self):
+        """Clear display history."""
+        self.clear()
+
+    def show_error(self, message: str):
+        """Show error message to user."""
+        QMessageBox.critical(self, "Error", message)
+
+    def __del__(self):
+        """Cleanup on deletion."""
+        self.cleanup_viewer()

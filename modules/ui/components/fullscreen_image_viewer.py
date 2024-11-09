@@ -5,37 +5,22 @@ import traceback
 from functools import lru_cache
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QLabel, QVBoxLayout, QTextBrowser, QApplication, QMessageBox, QWidget, QShortcut, QSizePolicy
+    QMainWindow, QLabel, QVBoxLayout, QTextBrowser, QApplication, QMessageBox, 
+    QWidget, QShortcut, QSizePolicy
 )
-from PyQt5.QtGui import QPixmap, QPainter, QColor, QKeyEvent, QPen, QPainterPath, QKeySequence, QTextOption, QFont
-from PyQt5.QtCore import Qt, QSize, QRect
-
-# Setup logging
-def setup_logging():
-    """
-    Configures logging to output to both console and a log file with timestamps and log levels.
-    """
-    log_directory = os.path.join(os.path.expanduser("~"), "FullscreenImageViewerLogs")
-    os.makedirs(log_directory, exist_ok=True)
-    log_file = os.path.join(log_directory, "app.log")
-
-    logging.basicConfig(
-        level=logging.DEBUG,  # Set to DEBUG for detailed logs
-        format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.FileHandler(log_file),
-            logging.StreamHandler(sys.stdout)
-        ]
-    )
-
-setup_logging()
-
+from PyQt5.QtGui import (
+    QPixmap, QPainter, QColor, QKeyEvent, QPen, QPainterPath, 
+    QKeySequence, QTextOption, QFont
+)
+from PyQt5.QtCore import Qt, QSize, QRect, pyqtSignal
 
 class OutlinedTextBrowser(QTextBrowser):
+    """Text browser with outlined text for better visibility on any background."""
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.stroke_color = QColor(0, 0, 0)  # Black outline
-        self.stroke_width = 3  # Increased width of the outline
+        self.stroke_width = 3  # Width of the outline
         self.setViewportMargins(0, 0, 0, 0)
         self.setStyleSheet("""
             QTextBrowser {
@@ -47,6 +32,7 @@ class OutlinedTextBrowser(QTextBrowser):
         """)
 
     def paintEvent(self, event):
+        """Custom paint event for outlined text."""
         painter = QPainter(self.viewport())
         painter.setRenderHint(QPainter.TextAntialiasing)
         
@@ -80,13 +66,16 @@ class OutlinedTextBrowser(QTextBrowser):
             text
         )
 
-
 class FullscreenImageViewer(QMainWindow):
+    """Fullscreen image viewer with story progression capability."""
+    
+    story_advance_signal = pyqtSignal()
+    
     def __init__(self, image_path, story_text, parent=None):
         super().__init__(parent)
         logging.info("Initializing FullscreenImageViewer")
-
-        # Set black background
+        
+        # Set window properties
         self.setStyleSheet("background-color: black;")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         
@@ -114,11 +103,20 @@ class FullscreenImageViewer(QMainWindow):
         self.position_elements()
 
         # Setup shortcuts
+        self.setup_shortcuts()
+        
+        # Initialize state
+        self.text_visible = True
+
+    def setup_shortcuts(self):
+        """Setup keyboard shortcuts."""
         QShortcut(QKeySequence('F'), self, self.close)
         QShortcut(QKeySequence('Escape'), self, self.close)
         QShortcut(QKeySequence('T'), self, self.toggle_text)
+        QShortcut(QKeySequence('G'), self, self.advance_story)
 
     def position_elements(self):
+        """Position the image and text elements."""
         screen_rect = self.geometry()
         
         # Position the image to fill the screen
@@ -136,10 +134,13 @@ class FullscreenImageViewer(QMainWindow):
         )
 
     def resizeEvent(self, event):
+        """Handle window resize events."""
         super().resizeEvent(event)
         self.position_elements()
+        self.scale_image()
 
     def scale_image(self):
+        """Scale the image to fit the window while maintaining aspect ratio."""
         if hasattr(self, 'original_pixmap') and not self.original_pixmap.isNull():
             screen = QApplication.primaryScreen()
             size = screen.size()
@@ -156,88 +157,86 @@ class FullscreenImageViewer(QMainWindow):
             self.image_label.setPixmap(scaled)
 
     def toggle_text(self):
-        self.text_browser.setVisible(not self.text_browser.isVisible())
+        """Toggle text visibility."""
+        self.text_visible = not self.text_visible
+        self.text_browser.setVisible(self.text_visible)
 
-    def close(self):
-        """
-        Closes the application window.
-        """
-        logging.info("Close shortcut activated. Closing application.")
-        super().close()
+    def advance_story(self):
+        """Handle story progression request."""
+        try:
+            logging.debug("Story advance requested from fullscreen viewer")
+            self.story_advance_signal.emit()
+            self.close()
+        except Exception as e:
+            logging.error(f"Error advancing story from fullscreen view: {e}")
 
-    def show_error_message(self, message):
-        """
-        Displays a critical error message to the user and closes the application.
-
-        :param message: The error message to display.
-        """
-        QMessageBox.critical(self, "Error", message)
-        self.close()
-
-    @lru_cache(maxsize=10)
-    def get_scaled_pixmap(self, size_tuple):
-        """
-        Caches and returns a scaled version of the original pixmap that fits the screen height.
-
-        :param size_tuple: A tuple (width, height) representing the target size.
-        :return: Scaled QPixmap.
-        """
-        width, height = size_tuple
-        target_size = QSize(width, height)
-        return self.original_pixmap.scaled(
-            target_size,
-            Qt.KeepAspectRatio,  # Changed to KeepAspectRatio
-            Qt.SmoothTransformation
-        )
-
-    def on_resize(self, event):
-        """
-        Handles window resize events to scale the image.
-
-        :param event: The resize event.
-        """
-        logging.debug(f"Window resized to: {self.size().width()}x{self.size().height()}")
-        self.scale_image()
-        event.accept()
-        logging.debug("Window resize event handled.")
-
-    def keyPressEvent(self, event: QKeyEvent):
-        """
-        Overrides the key press event to handle additional keys.
-
-        Note: This is optional since we're using QShortcut for key handling.
-
-        :param event: The key event.
-        """
-        logging.debug(f"Key pressed: {event.key()}")
-        super().keyPressEvent(event)
-
-    def __del__(self):
-        """
-        Cleanup resources when the object is destroyed.
-        """
-        logging.info("Cleaning up FullscreenImageViewer resources")
-        self.get_scaled_pixmap.cache_clear()
-        # Clear any other cached resources
-        self.original_pixmap = None
-        self.scaled_pixmap = None
+    def keyPressEvent(self, event):
+        """Handle key press events."""
+        try:
+            if event.key() == Qt.Key_G:
+                self.advance_story()
+            elif event.key() == Qt.Key_T:
+                self.toggle_text()
+            elif event.key() in (Qt.Key_Escape, Qt.Key_F):
+                self.close()
+            else:
+                super().keyPressEvent(event)
+        except Exception as e:
+            logging.error(f"Error handling key press in fullscreen viewer: {e}")
 
     def showEvent(self, event):
-        """
-        Handle window show event to ensure proper focus.
-        """
+        """Handle window show event to ensure proper focus."""
         super().showEvent(event)
         self.setFocus()
         self.activateWindow()
         self.raise_()
 
+    def closeEvent(self, event):
+        """Handle window close event."""
+        try:
+            self.cleanup_resources()
+            super().closeEvent(event)
+            logging.info("FullscreenImageViewer closed successfully")
+        except Exception as e:
+            logging.error(f"Error during FullscreenImageViewer cleanup: {e}")
+            event.accept()
+
+    def cleanup_resources(self):
+        """Clean up resources before closing."""
+        try:
+            self.original_pixmap = None
+            self.get_scaled_pixmap.cache_clear()
+        except Exception as e:
+            logging.error(f"Error cleaning up resources: {e}")
+
+    @lru_cache(maxsize=10)
+    def get_scaled_pixmap(self, size_tuple):
+        """Cache and return scaled versions of the pixmap."""
+        width, height = size_tuple
+        target_size = QSize(width, height)
+        return self.original_pixmap.scaled(
+            target_size,
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+
+    def update_content(self, image_path: str, story_text: str):
+        """Update the viewer's content."""
+        try:
+            if os.path.exists(image_path):
+                self.original_pixmap = QPixmap(image_path)
+                self.scale_image()
+            self.text_browser.setText(story_text)
+            logging.debug("Fullscreen viewer content updated")
+        except Exception as e:
+            logging.error(f"Error updating fullscreen viewer content: {e}")
+
     def format_story_text(self, text: str) -> str:
         """Format the story text into multiple lines with proper wrapping."""
-        # Split into words and rebuild with line breaks
         words = text.split()
         lines = []
         current_line = []
-        chars_per_line = 80  # Adjust this value based on your needs
+        chars_per_line = 80
         
         current_length = 0
         for word in words:
@@ -254,34 +253,3 @@ class FullscreenImageViewer(QMainWindow):
             lines.append(' '.join(current_line))
             
         return '\n'.join(lines)
-
-
-# Example usage
-if __name__ == "__main__":
-    # Optionally, disable or enable High-DPI scaling
-    # To disable:
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, False)
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, False)
-
-    # To enable, comment out the above two lines and uncomment the following:
-    # QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-    # QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
-
-    app = QApplication(sys.argv)
-
-    # Replace "path_to_image.jpg" with the actual path to your image
-    image_path = "path_to_image.jpg"
-    story_text = "Your story text goes here."
-
-    # Verify if the image exists
-    if not os.path.exists(image_path):
-        logging.error(f"Image file does not exist: {image_path}")
-        QMessageBox.critical(None, "Error", f"Image file does not exist: {image_path}")
-        sys.exit(1)
-
-    viewer = FullscreenImageViewer(image_path, story_text)
-    # Removed the redundant show() call
-    # viewer.show()
-
-    logging.info("FullscreenImageViewer launched")
-    sys.exit(app.exec_())
