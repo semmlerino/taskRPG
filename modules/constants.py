@@ -1,5 +1,5 @@
 import os
-
+import keyboard
 # Base directory (one level above 'modules')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -40,7 +40,31 @@ HOTKEYS = {
     'heavy_attack': 'shift+d',
     'toggle_pause': '#',
     'next_story': 'g',
-    'open_settings': 's'
+    'open_settings': 's',
+    'fullscreen': 'f'
+}
+
+# UI Colors
+UI_COLORS = {
+    'PRIMARY': '#2196F3',
+    'SECONDARY': '#4CAF50',
+    'ACCENT': '#FF5722',
+    'BACKGROUND': '#FFFFFF',
+    'TEXT': '#333333',
+    'LIGHT_TEXT': '#FFFFFF',
+    'DISABLED': '#CCCCCC',
+    'ERROR': '#F44336',
+    'WARNING': '#FFC107',
+    'SUCCESS': '#4CAF50',
+}
+
+# UI Fonts
+UI_FONTS = {
+    'DEFAULT_FAMILY': 'Arial',
+    'DEFAULT_SIZE': 10,
+    'HEADER_SIZE': 14,
+    'TITLE_SIZE': 16,
+    'BUTTON_SIZE': 12,
 }
 
 # Create necessary directories if they don't exist
