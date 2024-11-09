@@ -1,215 +1,260 @@
-# modules/story.py
-
 import os
 import json
 import logging
-import random
-from typing import Dict, Any, Optional, List
-from PIL import Image
+from typing import Optional, Dict, Any, List, Union
+from enum import Enum, auto
+from core.story.story_content import StoryContent
+from .image_generator import ImageGenerator
 
-from modules.constants import STORIES_DIR, ASSETS_DIR
-from modules.image_generator import ImageGenerator
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+class NavigationDirection(Enum):
+    """Enum for navigation directions."""
+    FORWARD = auto()
+    BACKWARD = auto()
 
 class StoryManager:
-    def __init__(self, filepath: str, image_generator: Optional[ImageGenerator] = None, image_folder: str = None):
+    """
+    Manages story progression, content, and state.
+    """
+    def __init__(self, filepath: str, image_generator: ImageGenerator, 
+                 image_folder: Optional[str] = None, ui_component: Optional[Any] = None):
         self.filepath = filepath
-        logging.info(f"Initializing StoryManager with filepath: {filepath}")
-        
+        self.ui = ui_component
+        self.image_generator = image_generator
+        self.image_folder = image_folder
+
+        # Initialize state
         self.story_data = self.load_story()
         self.current_node_key = self.get_initial_node()
         self.current_node = self.story_data.get(self.current_node_key, {})
-        self.image_cache = {}
-        self.image_folder = image_folder
-        
-        logging.info(f"Story loaded. Initial node: {self.current_node_key}")
-        logging.info(f"Image folder set to: {self.image_folder}")
+        self._current_content: Optional[StoryContent] = None
 
-        # Initialize ImageGenerator
-        self.image_generator = image_generator or ImageGenerator()
+        # Navigation history
+        self._history: List[tuple] = []
+        self._history_index: int = -1
+
+        logging.info(f"StoryManager initialized with filepath: {filepath}")
 
     def load_story(self) -> Dict[str, Any]:
-        """
-        Loads the story JSON file from the given filepath.
-        """
+        """Load and parse the story JSON file."""
         try:
             with open(self.filepath, 'r', encoding='utf-8') as f:
                 story = json.load(f)
-            logging.info(f"Story loaded from {self.filepath}")
-            logging.info(f"Story contains {len(story)} nodes")
+            logging.info(f"Story loaded successfully from {self.filepath}")
             return story
-        except FileNotFoundError:
-            logging.error(f"Story file not found at {self.filepath}")
-            return {}
-        except json.JSONDecodeError as e:
-            logging.error(f"Error decoding JSON from {self.filepath}: {e}")
+        except Exception as e:
+            logging.error(f"Error loading story: {e}")
             return {}
 
     def get_initial_node(self) -> str:
-        """
-        Gets the initial node of the story.
-        """
+        """Get the initial node of the story."""
         if not self.story_data:
             raise ValueError("Story data is empty")
-            
-        # Priority 1: Check for 'start' node
+
         if 'start' in self.story_data:
-            logging.info("Using 'start' as initial node")
             return 'start'
-        
-        # Priority 2: Check for 'node1' node
         elif 'node1' in self.story_data:
-            logging.info("Using 'node1' as initial node")
             return 'node1'
-        
-        # Priority 3: Use the first node in the story data
         else:
-            first_node = next(iter(self.story_data))
-            logging.info(f"No 'start' or 'node1' found. Using first available node: '{first_node}'")
-            return first_node
+            return next(iter(self.story_data))
 
-    def set_current_node(self, node_key: str):
-        """
-        Sets the current node in the story based on the node_key.
-        """
-        self.current_node_key = node_key
-        self.current_node = self.story_data.get(self.current_node_key, {})
-        logging.info(f"Current node set to '{self.current_node_key}'")
+    def display_story_segment(self) -> bool:
+        """Display the current segment of the story."""
+        try:
+            if not self._validate_story_state():
+                return False
 
-    def get_current_node(self) -> Dict[str, Any]:
-        """Retrieves the current node in the story."""
-        return self.current_node
+            node = self.get_current_node()
+            content = self._create_node_content(node)
+            if not content:
+                return False
 
+            self._current_content = content
+
+            # Update history if moving forward
+            if self._history_index == len(self._history) - 1:
+                self._history.append((self.current_node_key, content))
+                self._history_index += 1
+
+            # Update UI if available
+            if self.ui:
+                self._update_ui_display(content)
+
+            return True
+
+        except Exception as e:
+            logging.error(f"Error displaying story segment: {e}")
+            return False
+
+    def _validate_story_state(self) -> bool:
+        """Validate the current story state."""
+        if not self.story_data:
+            logging.error("No story data available")
+            return False
+
+        if not self.current_node:
+            logging.error("No current node available")
+            return False
+
+        return True
+
+    def _create_node_content(self, node: Dict) -> Optional[StoryContent]:
+        """Create node content from node data."""
+        try:
+            return StoryContent(
+                text=self.get_text(),
+                node_key=self.current_node_key,
+                image_path=self.get_generated_image(self.current_node_key),
+                environment=self.get_environment(),
+                event=self.get_event(),
+                npc_info=self.get_npc(),
+                battle_info=self.get_battle_info(),
+                choices=self.get_choices()
+            )
+        except Exception as e:
+            logging.error(f"Error creating node content: {e}")
+            return None
+
+    def _update_ui_display(self, content: StoryContent):
+        """Update UI with node content."""
+        if not self.ui:
+            return
+
+        try:
+            html_content = content.to_html()
+            self.ui.story_display.set_page(
+                self.current_node_key,
+                html_content,
+                content.image_path
+            )
+        except Exception as e:
+            logging.error(f"Error updating UI display: {e}")
+
+    def navigate(self, direction: NavigationDirection) -> bool:
+        """Navigate through story history."""
+        try:
+            if not self._can_navigate(direction):
+                return False
+
+            if direction == NavigationDirection.FORWARD:
+                self._history_index += 1
+            else:
+                self._history_index -= 1
+
+            node_key, content = self._history[self._history_index]
+            self.current_node_key = node_key
+            self.current_node = self.story_data[node_key]
+            self._current_content = content
+
+            if self.ui:
+                self._update_ui_display(content)
+
+            return True
+
+        except Exception as e:
+            logging.error(f"Error during navigation: {e}")
+            return False
+
+    def _can_navigate(self, direction: NavigationDirection) -> bool:
+        """Check if navigation in given direction is possible."""
+        if direction == NavigationDirection.FORWARD:
+            return self._history_index < len(self._history) - 1
+        else:
+            return self._history_index > 0
+
+    # Getter methods for node content
     def get_text(self) -> str:
-        """Retrieves the narrative text from the current node."""
+        """Get narrative text from current node."""
         return self.current_node.get('text', '')
 
-    def get_image_prompt(self) -> Optional[str]:
-        """Retrieves the image prompt from the current node."""
-        return self.current_node.get('image_prompt')
-
-    def get_choices(self) -> Optional[List[Dict[str, Any]]]:
-        """Retrieves the choices available in the current node."""
-        return self.current_node.get('choices')
-
     def get_environment(self) -> Optional[str]:
-        """Retrieves the environment description."""
+        """Get environment description from current node."""
         return self.current_node.get('environment')
 
-    def get_npc(self) -> Optional[Dict[str, Any]]:
-        """Retrieves the NPC details."""
+    def get_npc(self) -> Optional[Dict]:
+        """Get NPC information from current node."""
         return self.current_node.get('npc')
 
     def get_event(self) -> Optional[str]:
-        """Retrieves event descriptions."""
+        """Get event description from current node."""
         return self.current_node.get('event')
 
-    def get_battle_info(self) -> Optional[Dict[str, Any]]:
-        """Retrieves battle information."""
-        return self.current_node.get('battle')
+    def get_battle_info(self) -> Optional[dict]:
+        """Extract battle information from current node."""
+        try:
+            if not self.current_node or 'battle' not in self.current_node:
+                return None
+                
+            battle_data = self.current_node['battle']
+            if isinstance(battle_data, dict):
+                logging.info(f"Found battle data: {battle_data}")
+                return battle_data
+                
+            logging.warning("Battle data found but in incorrect format")
+            return None
+            
+        except Exception as e:
+            logging.error(f"Error getting battle info: {e}")
+            return None
 
-    def get_stats(self) -> Optional[Dict[str, Any]]:
-        """Retrieves player stats."""
-        return self.current_node.get('stats')
+    def get_choices(self) -> Optional[List]:
+        """Get choices from current node."""
+        return self.current_node.get('choices')
 
-    def get_quests(self) -> Optional[List[Dict[str, Any]]]:
-        """Retrieves quest information."""
-        return self.current_node.get('quests')
-
-    def get_inventory(self) -> Optional[List[Dict[str, Any]]]:
-        """Retrieves inventory information."""
-        return self.current_node.get('inventory')
-
-    def get_all_image_prompts(self) -> Dict[str, str]:
-        """
-        Extracts all image prompts from the story.
-        """
-        image_prompts = {}
-        for node_key, node_data in self.story_data.items():
-            if 'image_prompt' in node_data:
-                image_prompts[node_key] = node_data['image_prompt']
-                logging.info(f"Found image prompt for node {node_key}")
-        
-        logging.info(f"Total image prompts found: {len(image_prompts)}")
-        return image_prompts
+    def get_current_node(self) -> Dict[str, Any]:
+        """Get current node data."""
+        return self.current_node
 
     def get_generated_image(self, node_key: str) -> Optional[str]:
-        """Gets the generated image path for a specific node."""
-        try:
-            # First check if this node exists
-            if node_key not in self.story_data:
-                logging.error(f"Node {node_key} not found in story data")
-                return None
-            
-            # Construct image path
-            image_filename = f"{node_key}.png"
-            if self.image_folder:
-                image_path = os.path.join(self.image_folder, image_filename)
-                logging.info(f"Looking for image at: {image_path}")
-                
-                if os.path.exists(image_path):
-                    logging.info(f"Found image at: {image_path}")
-                    # Verify image is readable
-                    try:
-                        with open(image_path, 'rb') as f:
-                            f.read(1024)  # Try to read first 1KB
-                        return image_path
-                    except Exception as e:
-                        logging.error(f"Image file exists but is not readable: {e}")
-                else:
-                    logging.error(f"Image file does not exist: {image_path}")
-                    # List directory contents for debugging
-                    if os.path.exists(self.image_folder):
-                        files = os.listdir(self.image_folder)
-                        logging.info(f"Files in image folder: {files}")
-                    else:
-                        logging.error(f"Image folder does not exist: {self.image_folder}")
-            else:
-                logging.error("No image folder specified")
-                
+        """Gets the path to a generated image for a node."""
+        if not self.image_folder:
             return None
-        except Exception as e:
-            logging.error(f"Error getting generated image: {e}")
-            return None
+
+        image_path = os.path.join(self.image_folder, f"{node_key}.png")
+        return os.path.abspath(image_path) if os.path.exists(image_path) else None
+
+    def get_all_image_prompts(self) -> Dict[str, str]:
+        """Get all image prompts from story nodes."""
+        prompts = {}
+        for node_key, node_data in self.story_data.items():
+            if isinstance(node_data, dict) and 'image_prompt' in node_data:
+                prompts[node_key] = node_data['image_prompt']
+        return prompts
+
+    def set_current_node(self, node_key: str):
+        """Set current node in story."""
+        if node_key not in self.story_data:
+            raise ValueError(f"Invalid node key: {node_key}")
+
+        self.current_node_key = node_key
+        self.current_node = self.story_data[node_key]
 
     def set_generated_image(self, node_key: str, image_path: str):
-        """Sets the generated image path for a specific node."""
-        try:
-            if node_key in self.story_data:
-                self.story_data[node_key]['generated_image'] = image_path
-                logging.info(f"Set generated image for node {node_key}: {image_path}")
-            else:
-                logging.warning(f"Attempted to set image for non-existent node: {node_key}")
-        except Exception as e:
-            logging.error(f"Error setting generated image: {e}")
+        """Sets the generated image path for a node."""
+        if image_path and os.path.exists(image_path):
+            self.image_generator.cache_image(node_key, image_path)
 
     def is_end(self) -> bool:
-        """Checks if the current node is an end node."""
+        """Check if current node is an end node."""
         return self.current_node.get('end', False)
 
-    def verify_image_paths(self):
-        """Verifies all image paths in the story."""
-        if not self.image_folder:
-            logging.error("No image folder specified")
-            return
-            
-        logging.info(f"Verifying images in folder: {self.image_folder}")
-        
-        if not os.path.exists(self.image_folder):
-            logging.error(f"Image folder does not exist: {self.image_folder}")
-            return
-            
-        # Get all image files in the folder
-        existing_images = set(os.listdir(self.image_folder))
-        logging.info(f"Found {len(existing_images)} files in image folder")
-        
-        # Check each node that should have an image
-        for node_key, node_data in self.story_data.items():
-            if 'image_prompt' in node_data:
-                expected_filename = f"{node_key}.png"
-                if expected_filename in existing_images:
-                    logging.info(f"Found image for node {node_key}: {expected_filename}")
-                else:
-                    logging.warning(f"Missing image for node {node_key}")
+    def cleanup(self):
+        """Clean up story manager resources."""
+        try:
+            logging.info("Cleaning up story manager")
+            self._cleanup_content(self._current_content)
+            self._clear_cache()
+            self._history.clear()
+            self._history_index = -1
+        except Exception as e:
+            logging.error(f"Error during cleanup: {e}")
 
+    def _clear_cache(self):
+        """Clear the image cache."""
+        self.image_generator.clear_cache()
+
+    def _cleanup_content(self, content: Optional[StoryContent]):
+        """Clean up story content resources."""
+        if content and content.image_path:
+            # If we're using node keys as cache keys
+            self.image_generator.remove_from_cache(content.node_key)
+            content.image_path = None

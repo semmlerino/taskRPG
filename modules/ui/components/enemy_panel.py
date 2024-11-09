@@ -1,14 +1,11 @@
-# modules/ui/components/enemy_panel.py
-
 from PyQt5.QtWidgets import QWidget, QLabel, QVBoxLayout, QProgressBar, QGroupBox
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from typing import Any
+from modules.battle.enemy import Enemy
 
 class EnemyPanel(QWidget):
-    """
-    Displays enemy statistics and task information.
-    """
+    """Displays enemy statistics and task information."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.current_enemy = None
@@ -73,6 +70,11 @@ class EnemyPanel(QWidget):
                 else:
                     color = "#F44336"  # Red
                 self.hp_bar.setStyleSheet(f"""
+                    QProgressBar {{
+                        border: 2px solid grey;
+                        border-radius: 5px;
+                        text-align: center;
+                    }}
                     QProgressBar::chunk {{
                         background-color: {color};
                     }}

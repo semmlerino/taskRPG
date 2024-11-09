@@ -1,7 +1,3 @@
-# modules/ui/managers/__init__.py
+from modules.ui.managers.battle_manager import UIBattleManager
 
-from .window_manager import WindowManager
-from .hotkey_manager import HotkeyManager
-from .image_manager import ImageManager
-from .battle_manager import BattleManager
-from .story_manager import StoryManager
+__all__ = ['UIBattleManager']

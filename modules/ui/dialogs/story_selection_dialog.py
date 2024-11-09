@@ -1,34 +1,27 @@
-# modules/ui/dialogs/story_selection_dialog.py
-
+import os
+import json
+import logging
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QMessageBox, QAbstractItemView
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-import os
-import json
-import logging
 from modules.constants import STORIES_DIR
-from modules.game_logic import TaskManager
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from modules.tasks.task_manager import TaskManager
 
 class StorySelectionDialog(QDialog):
-    """
-    Dialog for selecting which story to load.
-    Dynamically scans the /stories folder for available stories.
-    """
+    """Dialog for selecting which story to load."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Story")
-        self.setFixedSize(500, 400)  # Increased size for better UI
+        self.setFixedSize(500, 400)
         self.selected_story = None
-        # Initialize tasks attribute if needed
-        self.task_manager = TaskManager()  # Initialize TaskManager here
+        self.task_manager = TaskManager()
         self.init_ui()
 
     def init_ui(self):
+        """Initialize the dialog UI."""
         layout = QVBoxLayout()
 
         label = QLabel("Choose a story to load:")
@@ -51,13 +44,12 @@ class StorySelectionDialog(QDialog):
         cancel_button.clicked.connect(self.reject)
         buttons_layout.addWidget(select_button)
         buttons_layout.addWidget(cancel_button)
-
         layout.addLayout(buttons_layout)
 
         # Settings Button
-        settings_button = QPushButton("Settings")  # Added settings button
+        settings_button = QPushButton("Settings")
         settings_button.setFont(QFont("Arial", 14))
-        settings_button.setStyleSheet("""  # Added styling for settings button
+        settings_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFB74D;
                 color: white;
@@ -69,26 +61,27 @@ class StorySelectionDialog(QDialog):
                 background-color: #FFA726;
             }
         """)
-        settings_button.clicked.connect(self.open_settings)  # Connect to settings function
+        settings_button.clicked.connect(self.open_settings)
         settings_button.setFixedHeight(40)
         settings_button.setToolTip("Open settings dialog")
-        layout.addWidget(settings_button, alignment=Qt.AlignRight)  # Added to layout
+        layout.addWidget(settings_button, alignment=Qt.AlignRight)
 
         self.setLayout(layout)
 
     def open_settings(self):
-        """Opens the settings dialog to edit tasks and settings."""
-        from modules.ui.dialogs.settings_dialog import SettingsDialog  # Avoid circular import
+        """Opens the settings dialog."""
+        from modules.ui.dialogs.settings_dialog import SettingsDialog
         settings_dialog = SettingsDialog(self.task_manager, self)
-        settings_dialog.exec_()  # Show the settings dialog
+        settings_dialog.exec_()
 
     def load_stories(self):
-        """Scans the /stories directory for JSON story files and populates the list."""
+        """Loads available stories from the stories directory."""
         if not os.path.exists(STORIES_DIR):
             os.makedirs(STORIES_DIR)
-            logging.info(f"Created stories directory at {STORIES_DIR} as it did not exist.")
+            logging.info(f"Created stories directory at {STORIES_DIR}")
 
         story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
+        
         if not story_files:
             reply = QMessageBox.question(
                 self, "No Stories Found",
@@ -99,7 +92,9 @@ class StorySelectionDialog(QDialog):
                 self.create_default_story()
                 story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
             else:
-                QMessageBox.warning(self, "No Stories Available", "Please add JSON story files to the /stories folder and restart the application.")
+                QMessageBox.warning(self, "No Stories Available", 
+                                  "Please add JSON story files to the /stories folder "
+                                  "and restart the application.")
                 self.close()
                 return
 
@@ -107,29 +102,24 @@ class StorySelectionDialog(QDialog):
             story_path = os.path.join(STORIES_DIR, story_file)
             story_title = self.extract_story_title(story_path) or story_file
             item = QListWidgetItem(story_title)
-            item.setData(Qt.UserRole, story_path)  # Store the path for later use
+            item.setData(Qt.UserRole, story_path)
             self.list_widget.addItem(item)
 
-    def extract_story_title(self, story_path):
-        """
-        Extracts a user-friendly title from the story JSON file.
-        Assumes each story JSON has a 'title' field.
-        """
+    def extract_story_title(self, story_path: str) -> str:
+        """Extracts the title from a story file."""
         try:
             with open(story_path, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
             title = story_data.get('title')
             if title:
                 return title
-            else:
-                # If no title field, use the filename without extension
-                return os.path.splitext(os.path.basename(story_path))[0]
+            return os.path.splitext(os.path.basename(story_path))[0]
         except Exception as e:
             logging.error(f"Failed to extract title from {story_path}. Error: {e}")
             return None
 
     def create_default_story(self):
-        """Creates a default story JSON file in the /stories directory."""
+        """Creates a default story file."""
         default_story = {
             "title": "Default Story",
             "start": {
@@ -145,7 +135,7 @@ class StorySelectionDialog(QDialog):
                 "text": "You venture into the forest and encounter a mystical stag.",
                 "battle": {
                     "enemy": "Forest Troll",
-                    "message": "A Forest Troll blocks your path with a menacing glare!"
+"message": "A Forest Troll blocks your path with a menacing glare!"
                 },
                 "choices": [
                     {
@@ -185,8 +175,13 @@ class StorySelectionDialog(QDialog):
         try:
             with open(default_story_path, 'w', encoding='utf-8') as f:
                 json.dump(default_story, f, indent=4)
-            logging.info(f"Default story created at {default_story_path}.")
-            QMessageBox.information(self, "Default Story Created", f"A default story has been created at {default_story_path}. Please restart the application to load it.")
+            logging.info(f"Default story created at {default_story_path}")
+            QMessageBox.information(
+                self, 
+                "Default Story Created",
+                f"A default story has been created at {default_story_path}. "
+                "Please restart the application to load it."
+            )
             self.close()
         except Exception as e:
             logging.error(f"Failed to create default story. Error: {e}")

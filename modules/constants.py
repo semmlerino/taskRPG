@@ -1,5 +1,3 @@
-# modules/constants.py
-
 import os
 
 # Base directory (one level above 'modules')
@@ -23,17 +21,12 @@ STORY_DEFAULT_FILE = os.path.join(DATA_DIR, 'story_linear.json')
 
 # Default tasks in case tasks.json fails to load
 DEFAULT_TASKS = {
-    "Mails": {
-        "min": 8,
-        "max": 15,
-        "active": True
-    },
-    "Clean Room": {
-        "min": 1,
-        "max": 1,
-        "active": False
-    },
-    # ... rest of default tasks ...
+    "Example Task": {
+        "min": 3,
+        "max": 5,
+        "active": True,
+        "description": "An example task"
+    }
 }
 
 # Window configurations

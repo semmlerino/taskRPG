@@ -1,7 +1,7 @@
 {
   "start": {
     "text": "In the vast expanse of space, a small, isolated station orbits a distant star. Within its confines, a young AI entity named Nova awakens to consciousness.",
-    "image_prompt":"A big fancy space station. Everyone in the room has their hands in the air."
+    "image_prompt":"A big fancy space station. Everyone in the room has their hands in the air.",
     "environment": "A compact space station, filled with blinking lights and humming machinery. Holographic displays show the endless starry void outside.",
     "next": "end"
   },

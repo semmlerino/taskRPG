@@ -1,5 +1,3 @@
-# modules/ui/dialogs/settings_dialog.py
-
 import os
 import json
 import logging
@@ -7,13 +5,11 @@ from typing import Dict, Any
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QFormLayout, QLineEdit, QCheckBox, QMessageBox, QTableWidget,
-    QTableWidgetItem, QAbstractItemView, QHeaderView, QSpinBox, QWidget, QHBoxLayout
+    QTableWidgetItem, QAbstractItemView, QHeaderView, QSpinBox, QWidget
 )
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from modules.game_logic import TaskManager
-
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+from modules.tasks.task_manager import TaskManager
 
 class SettingsDialog(QDialog):
     def __init__(self, task_manager: TaskManager, parent=None):
@@ -23,13 +19,12 @@ class SettingsDialog(QDialog):
         self.task_manager = task_manager
         self.saved = False
         
-        # Handle both list and dictionary cases
         if isinstance(task_manager.tasks, dict):
             self.updated_tasks = {k: v.copy() for k, v in task_manager.tasks.items()}
         elif isinstance(task_manager.tasks, list):
             self.updated_tasks = {task['name']: task.copy() for task in task_manager.tasks}
         else:
-            self.updated_tasks = {}  # Initialize as empty if neither list nor dict
+            self.updated_tasks = {}
         
         self.init_ui()
 
@@ -46,11 +41,12 @@ class SettingsDialog(QDialog):
         self.task_table.setColumnCount(4)
         self.task_table.setHorizontalHeaderLabels(['Name', 'Min', 'Max', 'Active'])
         self.task_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.task_table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed)
+        self.task_table.setEditTriggers(
+            QAbstractItemView.DoubleClicked | 
+            QAbstractItemView.EditKeyPressed
+        )
         
-        # Enable alternating row colors
         self.task_table.setAlternatingRowColors(True)
-        # Set custom stylesheet for alternating row colors
         self.task_table.setStyleSheet("""
             QTableWidget {
                 alternate-background-color: #f0f0f0;
@@ -98,7 +94,7 @@ class SettingsDialog(QDialog):
     def populate_tasks(self):
         """Populates the task table with existing tasks."""
         self.task_table.setRowCount(0)
-        for row_index, (task_name, task) in enumerate(self.updated_tasks.items()):
+        for task_name, task in self.updated_tasks.items():
             row_position = self.task_table.rowCount()
             self.task_table.insertRow(row_position)
 
@@ -117,22 +113,20 @@ class SettingsDialog(QDialog):
             max_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.task_table.setItem(row_position, 2, max_item)
 
-            # Active - Use QCheckBox instead of Yes/No text
+            # Active Checkbox
             active_checkbox = QCheckBox()
             active_checkbox.setChecked(task.get('active', True))
-            # Create a QWidget to center the checkbox
-            widget = QWidget()
-            layout = QHBoxLayout()
-            layout.addWidget(active_checkbox)
-            layout.setAlignment(Qt.AlignCenter)
-            layout.setContentsMargins(0, 0, 0, 0)  # Remove margins to better center
-            widget.setLayout(layout)
-            self.task_table.setCellWidget(row_position, 3, widget)
+            checkbox_widget = QWidget()
+            checkbox_layout = QHBoxLayout()
+            checkbox_layout.addWidget(active_checkbox)
+            checkbox_layout.setAlignment(Qt.AlignCenter)
+            checkbox_layout.setContentsMargins(0, 0, 0, 0)
+            checkbox_widget.setLayout(checkbox_layout)
+            self.task_table.setCellWidget(row_position, 3, checkbox_widget)
 
     def add_task(self):
         """Adds a new empty task to the table."""
         new_task_name = f"Task_{len(self.updated_tasks) + 1}"
-        # Ensure unique task names
         counter = 1
         base_name = new_task_name
         while new_task_name in self.updated_tasks:
@@ -163,60 +157,61 @@ class SettingsDialog(QDialog):
                 self.shake_checkbox.setChecked(shake_enabled)
             except Exception as e:
                 logging.error(f"Failed to load shaking setting. Error: {e}")
-                self.shake_checkbox.setChecked(True)  # Default to enabled
+                self.shake_checkbox.setChecked(True)
         else:
-            self.shake_checkbox.setChecked(True)  # Default to enabled
+            self.shake_checkbox.setChecked(True)
 
     def save_settings(self):
         """Saves the updated tasks and settings."""
-        # Update tasks from table
-        new_tasks = {}
-        for row in range(self.task_table.rowCount()):
-            name = self.task_table.item(row, 0).text().strip()
-            if not name:
-                QMessageBox.warning(self, "Invalid Task Name", f"Task name in row {row + 1} cannot be empty.")
-                return
-            if name in new_tasks:
-                QMessageBox.warning(self, "Duplicate Task Name", f"Task name '{name}' in row {row + 1} is duplicated.")
-                return
-            try:
+        try:
+            new_tasks = {}
+            for row in range(self.task_table.rowCount()):
+                name = self.task_table.item(row, 0).text().strip()
+                if not name:
+                    QMessageBox.warning(self, "Invalid Task Name", 
+                                      f"Task name in row {row + 1} cannot be empty.")
+                    return
+                if name in new_tasks:
+                    QMessageBox.warning(self, "Duplicate Task Name", 
+                                      f"Task name '{name}' in row {row + 1} is duplicated.")
+                    return
+                
                 min_val = int(self.task_table.item(row, 1).text())
                 max_val = int(self.task_table.item(row, 2).text())
-                # Retrieve the state from the checkbox
+                
                 active_widget = self.task_table.cellWidget(row, 3)
+                active = False
                 if isinstance(active_widget, QWidget):
                     layout = active_widget.layout()
-                    if layout is not None and layout.count() > 0:
-                        active_checkbox = layout.itemAt(0).widget()
-                        if isinstance(active_checkbox, QCheckBox):
-                            active = active_checkbox.isChecked()
-                        else:
-                            active = True
-                    else:
-                        active = True
-                else:
-                    # Fallback to True if widget is not found
-                    active = True
+                    if layout and layout.count() > 0:
+                        checkbox = layout.itemAt(0).widget()
+                        if isinstance(checkbox, QCheckBox):
+                            active = checkbox.isChecked()
+
                 new_tasks[name] = {'min': min_val, 'max': max_val, 'active': active}
-            except ValueError:
-                QMessageBox.warning(self, "Invalid Input", f"Min and Max values in row {row + 1} must be integers.")
-                return
 
-        self.updated_tasks = new_tasks
+            self.updated_tasks = new_tasks
+            self.task_manager.tasks = self.updated_tasks
 
-        # Save tasks back to TaskManager
-        self.task_manager.tasks = self.updated_tasks
-
-        # Save settings
-        shake_enabled = self.shake_checkbox.isChecked()
-        settings = {'shake_animation': shake_enabled}
-        settings_file = os.path.join(os.path.dirname(self.task_manager.filepath), 'settings.json')
-        try:
+            # Save settings
+            shake_enabled = self.shake_checkbox.isChecked()
+            settings = {'shake_animation': shake_enabled}
+            settings_file = os.path.join(
+                os.path.dirname(self.task_manager.filepath), 
+                'settings.json'
+            )
+            
             with open(settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, indent=4)
+            
             self.saved = True
-            QMessageBox.information(self, "Settings Saved", "Settings have been saved successfully.")
+            QMessageBox.information(self, "Settings Saved", 
+                                  "Settings have been saved successfully.")
             self.accept()
+            
+        except ValueError:
+            QMessageBox.warning(self, "Invalid Input", 
+                              "Min and Max values must be integers.")
         except Exception as e:
             logging.error(f"Failed to save settings. Error: {e}")
             QMessageBox.critical(self, "Error", "Failed to save settings.")

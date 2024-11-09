@@ -1,14 +1,10 @@
-# modules/ui/components/action_buttons.py
-
 from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt
 from typing import Callable
 
 class ActionButtons(QWidget):
-    """
-    Manages action buttons like Next, Attack, and Heavy Attack.
-    """
+    """Manages action buttons like Next, Attack, and Heavy Attack."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
@@ -95,3 +91,9 @@ class ActionButtons(QWidget):
         self.attack_button.hide()
         self.heavy_attack_button.hide()
         self.next_button.show()
+    
+    def debug_button_state(self):
+        """Print the visibility state of all buttons"""
+        print(f"Next button visible: {self.next_button.isVisible()}")
+        print(f"Attack button visible: {self.attack_button.isVisible()}")
+        print(f"Heavy attack button visible: {self.heavy_attack_button.isVisible()}")
