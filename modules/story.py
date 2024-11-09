@@ -3,24 +3,36 @@ import json
 import logging
 from typing import Optional, Dict, Any, List, Union
 from enum import Enum, auto
+
 from core.story.story_content import StoryContent
+from core.battle.battle_manager import BattleManager  # Imported BattleManager
 from .image_generator import ImageGenerator
+
 
 class NavigationDirection(Enum):
     """Enum for navigation directions."""
     FORWARD = auto()
     BACKWARD = auto()
 
+
 class StoryManager:
     """
     Manages story progression, content, and state.
     """
-    def __init__(self, filepath: str, image_generator: ImageGenerator, 
-                 image_folder: Optional[str] = None, ui_component: Optional[Any] = None):
+    def __init__(
+        self,
+        filepath: str,
+        image_generator: ImageGenerator,
+        image_folder: Optional[str] = None,
+        ui_component: Optional[Any] = None,
+        battle_manager: Optional[BattleManager] = None  # Made battle_manager optional
+    ):
         self.filepath = filepath
         self.ui = ui_component
         self.image_generator = image_generator
         self.image_folder = image_folder
+
+        self.battle_manager = battle_manager  # Store battle_manager reference
 
         # Initialize state
         self.story_data = self.load_story()
@@ -31,6 +43,9 @@ class StoryManager:
         # Navigation history
         self._history: List[tuple] = []
         self._history_index: int = -1
+
+        # Track completed battles
+        self.completed_battle_nodes = set()
 
         logging.info(f"StoryManager initialized with filepath: {filepath}")
 
@@ -64,6 +79,16 @@ class StoryManager:
                 return False
 
             node = self.get_current_node()
+
+            # Skip if this is a completed battle node
+            if "battle" in node and self.current_node_key in self.completed_battle_nodes:
+                next_node = node.get('next')
+                if next_node:
+                    self.current_node_key = next_node
+                    self.current_node = self.story_data[next_node]
+                    return self.display_story_segment()  # Recursively display the next segment
+                return False
+
             content = self._create_node_content(node)
             if not content:
                 return False
@@ -132,7 +157,12 @@ class StoryManager:
     def navigate(self, direction: NavigationDirection) -> bool:
         """Navigate through story history."""
         try:
+            logging.debug(f"Attempting navigation: direction={direction}, "
+                         f"history_index={self._history_index}, "
+                         f"history_length={len(self._history)}")
+            
             if not self._can_navigate(direction):
+                logging.debug("Cannot navigate in this direction")
                 return False
 
             if direction == NavigationDirection.FORWARD:
@@ -183,15 +213,15 @@ class StoryManager:
         try:
             if not self.current_node or 'battle' not in self.current_node:
                 return None
-                
+
             battle_data = self.current_node['battle']
             if isinstance(battle_data, dict):
                 logging.info(f"Found battle data: {battle_data}")
                 return battle_data
-                
+
             logging.warning("Battle data found but in incorrect format")
             return None
-            
+
         except Exception as e:
             logging.error(f"Error getting battle info: {e}")
             return None
@@ -258,3 +288,46 @@ class StoryManager:
             # If we're using node keys as cache keys
             self.image_generator.remove_from_cache(content.node_key)
             content.image_path = None
+
+    # New method added to mark battle as complete
+    def mark_battle_complete(self, node_key: str):
+        """Mark a battle node as completed."""
+        self.completed_battle_nodes.add(node_key)
+        logging.info(f"Marked battle node {node_key} as completed")
+
+    # New method added to handle story progression with battle integration
+    def next_story_segment(self) -> bool:
+        """Progress to next story segment with proper battle integration."""
+        try:
+            current_node = self.get_current_node()
+
+            # Handle battle nodes
+            if "battle" in current_node and not current_node.get("battle_completed", False):
+                battle_info = current_node["battle"]
+                if self.battle_manager and self.battle_manager.start_battle(battle_info):
+                    # Mark this battle as completed
+                    current_node["battle_completed"] = True
+                    self.mark_battle_complete(self.current_node_key)
+                else:
+                    return False  # Battle couldn't start
+
+            # Normal story progression
+            next_node = current_node.get('next')
+            if next_node:
+                try:
+                    self.set_current_node(next_node)
+                    return self.display_story_segment()
+                except ValueError as e:
+                    logging.error(f"Invalid next node: {e}")
+                    return False
+
+            return False
+
+        except Exception as e:
+            logging.error(f"Error in story progression: {e}")
+            return False
+
+    def set_battle_manager(self, battle_manager: BattleManager) -> None:
+        """Set the battle manager after initialization."""
+        self.battle_manager = battle_manager
+        logging.info("Battle manager set in StoryManager")

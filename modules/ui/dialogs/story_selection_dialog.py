@@ -1,55 +1,47 @@
-import os
-import json
-import logging
+# modules/ui/dialogs/story_selection_dialog.py
+
 from PyQt5.QtWidgets import (
-    QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QListWidget, QListWidgetItem, QMessageBox, QAbstractItemView
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, 
+    QPushButton, QMessageBox
 )
-from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from modules.constants import STORIES_DIR
-from modules.tasks.task_manager import TaskManager
+from modules.ui.dialogs.settings_dialog import SettingsDialog
+import logging
+
+import os
+
+from modules.constants import STORIES_DIR, ASSETS_DIR
+from modules.story import StoryManager
+
 
 class StorySelectionDialog(QDialog):
-    """Dialog for selecting which story to load."""
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Story")
         self.setFixedSize(500, 400)
         self.selected_story = None
-        self.task_manager = TaskManager()
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the dialog UI."""
         layout = QVBoxLayout()
 
-        label = QLabel("Choose a story to load:")
-        label.setFont(QFont("Arial", 16))
-        label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(label)
+        # Story list
+        self.story_list = QListWidget()
+        self.populate_story_list()
+        layout.addWidget(self.story_list)
 
-        self.list_widget = QListWidget()
-        self.list_widget.setSelectionMode(QAbstractItemView.SingleSelection)
-        self.load_stories()
-        layout.addWidget(self.list_widget)
+        # Button layout
+        button_layout = QHBoxLayout()
 
-        # Buttons
-        buttons_layout = QHBoxLayout()
-        select_button = QPushButton("Select")
-        select_button.setFont(QFont("Arial", 14))
+        # Select button
+        select_button = QPushButton("Select Story")
         select_button.clicked.connect(self.select_story)
-        cancel_button = QPushButton("Cancel")
-        cancel_button.setFont(QFont("Arial", 14))
-        cancel_button.clicked.connect(self.reject)
-        buttons_layout.addWidget(select_button)
-        buttons_layout.addWidget(cancel_button)
-        layout.addLayout(buttons_layout)
+        button_layout.addWidget(select_button)
 
-        # Settings Button
-        settings_button = QPushButton("Settings")
-        settings_button.setFont(QFont("Arial", 14))
-        settings_button.setStyleSheet("""
+        # Settings button
+        self.settings_button = QPushButton("Settings")
+        self.settings_button.setFont(QFont("Arial", 14))
+        self.settings_button.setStyleSheet("""
             QPushButton {
                 background-color: #FFB74D;
                 color: white;
@@ -61,139 +53,86 @@ class StorySelectionDialog(QDialog):
                 background-color: #FFA726;
             }
         """)
-        settings_button.clicked.connect(self.open_settings)
-        settings_button.setFixedHeight(40)
-        settings_button.setToolTip("Open settings dialog")
-        layout.addWidget(settings_button, alignment=Qt.AlignRight)
+        self.settings_button.clicked.connect(self.open_settings)
+        self.settings_button.setFixedHeight(40)
+        self.settings_button.setToolTip("Open settings dialog")
+        button_layout.addWidget(self.settings_button)
 
+        layout.addLayout(button_layout)
         self.setLayout(layout)
 
-    def open_settings(self):
-        """Opens the settings dialog."""
-        from modules.ui.dialogs.settings_dialog import SettingsDialog
-        settings_dialog = SettingsDialog(self.task_manager, self)
-        settings_dialog.exec_()
+    def populate_story_list(self):
+        try:
+            story_files = [f for f in os.listdir(STORIES_DIR)
+                          if f.endswith('.json')]
 
-    def load_stories(self):
-        """Loads available stories from the stories directory."""
-        if not os.path.exists(STORIES_DIR):
-            os.makedirs(STORIES_DIR)
-            logging.info(f"Created stories directory at {STORIES_DIR}")
-
-        story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-        
-        if not story_files:
-            reply = QMessageBox.question(
-                self, "No Stories Found",
-                f"No story files found in {STORIES_DIR}. Would you like to create a default story?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-            )
-            if reply == QMessageBox.Yes:
-                self.create_default_story()
-                story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-            else:
-                QMessageBox.warning(self, "No Stories Available", 
-                                  "Please add JSON story files to the /stories folder "
-                                  "and restart the application.")
-                self.close()
+            if not story_files:
+                QMessageBox.warning(self, "No Stories Found",
+                                    "No story files found in the stories directory.")
                 return
 
-        for story_file in story_files:
-            story_path = os.path.join(STORIES_DIR, story_file)
-            story_title = self.extract_story_title(story_path) or story_file
-            item = QListWidgetItem(story_title)
-            item.setData(Qt.UserRole, story_path)
-            self.list_widget.addItem(item)
+            self.story_list.addItems(story_files)
+            self.story_list.setCurrentRow(0)
 
-    def extract_story_title(self, story_path: str) -> str:
-        """Extracts the title from a story file."""
-        try:
-            with open(story_path, 'r', encoding='utf-8') as f:
-                story_data = json.load(f)
-            title = story_data.get('title')
-            if title:
-                return title
-            return os.path.splitext(os.path.basename(story_path))[0]
         except Exception as e:
-            logging.error(f"Failed to extract title from {story_path}. Error: {e}")
-            return None
-
-    def create_default_story(self):
-        """Creates a default story file."""
-        default_story = {
-            "title": "Default Story",
-            "start": {
-                "text": "Welcome to the Default Story. This is where your adventure begins.",
-                "choices": [
-                    {
-                        "text": "Proceed to the Forest",
-                        "next": "forest"
-                    }
-                ]
-            },
-            "forest": {
-                "text": "You venture into the forest and encounter a mystical stag.",
-                "battle": {
-                    "enemy": "Forest Troll",
-"message": "A Forest Troll blocks your path with a menacing glare!"
-                },
-                "choices": [
-                    {
-                        "text": "Attack the Troll",
-                        "next": "victory"
-                    },
-                    {
-                        "text": "Run away",
-                        "next": "retreat"
-                    }
-                ]
-            },
-            "victory": {
-                "text": "You have defeated the Forest Troll and continue your journey.",
-                "choices": [
-                    {
-                        "text": "Press 'G' or click 'Next' to continue your journey.",
-                        "next": "end"
-                    }
-                ]
-            },
-            "retreat": {
-                "text": "You decide it's best not to meddle with mystical forces and head back home.",
-                "choices": [
-                    {
-                        "text": "Press 'G' or click 'Next' to conclude your adventure.",
-                        "next": "end"
-                    }
-                ]
-            },
-            "end": {
-                "text": "Thank you for playing the Default Story!",
-                "choices": []
-            }
-        }
-        default_story_path = os.path.join(STORIES_DIR, "default_story.json")
-        try:
-            with open(default_story_path, 'w', encoding='utf-8') as f:
-                json.dump(default_story, f, indent=4)
-            logging.info(f"Default story created at {default_story_path}")
-            QMessageBox.information(
-                self, 
-                "Default Story Created",
-                f"A default story has been created at {default_story_path}. "
-                "Please restart the application to load it."
-            )
-            self.close()
-        except Exception as e:
-            logging.error(f"Failed to create default story. Error: {e}")
-            QMessageBox.critical(self, "Error", "Failed to create a default story.")
+            logging.error(f"Error populating story list: {e}")
+            QMessageBox.critical(self, "Error",
+                                 f"Failed to load story files: {str(e)}")
 
     def select_story(self):
-        """Handles the selection of a story."""
-        selected_items = self.list_widget.selectedItems()
-        if selected_items:
-            selected_item = selected_items[0]
-            story_path = selected_item.data(Qt.UserRole)
-            self.selected_story = story_path
+        if self.story_list.currentItem():
+            self.selected_story = os.path.join(
+                STORIES_DIR,
+                self.story_list.currentItem().text()
+            )
             self.accept()
         else:
-            QMessageBox.warning(self, "No Selection", "Please select a story to load.")
+            QMessageBox.warning(self, "No Selection",
+                                "Please select a story to continue.")
+
+    def accept(self):
+        """Handle dialog acceptance and story initialization."""
+        if not self.selected_story:
+            return
+
+        try:
+            # Extract story name without extension
+            story_name = os.path.splitext(os.path.basename(self.selected_story))[0]
+            image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
+
+            # Ensure the image folder exists
+            os.makedirs(image_folder, exist_ok=True)
+
+            # Initialize the StoryManager with the selected story and existing BattleManager
+            self.parent().story_manager = StoryManager(
+                filepath=self.selected_story,
+                image_generator=self.parent().image_generator,
+                image_folder=image_folder,
+                ui_component=self.parent(),
+                battle_manager=self.parent().battle_manager  # Pass existing BattleManager
+            )
+
+            # Display the initial story segment
+            self.parent().story_manager.display_story_segment()
+
+            logging.info(f"Story '{story_name}' loaded successfully.")
+
+            super().accept()
+
+        except Exception as e:
+            logging.error(f"Failed to load selected story: {e}")
+            QMessageBox.critical(self, "Error",
+                                 f"Failed to load the selected story:\n{str(e)}")
+
+    def open_settings(self):
+        """Open the settings dialog."""
+        try:
+            if hasattr(self.parent(), 'task_manager'):
+                settings_dialog = SettingsDialog(self.parent().task_manager, self)
+                settings_dialog.exec_()
+                if settings_dialog.saved:
+                    self.parent().task_manager = settings_dialog.task_manager
+                    self.parent().task_manager.save_tasks()
+        except Exception as e:
+            logging.error(f"Error opening settings: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to open settings: {str(e)}")

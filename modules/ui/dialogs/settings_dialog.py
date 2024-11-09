@@ -1,7 +1,9 @@
+# modules/ui/dialogs/settings_dialog.py
+
 import os
 import json
 import logging
-from typing import Dict, Any
+from typing import Dict
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QFormLayout, QLineEdit, QCheckBox, QMessageBox, QTableWidget,
@@ -10,42 +12,37 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from modules.tasks.task_manager import TaskManager
+from modules.tasks.task import Task
 
 class SettingsDialog(QDialog):
+    """Dialog for managing game settings and tasks."""
+    
     def __init__(self, task_manager: TaskManager, parent=None):
+        """Initialize the settings dialog."""
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setFixedSize(600, 500)
         self.task_manager = task_manager
         self.saved = False
-        
-        if isinstance(task_manager.tasks, dict):
-            self.updated_tasks = {k: v.copy() for k, v in task_manager.tasks.items()}
-        elif isinstance(task_manager.tasks, list):
-            self.updated_tasks = {task['name']: task.copy() for task in task_manager.tasks}
-        else:
-            self.updated_tasks = {}
-        
-        self.init_ui()
+        self.updated_tasks = {k: v for k, v in task_manager.tasks.items()}
+        self.init_ui()  # This line is causing the error
 
     def init_ui(self):
-        """Initializes the settings dialog UI."""
+        """Initialize the UI components."""
+        # Main layout
         layout = QVBoxLayout()
-
+        
         # Task Editing Section
         task_label = QLabel("Edit Tasks:")
         task_label.setFont(QFont("Arial", 14, QFont.Bold))
         layout.addWidget(task_label)
 
+        # Task table
         self.task_table = QTableWidget()
         self.task_table.setColumnCount(4)
         self.task_table.setHorizontalHeaderLabels(['Name', 'Min', 'Max', 'Active'])
         self.task_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.task_table.setEditTriggers(
-            QAbstractItemView.DoubleClicked | 
-            QAbstractItemView.EditKeyPressed
-        )
-        
+        self.task_table.setEditTriggers(QAbstractItemView.DoubleClicked | QAbstractItemView.EditKeyPressed)
         self.task_table.setAlternatingRowColors(True)
         self.task_table.setStyleSheet("""
             QTableWidget {
@@ -53,23 +50,29 @@ class SettingsDialog(QDialog):
                 background-color: white;
             }
         """)
-        
-        self.populate_tasks()
         layout.addWidget(self.task_table)
+        
+        # Populate tasks
+        self.populate_tasks()
 
-        # Add and Remove Task Buttons
+        # Button layout for Add/Remove
         buttons_layout = QHBoxLayout()
+        
+        # Add task button
         add_task_button = QPushButton("Add Task")
         add_task_button.setFont(QFont("Arial", 12))
         add_task_button.clicked.connect(self.add_task)
+        buttons_layout.addWidget(add_task_button)
+        
+        # Remove task button
         remove_task_button = QPushButton("Remove Selected Task")
         remove_task_button.setFont(QFont("Arial", 12))
         remove_task_button.clicked.connect(self.remove_task)
-        buttons_layout.addWidget(add_task_button)
         buttons_layout.addWidget(remove_task_button)
+        
         layout.addLayout(buttons_layout)
 
-        # Shaking Animation Toggle
+        # Shake animation toggle
         shake_layout = QHBoxLayout()
         self.shake_checkbox = QCheckBox("Enable Shaking Animation")
         self.shake_checkbox.setFont(QFont("Arial", 12))
@@ -77,45 +80,49 @@ class SettingsDialog(QDialog):
         shake_layout.addWidget(self.shake_checkbox)
         layout.addLayout(shake_layout)
 
-        # Save and Cancel Buttons
+        # Save/Cancel buttons
         save_cancel_layout = QHBoxLayout()
+        
         save_button = QPushButton("Save")
         save_button.setFont(QFont("Arial", 14))
         save_button.clicked.connect(self.save_settings)
+        save_cancel_layout.addWidget(save_button)
+        
         cancel_button = QPushButton("Cancel")
         cancel_button.setFont(QFont("Arial", 14))
         cancel_button.clicked.connect(self.reject)
-        save_cancel_layout.addWidget(save_button)
         save_cancel_layout.addWidget(cancel_button)
+        
         layout.addLayout(save_cancel_layout)
 
+        # Set the layout
         self.setLayout(layout)
 
     def populate_tasks(self):
-        """Populates the task table with existing tasks."""
+        """Populate task table with current tasks."""
         self.task_table.setRowCount(0)
         for task_name, task in self.updated_tasks.items():
             row_position = self.task_table.rowCount()
             self.task_table.insertRow(row_position)
-
-            # Name
+            
+            # Task name
             name_item = QTableWidgetItem(task_name)
             name_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.task_table.setItem(row_position, 0, name_item)
-
-            # Min
-            min_item = QTableWidgetItem(str(task.get('min', 1)))
+            
+            # Min value
+            min_item = QTableWidgetItem(str(task.min_count))
             min_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.task_table.setItem(row_position, 1, min_item)
-
-            # Max
-            max_item = QTableWidgetItem(str(task.get('max', 10)))
+            
+            # Max value
+            max_item = QTableWidgetItem(str(task.max_count))
             max_item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsEnabled)
             self.task_table.setItem(row_position, 2, max_item)
-
-            # Active Checkbox
+            
+            # Active checkbox
             active_checkbox = QCheckBox()
-            active_checkbox.setChecked(task.get('active', True))
+            active_checkbox.setChecked(task.active)
             checkbox_widget = QWidget()
             checkbox_layout = QHBoxLayout()
             checkbox_layout.addWidget(active_checkbox)
@@ -125,29 +132,36 @@ class SettingsDialog(QDialog):
             self.task_table.setCellWidget(row_position, 3, checkbox_widget)
 
     def add_task(self):
-        """Adds a new empty task to the table."""
+        """Add a new task."""
         new_task_name = f"Task_{len(self.updated_tasks) + 1}"
         counter = 1
         base_name = new_task_name
         while new_task_name in self.updated_tasks:
             new_task_name = f"{base_name}_{counter}"
             counter += 1
-        self.updated_tasks[new_task_name] = {'min': 1, 'max': 10, 'active': True}
+
+        self.updated_tasks[new_task_name] = Task(
+            name=new_task_name,
+            min_count=1,
+            max_count=3,
+            active=True
+        )
         self.populate_tasks()
 
     def remove_task(self):
-        """Removes the selected task from the table."""
+        """Remove selected task."""
         selected_items = self.task_table.selectedItems()
         if not selected_items:
             QMessageBox.warning(self, "No Selection", "Please select a task to remove.")
             return
         selected_row = selected_items[0].row()
         task_name = self.task_table.item(selected_row, 0).text()
-        del self.updated_tasks[task_name]
-        self.populate_tasks()
+        if task_name in self.updated_tasks:
+            del self.updated_tasks[task_name]
+            self.populate_tasks()
 
     def load_shaking_setting(self):
-        """Loads the shaking animation setting from the settings file."""
+        """Load shake animation setting."""
         settings_file = os.path.join(os.path.dirname(self.task_manager.filepath), 'settings.json')
         if os.path.exists(settings_file):
             try:
@@ -156,16 +170,17 @@ class SettingsDialog(QDialog):
                 shake_enabled = settings.get('shake_animation', True)
                 self.shake_checkbox.setChecked(shake_enabled)
             except Exception as e:
-                logging.error(f"Failed to load shaking setting. Error: {e}")
+                logging.error(f"Failed to load shaking setting: {e}")
                 self.shake_checkbox.setChecked(True)
         else:
             self.shake_checkbox.setChecked(True)
 
     def save_settings(self):
-        """Saves the updated tasks and settings."""
+        """Save settings and tasks."""
         try:
             new_tasks = {}
             for row in range(self.task_table.rowCount()):
+                # Get task name
                 name = self.task_table.item(row, 0).text().strip()
                 if not name:
                     QMessageBox.warning(self, "Invalid Task Name", 
@@ -176,9 +191,16 @@ class SettingsDialog(QDialog):
                                       f"Task name '{name}' in row {row + 1} is duplicated.")
                     return
                 
-                min_val = int(self.task_table.item(row, 1).text())
-                max_val = int(self.task_table.item(row, 2).text())
+                # Get min/max values
+                try:
+                    min_val = int(self.task_table.item(row, 1).text())
+                    max_val = int(self.task_table.item(row, 2).text())
+                except ValueError:
+                    QMessageBox.warning(self, "Invalid Input", 
+                                      "Min and Max values must be integers.")
+                    return
                 
+                # Get active state
                 active_widget = self.task_table.cellWidget(row, 3)
                 active = False
                 if isinstance(active_widget, QWidget):
@@ -188,14 +210,22 @@ class SettingsDialog(QDialog):
                         if isinstance(checkbox, QCheckBox):
                             active = checkbox.isChecked()
 
-                new_tasks[name] = {'min': min_val, 'max': max_val, 'active': active}
+                # Create new task
+                new_tasks[name] = Task(
+                    name=name,
+                    min_count=min_val,
+                    max_count=max_val,
+                    active=active,
+                    description=self.updated_tasks[name].description if name in self.updated_tasks else None
+                )
 
-            self.updated_tasks = new_tasks
-            self.task_manager.tasks = self.updated_tasks
+            # Update task manager
+            self.task_manager.tasks = new_tasks
+            if not self.task_manager.save_tasks():
+                raise Exception("Failed to save tasks")
 
             # Save settings
-            shake_enabled = self.shake_checkbox.isChecked()
-            settings = {'shake_animation': shake_enabled}
+            settings = {'shake_animation': self.shake_checkbox.isChecked()}
             settings_file = os.path.join(
                 os.path.dirname(self.task_manager.filepath), 
                 'settings.json'
@@ -209,9 +239,7 @@ class SettingsDialog(QDialog):
                                   "Settings have been saved successfully.")
             self.accept()
             
-        except ValueError:
-            QMessageBox.warning(self, "Invalid Input", 
-                              "Min and Max values must be integers.")
         except Exception as e:
-            logging.error(f"Failed to save settings. Error: {e}")
+            logging.error(f"Failed to save settings: {e}")
             QMessageBox.critical(self, "Error", "Failed to save settings.")
+

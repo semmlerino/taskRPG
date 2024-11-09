@@ -2,71 +2,91 @@
     "Mails": {
         "min": 4,
         "max": 6,
-        "active": true
+        "active": true,
+        "description": null
     },
     "ToDo": {
         "min": 3,
         "max": 3,
-        "active": false
+        "active": false,
+        "description": null
     },
     "Gym": {
         "min": 1,
         "max": 1,
-        "active": false
+        "active": false,
+        "description": null
     },
     "Tabs": {
         "min": 7,
         "max": 14,
-        "active": true
+        "active": true,
+        "description": null
     },
     "GPTs": {
         "min": 2,
         "max": 7,
-        "active": true
+        "active": true,
+        "description": null
     },
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": true
+        "active": true,
+        "description": null
     },
     "KanaRPG": {
         "min": 1,
         "max": 1,
-        "active": false
+        "active": false,
+        "description": null
     },
     "3DE scripting": {
         "min": 1,
         "max": 1,
-        "active": false
+        "active": false,
+        "description": null
     },
     "SG scripting": {
         "min": 1,
         "max": 1,
-        "active": false
+        "active": false,
+        "description": null
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": false
+        "active": false,
+        "description": null
     },
     "Claude": {
         "min": 3,
         "max": 7,
-        "active": true
+        "active": true,
+        "description": null
     },
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": true
+        "active": true,
+        "description": null
     },
     "Perplexity": {
         "min": 5,
         "max": 9,
-        "active": true
+        "active": true,
+        "description": null
     },
     "Gemini": {
         "min": 2,
         "max": 5,
-        "active": true
+        "active": true,
+        "description": null
+    },
+    "Hair": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": null
     }
 }

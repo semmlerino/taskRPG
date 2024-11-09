@@ -1,7 +1,6 @@
 from PyQt5.QtWidgets import QTextBrowser
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QTextCursor, QPalette, QColor
-from modules.ui.styles.style_manager import StyleManager
 
 class StoryTextBrowser(QTextBrowser):
     """Custom text browser with enhanced features for story display."""
@@ -15,7 +14,7 @@ class StoryTextBrowser(QTextBrowser):
         self.setAcceptRichText(True)
         
         # Set default font size
-        self.setFontPointSize(UI_FONTS['DEFAULT_SIZE'])
+        self.setFontPointSize(12)
         
         # Enable external links but handle them internally
         self.setOpenExternalLinks(False)
@@ -26,8 +25,41 @@ class StoryTextBrowser(QTextBrowser):
         palette.setColor(QPalette.Text, QColor("#333333"))
         self.setPalette(palette)
         
-        # Custom stylesheet
-        self.setStyleSheet(StyleManager.get_text_browser_style())
+        # Apply stylesheet directly
+        self.setStyleSheet("""
+            QTextBrowser {
+                background-color: #FFFFFF;
+                color: #333333;
+                border: 1px solid #CCCCCC;
+                border-radius: 5px;
+                padding: 8px;
+                selection-background-color: #2196F3;
+                selection-color: #FFFFFF;
+            }
+            QTextBrowser:focus {
+                border: 1px solid #2196F3;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #F5F5F5;
+                width: 10px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #CCCCCC;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: #BBBBBB;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
+            }
+        """)
 
     def append_text(self, text: str):
         """Append text and scroll to the end."""

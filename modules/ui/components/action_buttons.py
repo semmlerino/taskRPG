@@ -1,99 +1,84 @@
-from PyQt5.QtWidgets import QWidget, QPushButton, QHBoxLayout
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
-from typing import Callable
+from PyQt5.QtWidgets import (
+    QWidget, QHBoxLayout, QPushButton
+)
+from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtGui import QFont, QIcon
 
 class ActionButtons(QWidget):
-    """Manages action buttons like Next, Attack, and Heavy Attack."""
+    attack_clicked = pyqtSignal()
+    heavy_attack_clicked = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.init_ui()
     
     def init_ui(self):
-        layout = QHBoxLayout()
-        layout.setSpacing(20)
+        layout = QHBoxLayout(self)
         
-        # Next Button
         self.next_button = QPushButton("Next (G)")
-        self.next_button.setFont(QFont("Arial", 14, QFont.Bold))
+        self.next_button.setFont(QFont("Arial", 14))
         self.next_button.setStyleSheet("""
             QPushButton {
-                background-color: #42A5F5;
+                background-color: #4CAF50;
                 color: white;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border: none;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #1E88E5;
+                background-color: #45a049;
             }
         """)
-        self.next_button.setFixedHeight(50)
-        self.next_button.setToolTip("Proceed to the next story segment (Shortcut: G)")
-        layout.addWidget(self.next_button)
         
-        # Attack Button
         self.attack_button = QPushButton("Attack (D)")
-        self.attack_button.setFont(QFont("Arial", 14, QFont.Bold))
         self.attack_button.setStyleSheet("""
             QPushButton {
-                background-color: #66BB6A;
+                background-color: #2196F3;
                 color: white;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border: none;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #43A047;
+                background-color: #1976D2;
             }
         """)
-        self.attack_button.setFixedHeight(50)
-        self.attack_button.setToolTip("Perform a regular attack (Shortcut: D)")
-        self.attack_button.hide()  # Initially hidden
-        layout.addWidget(self.attack_button)
         
-        # Heavy Attack Button
         self.heavy_attack_button = QPushButton("Heavy Attack (Shift+D)")
-        self.heavy_attack_button.setFont(QFont("Arial", 14, QFont.Bold))
         self.heavy_attack_button.setStyleSheet("""
             QPushButton {
-                background-color: #EF5350;
+                background-color: #FF5722;
                 color: white;
-                padding: 10px 20px;
+                padding: 8px 16px;
                 border: none;
                 border-radius: 5px;
             }
             QPushButton:hover {
-                background-color: #E53935;
+                background-color: #F4511E;
             }
         """)
-        self.heavy_attack_button.setFixedHeight(50)
-        self.heavy_attack_button.setToolTip("Perform a heavy attack (Shortcut: Shift+D)")
-        self.heavy_attack_button.hide()  # Initially hidden
+        
+        self.attack_button.clicked.connect(self.attack_clicked.emit)
+        self.heavy_attack_button.clicked.connect(self.heavy_attack_clicked.emit)
+        
+        layout.addWidget(self.next_button)
+        layout.addWidget(self.attack_button)
         layout.addWidget(self.heavy_attack_button)
         
         self.setLayout(layout)
-    
-    def connect_buttons(self, next_func: Callable, attack_func: Callable, heavy_attack_func: Callable):
-        """Connects button signals to their respective slots."""
-        self.next_button.clicked.connect(next_func)
-        self.attack_button.clicked.connect(attack_func)
-        self.heavy_attack_button.clicked.connect(heavy_attack_func)
+        self.hide_attack_buttons()
     
     def show_attack_buttons(self):
-        """Shows Attack and Heavy Attack buttons and hides Next button."""
-        self.next_button.hide()
+        """Show attack buttons during battle."""
         self.attack_button.show()
         self.heavy_attack_button.show()
     
     def hide_attack_buttons(self):
-        """Hides Attack and Heavy Attack buttons and shows Next button."""
+        """Hide attack buttons when not in battle."""
         self.attack_button.hide()
         self.heavy_attack_button.hide()
-        self.next_button.show()
     
-    def debug_button_state(self):
-        """Print the visibility state of all buttons"""
-        print(f"Next button visible: {self.next_button.isVisible()}")
-        print(f"Attack button visible: {self.attack_button.isVisible()}")
-        print(f"Heavy attack button visible: {self.heavy_attack_button.isVisible()}")
+    def update_navigation_buttons(self, can_go_back: bool, can_go_forward: bool):
+        """Update the enabled state of navigation buttons."""
+        self.back_button.setEnabled(can_go_back)
+        self.forward_button.setEnabled(can_go_forward)

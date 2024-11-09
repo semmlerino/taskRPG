@@ -1,6 +1,11 @@
+from PyQt5.QtWidgets import (
+    QWidget, QVBoxLayout, QLabel, 
+    QProgressBar
+)
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
-from PyQt5.QtGui import QFont
+from typing import Optional
+
+from modules.battle.enemy import Enemy
 
 class CompactBattleWindow(QWidget):
     """Compact window for displaying battle stats when main window loses focus."""
@@ -68,42 +73,21 @@ class CompactBattleWindow(QWidget):
         # Simple tooltip showing hotkeys
         self.setToolTip("D: Normal Attack\nShift+D: Heavy Attack")
 
-    def update_display(self, enemy):
-        """Updates the compact display with current battle information."""
+    def update_tasks(self, tasks_left: int):
+        """Update the tasks left display."""
+        self.tasks_label.setText(f"Tasks left: {tasks_left}")
+        self.hp_bar.setValue(tasks_left)
+
+    def update_display(self, enemy: Optional[Enemy]):
+        """Update the compact window display with enemy information."""
         if enemy:
-            # Display enemy name and task name
-            self.enemy_label.setText(f"{enemy.name} ({enemy.task_name})")
-            
-            # Update HP bar
+            self.enemy_label.setText(f"{enemy.name} - {enemy.task_name}")
             self.hp_bar.setMaximum(enemy.max_hp)
             self.hp_bar.setValue(enemy.current_hp)
-            self.tasks_label.setText(f"Tasks remaining: {enemy.current_hp}")
-            
-            # Update HP bar color based on remaining HP
-            hp_percentage = enemy.get_health_percentage()
-            if hp_percentage > 60:
-                color = "#76FF03"  # Green
-            elif hp_percentage > 30:
-                color = "#FF9800"  # Orange
-            else:
-                color = "#F44336"  # Red
-            
-            self.hp_bar.setStyleSheet(f"""
-                QProgressBar {{
-                    border: 2px solid grey;
-                    border-radius: 5px;
-                    text-align: center;
-                    background-color: #f5f5f5;
-                }}
-                QProgressBar::chunk {{
-                    background-color: {color};
-                }}
-            """)
+            self.tasks_label.setText(f"Tasks left: {enemy.current_hp}")
+            self.show()
         else:
-            # Reset display if no enemy
-            self.enemy_label.setText("")
-            self.hp_bar.setValue(0)
-            self.tasks_label.setText("")
+            self.hide()
     
     def mousePressEvent(self, event):
         """Handle mouse press for dragging."""
