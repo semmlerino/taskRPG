@@ -8,8 +8,7 @@ from enum import Enum, auto
 import random
 
 from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QRect
-from PyQt5.QtCore import QTimer
+from PyQt5.QtCore import QRect, QTimer, Qt
 
 # Core game system imports
 from modules.tasks.task_manager import TaskManager
@@ -403,19 +402,25 @@ class BattleManager:
         self._update_status(f"{attack_type} landed!")
 
     def _update_ui_for_victory(self, xp_gained: int) -> None:
-        """Update UI for victory."""
-        if self.story_display:
-            self.story_display.append_text(
-                f"<p>Victory! You gained <b>{xp_gained}</b> XP!</p>"
-            )
-        if self.enemy_panel:
-            self.enemy_panel.update_panel(None)
-        if self.action_buttons:
-            self.action_buttons.hide_attack_buttons()
-            self.action_buttons.next_button.show()
-        if self.player_panel:
-            self.player_panel.update_panel()
-        self._update_status("Victory! Story continues...")
+        """Update UI elements after victory."""
+        try:
+            # Create victory message with HTML formatting
+            victory_message = f"<p>Victory! You gained <b>{xp_gained}</b> XP!</p>"
+            
+            # Set text with HTML interpretation enabled
+            if hasattr(self, 'status_label'):
+                self.status_label.setTextFormat(Qt.RichText)  # Enable HTML interpretation
+                self.status_label.setText(victory_message)
+                
+            # If using a message box or other display method, ensure HTML is enabled there too
+            if hasattr(self, 'message_display'):
+                self.message_display.setTextFormat(Qt.RichText)
+                self.message_display.setText(victory_message)
+                
+            logging.debug(f"Victory UI updated with XP gain: {xp_gained}")
+            
+        except Exception as e:
+            logging.error(f"Error updating UI for victory: {e}")
 
     def _update_status(self, message: str) -> None:
         """Update status bar if available."""
@@ -653,3 +658,27 @@ class BattleManager:
             logging.error(f"Error updating battle UI: {e}")
             # Include the full error traceback for debugging
             logging.debug(f"Full error details:", exc_info=True)
+
+    def _handle_chapter_complete(self) -> None:
+        """Display chapter completion message."""
+        try:
+            completion_message = (
+                "<div style='text-align: center;'>"
+                "<br><b>Chapter Complete!</b><br>"
+                "<p style='margin: 10px 0;'>You have completed all available tasks for now.</p>"
+                "<p style='margin: 10px 0;'>Feel free to start a new chapter or take a break!</p>"
+                "</div>"
+            )
+            
+            if hasattr(self, 'status_label'):
+                self.status_label.setTextFormat(Qt.RichText)
+                self.status_label.setText(completion_message)
+                
+            if hasattr(self, 'message_display'):
+                self.message_display.setTextFormat(Qt.RichText)
+                self.message_display.setText(completion_message)
+                
+            logging.debug("Chapter completion message displayed")
+            
+        except Exception as e:
+            logging.error(f"Error displaying chapter completion: {e}")

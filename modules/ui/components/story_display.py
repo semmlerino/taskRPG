@@ -217,15 +217,21 @@ class StoryDisplay(QWidget):
         QMessageBox.critical(self, "Error", message)
 
     def append_text(self, text: str) -> None:
-        """Append text to the story display."""
-        current_text = self.story_text.toPlainText()
-        if current_text:
-            # Add a newline if there's existing text
-            self.story_text.setPlainText(f"{current_text}\n{text}")
-        else:
-            # Just set the text if the display is empty
-            self.story_text.setPlainText(text)
-        
-        # Scroll to the bottom to show new text
-        scrollbar = self.story_text.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
+        """Append text to the story display with HTML support."""
+        try:
+            if self.story_text.toHtml():
+                # Add new HTML content while preserving existing content
+                current_html = self.story_text.toHtml()
+                # Insert new content before the closing body tag
+                new_html = current_html.replace('</body>', f'{text}</body>')
+                self.story_text.setHtml(new_html)
+            else:
+                # Just set the HTML if the display is empty
+                self.story_text.setHtml(text)
+            
+            # Scroll to the bottom to show new text
+            scrollbar = self.story_text.verticalScrollBar()
+            scrollbar.setValue(scrollbar.maximum())
+            
+        except Exception as e:
+            logging.error(f"Error appending HTML text: {e}")
