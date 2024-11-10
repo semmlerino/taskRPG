@@ -178,27 +178,35 @@ class StoryDisplay(QWidget):
 
             self.cleanup_viewer()
             
-            # Disable global G hotkey
-            main_window = self.window()
-            if hasattr(main_window, 'hotkey_listener'):
-                main_window.hotkey_listener.set_next_story_enabled(False)
-                logging.info("Disabled global G hotkey for fullscreen mode")
-            
             # Create new fullscreen viewer
             self._fullscreen_viewer = FullscreenImageViewer(
                 self.current_image_path,
                 self.story_text.toPlainText()
             )
             
-            # Connect close event to re-enable hotkey
-            self._fullscreen_viewer.closeEvent = lambda event: self._handle_fullscreen_close(event)
-            
-            # Connect story advance signal
-            if main_window and hasattr(main_window, 'next_story_segment'):
-                self._fullscreen_viewer.story_advance_signal.connect(
-                    main_window.next_story_segment
+            # Connect signals
+            main_window = self.window()
+            if main_window:
+                # Connect story advance signal
+                if hasattr(main_window, 'next_story_segment'):
+                    self._fullscreen_viewer.story_advance_signal.connect(
+                        main_window.next_story_segment
+                    )
+                    logging.info("Story advance signal connected")
+                
+                # Connect navigate back signal to StoryDisplay's signal
+                self._fullscreen_viewer.navigate_back_signal.connect(
+                    self.navigate_back_signal.emit
                 )
-                logging.info("Signal connected to next_story_segment")
+                logging.info("Navigate back signal connected to StoryDisplay")
+            
+            # Handle global hotkeys
+            if hasattr(main_window, 'hotkey_listener'):
+                main_window.hotkey_listener.set_next_story_enabled(False)
+                logging.info("Disabled global G hotkey for fullscreen mode")
+            
+            # Connect close event
+            self._fullscreen_viewer.closeEvent = lambda event: self._handle_fullscreen_close(event)
             
             self._fullscreen_viewer.showFullScreen()
             logging.info("Fullscreen viewer displayed")

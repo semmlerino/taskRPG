@@ -151,10 +151,20 @@ class StoryManager:
 
             self._current_content = content
 
-            # Update history if moving forward
-            if self._history_index == len(self._history) - 1:
-                self._history.append((self.current_node_key, content))
-                self._history_index += 1
+            # Log history state before update
+            logging.info(f"History before update - Index: {self._history_index}, Size: {len(self._history)}")
+
+            # If we're not at the end of history, truncate the future history
+            if self._history_index < len(self._history) - 1:
+                self._history = self._history[:self._history_index + 1]
+                logging.info("Truncated future history")
+
+            # Add new node to history
+            self._history.append((self.current_node_key, content))
+            self._history_index = len(self._history) - 1
+            
+            # Log history state after update
+            logging.info(f"History after update - Index: {self._history_index}, Size: {len(self._history)}")
 
             # Update UI if available
             if self.ui:
@@ -239,15 +249,26 @@ class StoryManager:
     def navigate(self, direction: NavigationDirection) -> bool:
         """Navigate through story history."""
         try:
+            # Log current state before navigation
+            logging.info(f"Attempting navigation {direction.name}")
+            logging.info(f"Current history index: {self._history_index}")
+            logging.info(f"History size: {len(self._history)}")
+            logging.info(f"Available history nodes: {[key for key, _ in self._history]}")
+
             if not self._can_navigate(direction):
+                logging.info(f"Cannot navigate {direction.name}")
                 return False
 
+            # Update index
             if direction == NavigationDirection.FORWARD:
                 self._history_index += 1
             else:
                 self._history_index -= 1
 
+            # Get content from history
             node_key, content = self._history[self._history_index]
+            logging.info(f"Retrieved node {node_key} from history at index {self._history_index}")
+            
             self.current_node_key = node_key
             self.current_node = self.story_data[node_key]
             self._current_content = content
@@ -259,19 +280,32 @@ class StoryManager:
                     html_content,
                     content.image_path
                 )
+                logging.info(f"Updated display with node: {node_key}")
 
             return True
 
         except Exception as e:
-            logging.error(f"Error during navigation: {e}")
+            logging.error(f"Error during navigation: {e}", exc_info=True)
             return False
 
     def _can_navigate(self, direction: NavigationDirection) -> bool:
         """Check if navigation in given direction is possible."""
-        if direction == NavigationDirection.FORWARD:
-            return self._history_index < len(self._history) - 1
-        else:
-            return self._history_index > 0
+        try:
+            if direction == NavigationDirection.FORWARD:
+                can_nav = self._history_index < len(self._history) - 1
+            else:
+                can_nav = self._history_index > 0
+            
+            # Add detailed debug info
+            logging.info(f"Navigation check - Direction: {direction.name}")
+            logging.info(f"Current history index: {self._history_index}")
+            logging.info(f"History length: {len(self._history)}")
+            logging.info(f"Can navigate {direction.name}: {can_nav}")
+            
+            return can_nav
+        except Exception as e:
+            logging.error(f"Error checking navigation possibility: {e}")
+            return False
 
     def get_text(self) -> str:
         """Get narrative text from current node."""

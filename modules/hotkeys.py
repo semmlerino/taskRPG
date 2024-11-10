@@ -69,11 +69,14 @@ class GlobalHotkeys(QThread):
         """Registers or removes the next story hotkey based on enabled state."""
         try:
             if hasattr(self, '_next_story_hotkey') and self._next_story_hotkey:
-                keyboard.remove_hotkey(self._next_story_hotkey)
+                try:
+                    keyboard.remove_hotkey(self._next_story_hotkey)
+                except Exception as e:
+                    logging.debug(f"Could not remove hotkey: {e}")
                 self._next_story_hotkey = None
                 logging.debug("Next story hotkey removed")
             
-            if self.next_story_enabled:
+            if self.next_story_enabled and 'next_story' in HOTKEYS:
                 self._next_story_hotkey = keyboard.add_hotkey(
                     HOTKEYS['next_story'],
                     lambda: self.next_story_signal.emit()
