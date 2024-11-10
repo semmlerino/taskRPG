@@ -3,9 +3,9 @@
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QTextBrowser, 
     QSizePolicy, QSplitter, QScrollArea, QPushButton, 
-    QHBoxLayout, QMessageBox
+    QHBoxLayout, QMessageBox, QShortcut
 )
-from PyQt5.QtGui import QFont, QPixmap, QTextCursor, QKeyEvent
+from PyQt5.QtGui import QFont, QPixmap, QTextCursor, QKeyEvent, QKeySequence
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from typing import Optional
 from .fullscreen_image_viewer import FullscreenImageViewer
@@ -90,6 +90,10 @@ class StoryDisplay(QWidget):
         
         # Connect internal signals
         self._setup_connections()
+        
+        # Add shortcut for fullscreen
+        self.fullscreen_shortcut = QShortcut(QKeySequence('F'), self)
+        self.fullscreen_shortcut.activated.connect(self._handle_fullscreen_shortcut)
         
         logging.info("StoryDisplay initialized")
 
@@ -186,9 +190,13 @@ class StoryDisplay(QWidget):
             self.current_node_key = node_key
             self.clear()
             
-            if image_path:
+            if image_path and os.path.exists(image_path):
                 self.current_image_path = image_path
                 self.load_image()
+                logging.debug(f"Image loaded: {image_path}")
+            else:
+                self.current_image_path = None
+                logging.debug("No valid image path provided")
                 
             self.append_text(html_content)
             
@@ -278,9 +286,15 @@ class StoryDisplay(QWidget):
 
     def keyPressEvent(self, event: QKeyEvent):
         """Handle key press events."""
+        logging.debug(f"Key pressed in StoryDisplay: {event.key()}")
         try:
-            if event.key() == Qt.Key_F and self.current_image_path:
-                self._show_fullscreen_viewer()
+            if event.key() == Qt.Key_F:
+                logging.debug("F key detected - attempting to show fullscreen")
+                if hasattr(self, 'current_image_path') and self.current_image_path:
+                    logging.debug(f"Current image path: {self.current_image_path}")
+                    self._show_fullscreen_viewer()
+                else:
+                    logging.debug("No image available for fullscreen view")
             elif event.key() == Qt.Key_Left:
                 self.navigate_back_signal.emit()
             elif event.key() == Qt.Key_Right:
@@ -331,7 +345,6 @@ class StoryDisplay(QWidget):
                 logging.error(f"Error cleaning up viewer: {e}")
             finally:
                 self._fullscreen_viewer = None
-
     def clear(self):
         """Clear all content."""
         self.story_text.clear()
@@ -346,3 +359,11 @@ class StoryDisplay(QWidget):
     def __del__(self):
         """Cleanup on deletion."""
         self.cleanup_viewer()
+
+    def _handle_fullscreen_shortcut(self):
+        """Handle fullscreen shortcut activation."""
+        logging.debug("Fullscreen shortcut activated")
+        if hasattr(self, 'current_image_path') and self.current_image_path:
+            self._show_fullscreen_viewer()
+        else:
+            logging.debug("No image available for fullscreen view")
