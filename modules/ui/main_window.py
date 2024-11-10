@@ -1,20 +1,20 @@
-# modules/ui/main_window.py
+from __future__ import annotations
 
 import os
 import json
 import logging
 import sys
 import traceback
-from typing import Dict, List, Tuple, TYPE_CHECKING
+from typing import Dict, List, Tuple, Optional
 
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
     QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget, QProgressDialog
 )
 from PyQt5.QtCore import (
-    QEasingCurve, QEvent, QPropertyAnimation, QRect, QTimer, Qt
+    QEasingCurve, QEvent, QPropertyAnimation, QRect, QTimer, Qt, pyqtSlot
 )
-from PyQt5.QtGui import QFont, QIcon, QKeyEvent
+from PyQt5.QtGui import QFont, QIcon, QKeyEvent, QPalette, QColor
 
 from modules.constants import (
     WINDOW_ICON, WINDOW_TITLE, ASSETS_DIR, STORIES_DIR, DATA_DIR
@@ -38,82 +38,85 @@ from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from core.battle.battle_manager import BattleManager
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 class TaskRPG(QMainWindow):
     """
     Main game window handling UI coordination and game state management.
+    
+    Manages the overall game state, window behavior, and component interactions.
+    Handles fullscreen transitions, battle states, and focus management.
     """
-
+    
     def __init__(self):
+        """Initialize the main game window."""
         super().__init__()
         logging.info("Initializing TaskRPG main window")
-
-        # Set window properties
+        
         self.setWindowTitle(WINDOW_TITLE)
         self.setWindowIcon(QIcon(WINDOW_ICON))
         self.setMinimumSize(900, 700)
-
-        # Load window settings
+        
+        # Load window settings first
         self._load_window_settings()
-
-        # Initialize core components first
-        self.init_core_components()
-
-        # Create and set central widget
+        
+        # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-
-        # Initialize status bar
+        
+        # Initialize Status Bar (needed by UI)
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-
-        # Initialize UI components
+        
+        # Initialize core components that don't depend on UI
+        self.init_core_components()
+        
+        # Initialize UI Components
         self.init_ui()
-
-        # Initialize managers that depend on UI
+        
+        # Initialize managers that depend on UI components
         self.init_managers()
-
-        # Start hotkey system
+        
+        # Initialize and start global hotkeys listener
         self.init_hotkeys()
-
-        # Initialize animations
+        
+        # Initialize Shaking Animation
         self.init_animations()
-
-        # Setup dynamic font scaling
+        
+        # Dynamic Font Scaling Timer
         self.init_font_scaling()
-
+        
         # Install event filter for window state management
         self.installEventFilter(self)
-
-        # Set focus policy
+        
+        # Add focus and keyboard handling
         self.setFocusPolicy(Qt.StrongFocus)
-
-        # Prompt story selection (after UI is ready)
+        
+        # Schedule story selection and focus setup
         QTimer.singleShot(0, self.select_story)
-
-        # Set initial focus after a delay
         QTimer.singleShot(100, self._ensure_focus)
-
+        
         logging.info("TaskRPG main window initialization complete")
 
     def init_core_components(self):
         """Initialize core game components."""
         try:
-            # Initialize task manager
+            # Task Manager
             self.task_manager = TaskManager()
-
-            # Initialize player
+            
+            # Player and Game State
             self.player = Player()
-
-            # Initialize image generator
+            
+            # Image Generator
             self.image_generator = ImageGenerator()
-
-            # Initialize battle manager
+            
+            # Battle Manager - initialize before StoryManager
             self.battle_manager = BattleManager(self.task_manager, self.player)
-
-            # Initialize story manager with default path
+            
+            # Initialize with default story file path
             default_story_path = os.path.join(STORIES_DIR, "default_story.json")
             self.story_manager = StoryManager(
                 filepath=default_story_path,
@@ -122,9 +125,9 @@ class TaskRPG(QMainWindow):
                 ui_component=self,
                 battle_manager=self.battle_manager
             )
-
+            
             logging.info("Core components initialized")
-
+            
         except Exception as e:
             logging.error(f"Error initializing core components: {e}")
             raise
@@ -135,72 +138,72 @@ class TaskRPG(QMainWindow):
             main_layout = QVBoxLayout()
             main_layout.setContentsMargins(20, 20, 20, 20)
             main_layout.setSpacing(15)
-
-            # Top section (player, enemy, tasks)
+            
+            # Top Information Panel
             top_layout = self._create_top_section()
             main_layout.addLayout(top_layout)
-
-            # Story display
+            
+            # Story Display
             self.story_display = StoryDisplay()
             main_layout.addWidget(self.story_display)
-
-            # Choices panel
+            
+            # Choices Panel
             self.choices_panel = ChoicesPanel()
             main_layout.addWidget(self.choices_panel)
-
-            # Action buttons
+            
+            # Action Buttons
             self.action_buttons = ActionButtons()
             main_layout.addWidget(self.action_buttons)
-
-            # Settings button
-            settings_button = self._create_settings_button()
-            main_layout.addWidget(settings_button, alignment=Qt.AlignRight)
-
+            
+            # Settings Button
+            self.settings_button = self._create_settings_button()
+            main_layout.addWidget(self.settings_button, alignment=Qt.AlignRight)
+            
             # Set layout
             self.centralWidget().setLayout(main_layout)
-
-            # Connect signals
+            
+            # Connect UI signals
             self._connect_ui_signals()
-
+            
             logging.info("UI components initialized")
-
+            
         except Exception as e:
             logging.error(f"Error initializing UI: {e}")
             raise
 
     def _create_top_section(self) -> QHBoxLayout:
-        """Create the top section of the UI containing player, enemy, and task info."""
+        """Create the top section containing player, enemy, and task info."""
         layout = QHBoxLayout()
         layout.setSpacing(30)
-
-        # Player panel
+        
+        # Player Panel
         self.player_panel = PlayerPanel(self.player)
         layout.addWidget(self.player_panel)
-
-        # Enemy panel
+        
+        # Enemy Panel
         self.enemy_panel = EnemyPanel()
         layout.addWidget(self.enemy_panel)
-
-        # Tasks left group
+        
+        # Tasks Left Group
         tasks_group = QGroupBox("Tasks Left")
         tasks_layout = QVBoxLayout()
-
+        
         self.tasks_left_label = QLabel("0")
         self.tasks_left_label.setFont(QFont("Arial", 16, QFont.Bold))
         self.tasks_left_label.setAlignment(Qt.AlignCenter)
         self.tasks_left_label.setStyleSheet("color: #388E3C;")
-
+        
         tasks_layout.addWidget(self.tasks_left_label)
         tasks_group.setLayout(tasks_layout)
         layout.addWidget(tasks_group)
-
+        
         return layout
 
     def _create_settings_button(self) -> QPushButton:
         """Create and configure the settings button."""
-        self.settings_button = QPushButton("Settings")
-        self.settings_button.setFont(QFont("Arial", 14))
-        self.settings_button.setStyleSheet("""
+        button = QPushButton("Settings")
+        button.setFont(QFont("Arial", 14))
+        button.setStyleSheet("""
             QPushButton {
                 background-color: #FFB74D;
                 color: white;
@@ -212,22 +215,28 @@ class TaskRPG(QMainWindow):
                 background-color: #FFA726;
             }
         """)
-        self.settings_button.setFixedHeight(40)
-        self.settings_button.setToolTip("Open settings dialog")
-        return self.settings_button
+        button.setFixedHeight(40)
+        button.setToolTip("Open settings dialog")
+        return button
 
     def _connect_ui_signals(self):
         """Connect all UI signals."""
-        # Story navigation
-        self.story_display.navigate_back_signal.connect(self.navigate_back)
-        self.story_display.navigate_forward_signal.connect(self.navigate_forward)
-        self.story_display.story_advance_signal.connect(self.next_story_segment)
-
-        # Action buttons
-        self.action_buttons.next_button.clicked.connect(self.next_story_segment)
-
-        # Settings button
-        self.settings_button.clicked.connect(self.open_settings)
+        try:
+            # Story navigation
+            self.story_display.navigate_back_signal.connect(self.navigate_back)
+            self.story_display.navigate_forward_signal.connect(self.navigate_forward)
+            self.story_display.story_advance_signal.connect(self.next_story_segment)
+            
+            # Action buttons
+            self.action_buttons.next_button.clicked.connect(self.next_story_segment)
+            
+            # Settings button
+            self.settings_button.clicked.connect(self.open_settings)
+            
+            logging.debug("UI signals connected")
+            
+        except Exception as e:
+            logging.error(f"Error connecting UI signals: {e}")
 
     def init_managers(self):
         """Initialize managers that depend on UI components."""
@@ -242,14 +251,14 @@ class TaskRPG(QMainWindow):
                 tasks_left_label=self.tasks_left_label,
                 main_window=self
             )
-
+            
             # Connect victory callback
             self.battle_manager.register_callbacks(
                 on_victory=self.player_panel.update_panel
             )
-
-            logging.info("Managers initialized")
-
+            
+            logging.info("Managers initialized with UI components")
+            
         except Exception as e:
             logging.error(f"Error initializing managers: {e}")
             raise
@@ -258,24 +267,22 @@ class TaskRPG(QMainWindow):
         """Initialize the global hotkeys system."""
         try:
             self.hotkey_listener = GlobalHotkeys()
-
-            # Connect battle hotkeys
+            
+            # Connect battle hotkeys through battle manager
             self.battle_manager.connect_signals(self.hotkey_listener)
-
+            
             # Connect story progression
             self.hotkey_listener.next_story_signal.connect(self.next_story_segment)
-
-            # Start hotkey listener
+            
             self.hotkey_listener.start()
-
             logging.info("Hotkey system initialized")
-
+            
         except Exception as e:
             logging.error(f"Error initializing hotkeys: {e}")
             raise
 
     def init_animations(self):
-        """Initialize window animations."""
+        """Initialize animation properties."""
         self.shake_animation = QPropertyAnimation(self, b"geometry")
         self.shake_animation.setDuration(100)
         self.shake_animation.setLoopCount(4)
@@ -291,22 +298,18 @@ class TaskRPG(QMainWindow):
         """Load and apply window settings."""
         try:
             settings = self._load_settings_file()
-
-            # Get window dimensions
+            
             window_width = settings.get('window', {}).get('width', 900)
             window_height = settings.get('window', {}).get('height', 736)
-
-            # Calculate center position
+            
             screen = QApplication.primaryScreen().geometry()
             x = (screen.width() - window_width) // 2
             y = (screen.height() - window_height) // 2
-
-            # Set window geometry
+            
             self.setGeometry(x, y, window_width, window_height)
-
+            
         except Exception as e:
             logging.error(f"Error loading window settings: {e}")
-            # Use default size if settings fail
             self.resize(900, 736)
 
     def _load_settings_file(self) -> dict:
@@ -326,6 +329,7 @@ class TaskRPG(QMainWindow):
             dialog = StorySelectionDialog(self)
             if dialog.exec_() == QDialog.Accepted:
                 self._load_selected_story(dialog.selected_story)
+                QTimer.singleShot(100, self._ensure_focus)
             else:
                 logging.info("User cancelled story selection")
                 QMessageBox.information(
@@ -349,8 +353,7 @@ class TaskRPG(QMainWindow):
             story_name = os.path.splitext(os.path.basename(story_path))[0]
             image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
             os.makedirs(image_folder, exist_ok=True)
-
-            # Initialize story manager
+            
             self.story_manager = StoryManager(
                 filepath=story_path,
                 image_generator=self.image_generator,
@@ -358,12 +361,10 @@ class TaskRPG(QMainWindow):
                 ui_component=self,
                 battle_manager=self.battle_manager
             )
-
-            # Display initial segment
+            
             self.story_manager.display_story_segment()
-
             logging.info(f"Story '{story_name}' loaded successfully")
-
+            
         except Exception as e:
             logging.error(f"Error loading story: {e}")
             QMessageBox.critical(
@@ -378,13 +379,13 @@ class TaskRPG(QMainWindow):
             if not hasattr(self, 'story_manager'):
                 logging.error("No story manager found")
                 return
-
+                
             if not self._can_proceed():
                 logging.debug("Cannot proceed - conditions not met")
                 return
-
+                
             current_node = self.story_manager.get_current_node()
-
+            
             # Handle battle nodes
             if "battle" in current_node and not current_node.get("battle_completed", False):
                 battle_info = current_node["battle"]
@@ -392,7 +393,7 @@ class TaskRPG(QMainWindow):
                     current_node["battle_completed"] = True
                     logging.info("Battle started successfully")
                 return
-
+                
             # Handle story progression
             if next_node := current_node.get('next'):
                 try:
@@ -405,7 +406,7 @@ class TaskRPG(QMainWindow):
             else:
                 logging.info("Reached end of story branch")
                 self.handle_chapter_end()
-
+                
         except Exception as e:
             logging.error(f"Error in story progression: {e}")
             self.status_bar.showMessage("Error progressing story")
@@ -418,12 +419,13 @@ class TaskRPG(QMainWindow):
                 "<p>You have completed all available tasks for now.</p>"
                 "<p>Feel free to start a new chapter or take a break!</p>"
             )
-
+            
             # Update UI state
             self.action_buttons.hide_attack_buttons()
             self.action_buttons.next_button.hide()
+            self.settings_button.setEnabled(True)
             self.status_bar.showMessage("All tasks completed! Well done!")
-
+            
             # Show completion dialog
             QMessageBox.information(
                 self,
@@ -431,7 +433,7 @@ class TaskRPG(QMainWindow):
                 "Congratulations! You have completed all available tasks.\n\n"
                 "You can start a new chapter when you're ready!"
             )
-
+            
         except Exception as e:
             logging.error(f"Error handling chapter end: {e}")
             QMessageBox.critical(self, "Error", "Failed to handle chapter end properly")
@@ -439,11 +441,60 @@ class TaskRPG(QMainWindow):
     def _can_proceed(self) -> bool:
         """Check if story can proceed."""
         try:
-            # Add your specific conditions here
+            if self.battle_manager.is_in_battle():
+                logging.debug("Cannot proceed during battle")
+                return False
+            
+            if not hasattr(self, 'story_manager'):
+                logging.debug("No story manager available")
+                return False
+                
             return True
+            
         except Exception as e:
             logging.error(f"Error checking story progression: {e}")
             return False
+
+    def toggle_fullscreen(self):
+        """Toggle fullscreen state with proper battle handling."""
+        try:
+            if self.isFullScreen():
+                self.showNormal()
+                if self.battle_manager.is_in_battle():
+                    self.battle_manager.hide_compact_mode()
+            else:
+                self.showFullScreen()
+                
+            self._ensure_focus()
+            logging.debug(f"Fullscreen toggled: {self.isFullScreen()}")
+            
+        except Exception as e:
+            logging.error(f"Error toggling fullscreen: {e}")
+            # Emergency exit from fullscreen if needed
+            self.showNormal()
+
+    def _ensure_focus(self):
+        """Ensure proper focus is set."""
+        try:
+            # First check if we're in fullscreen
+            if self.isFullScreen():
+                # If in battle, ensure we can exit
+                if self.battle_manager.is_in_battle():
+                    self.battle_manager.hide_compact_mode()
+                    # Release any keyboard grab that might be stuck
+                    self.releaseKeyboard()
+            
+            # Set window focus
+            self.activateWindow()
+            self.raise_()
+            
+            # Set focus to story display
+            if hasattr(self, 'story_display'):
+                self.story_display.setFocus()
+                logging.info("Focus set to story display")
+                
+        except Exception as e:
+            logging.error(f"Error ensuring focus: {e}")
 
     def update_tasks_left(self):
         """Update the tasks left display."""
@@ -452,11 +503,11 @@ class TaskRPG(QMainWindow):
                 current_hp = self.battle_manager.battle_state.enemy_hp
                 tasks_left = max(0, current_hp)
                 self.tasks_left_label.setText(str(tasks_left))
-
+                
                 # Update compact window if it exists
                 if self.battle_manager.compact_window:
                     self.battle_manager.compact_window.update_tasks(tasks_left)
-
+                    
         except Exception as e:
             logging.error(f"Error updating tasks left: {e}")
 
@@ -484,7 +535,7 @@ class TaskRPG(QMainWindow):
                 # Update task manager
                 self.task_manager = settings_dialog.task_manager
                 self.task_manager.save_tasks()
-
+                
                 # Load and apply shake animation setting
                 settings_file = os.path.join(DATA_DIR, 'settings.json')
                 if os.path.exists(settings_file):
@@ -496,15 +547,15 @@ class TaskRPG(QMainWindow):
                         f"<p>Shaking animation has been <b>{status}</b>.</p>"
                     )
                     self.status_bar.showMessage(f"Shaking animation {status}")
-
+                
                 # Update UI
                 self.story_display.append_text("<p>Settings updated successfully.</p>")
                 self.status_bar.showMessage("Settings updated successfully")
-
+                
                 # Update tasks display if not in battle
                 if not self.battle_manager.is_in_battle():
                     self.update_tasks_left()
-
+                    
         except Exception as e:
             logging.error(f"Error applying settings changes: {e}")
             QMessageBox.critical(self, "Error", "Failed to apply settings changes")
@@ -512,42 +563,43 @@ class TaskRPG(QMainWindow):
     def adjust_fonts(self):
         """Adjust fonts based on window size."""
         try:
+            # Calculate font size based on window width
             width = self.width()
+            font_size = 16  # Default
             if width < 800:
                 font_size = 12
             elif width < 1200:
                 font_size = 14
-            else:
-                font_size = 16
-
+                
             # Update Player Panel fonts
             self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
             self.player_panel.xp_label.setFont(QFont("Arial", font_size))
-
+            
             # Update Enemy Panel fonts
             self.enemy_panel.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
             self.enemy_panel.task_label.setFont(QFont("Arial", font_size, QFont.StyleItalic))
             self.enemy_panel.hp_bar.setFont(QFont("Arial", font_size))
-
+            
             # Update Story Display fonts
             self.story_display.story_text.setFont(QFont("Times New Roman", font_size))
-
+            
             # Update Action Button fonts
-            self.action_buttons.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
+            if hasattr(self.action_buttons, 'next_button'):
+                self.action_buttons.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
             if hasattr(self.action_buttons, 'attack_button'):
-                self.action_buttons.attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
+                self.action_buttons.attack_button.setFont(QFont("Arial", font_size))
             if hasattr(self.action_buttons, 'heavy_attack_button'):
-                self.action_buttons.heavy_attack_button.setFont(QFont("Arial", font_size, QFont.Bold))
-
+                self.action_buttons.heavy_attack_button.setFont(QFont("Arial", font_size))
+                
             # Update Settings Button font
             self.settings_button.setFont(QFont("Arial", font_size))
-
+            
             # Update Choices Panel fonts
             for i in range(self.choices_panel.layout.count()):
                 item = self.choices_panel.layout.itemAt(i)
                 if item and item.widget():
                     item.widget().setFont(QFont("Arial", font_size))
-
+                    
         except Exception as e:
             logging.error(f"Error adjusting fonts: {e}")
 
@@ -556,16 +608,16 @@ class TaskRPG(QMainWindow):
         try:
             settings_file = os.path.join(DATA_DIR, 'settings.json')
             shake_enabled = True  # Default to True
-
+            
             if os.path.exists(settings_file):
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 shake_enabled = settings.get('shake_animation', True)
-
+            
             if shake_enabled and self.shake_animation.state() != QPropertyAnimation.Running:
                 original_geometry = self.geometry()
                 offset = 10
-
+                
                 # Define shake keyframes
                 keyframes = [
                     (0.0, QRect(original_geometry.x(), original_geometry.y(),
@@ -579,15 +631,27 @@ class TaskRPG(QMainWindow):
                     (1.0, QRect(original_geometry.x(), original_geometry.y(),
                               original_geometry.width(), original_geometry.height()))
                 ]
-
+                
                 self.shake_animation.stop()
                 self.shake_animation.setStartValue(keyframes[0][1])
                 for fraction, rect in keyframes[1:]:
                     self.shake_animation.setKeyValueAt(fraction, rect)
                 self.shake_animation.start()
-
+                
         except Exception as e:
             logging.error(f"Error during shake animation: {e}")
+
+    def eventFilter(self, obj, event):
+        """Handle window focus events."""
+        if obj is self:
+            if event.type() == QEvent.WindowDeactivate:
+                if self.battle_manager.is_in_battle():
+                    self.battle_manager.show_compact_mode()
+            elif event.type() == QEvent.WindowActivate:
+                self.battle_manager.hide_compact_mode()
+                if self.isFullScreen():
+                    self.releaseKeyboard()
+        return super().eventFilter(obj, event)
 
     def navigate_back(self):
         """Navigate to previous story segment."""
@@ -599,91 +663,24 @@ class TaskRPG(QMainWindow):
         if self._can_proceed():
             self.story_manager.navigate(NavigationDirection.FORWARD)
 
-    def _ensure_focus(self):
-        """Ensure proper focus is set."""
-        try:
-            self.activateWindow()
-            self.raise_()
-
-            if hasattr(self, 'story_display'):
-                self.story_display.setFocus()
-                logging.info("Focus set to story display")
-
-        except Exception as e:
-            logging.error(f"Error ensuring focus: {e}")
-
-    def eventFilter(self, obj, event):
-        """Handle window focus events."""
-        if obj is self:
-            if event.type() == QEvent.WindowDeactivate:
-                if self.battle_manager.is_in_battle():
-                    self.battle_manager.show_compact_mode()
-            elif event.type() == QEvent.WindowActivate:
-                self.battle_manager.hide_compact_mode()
-        return super().eventFilter(obj, event)
-
-    def closeEvent(self, event):
-        """Handle window close event."""
-        try:
-            # Save window settings
-            self.save_window_settings()
-
-            # Cleanup components
-            cleanup_errors = []
-
-            try:
-                self.hotkey_listener.stop()
-                self.hotkey_listener.wait()
-            except Exception as e:
-                cleanup_errors.append(f"Hotkey listener cleanup failed: {str(e)}")
-
-            if self.battle_manager:
-                try:
-                    self.battle_manager.cleanup()
-                except Exception as e:
-                    cleanup_errors.append(f"Battle manager cleanup failed: {str(e)}")
-
-            if cleanup_errors:
-                error_msg = "Errors during cleanup:\n" + "\n".join(cleanup_errors)
-                logging.error(error_msg)
-
-            event.accept()
-
-        except Exception as e:
-            logging.critical(f"Critical error during window close: {str(e)}")
-            event.accept()
-
-    def save_window_settings(self):
-        """Save current window settings."""
-        try:
-            settings_file = os.path.join(DATA_DIR, 'settings.json')
-            settings = self._load_settings_file()
-
-            # Update window dimensions
-            settings['window'] = {
-                'width': self.width(),
-                'height': self.height()
-            }
-
-            # Save settings
-            with open(settings_file, 'w', encoding='utf-8') as f:
-                json.dump(settings, f, indent=4)
-
-        except Exception as e:
-            logging.error(f"Error saving window settings: {e}")
-
-    def showEvent(self, event):
-        """Handle window show event."""
-        super().showEvent(event)
-        QTimer.singleShot(200, self._ensure_focus)
-
     def keyPressEvent(self, event: QKeyEvent):
         """Handle key events at the main window level."""
         try:
+            # Handle escape from fullscreen
+            if event.key() == Qt.Key_Escape:
+                if self.isFullScreen():
+                    self.showNormal()
+                    if self.battle_manager.is_in_battle():
+                        self.battle_manager.hide_compact_mode()
+                    self._ensure_focus()
+                    return
+                    
             if hasattr(self, 'story_display'):
                 if event.key() == Qt.Key_F:
                     if hasattr(self.story_display, 'current_image_path') and self.story_display.current_image_path:
                         self.story_display._show_fullscreen_viewer()
+                elif event.key() == Qt.Key_F11:
+                    self.toggle_fullscreen()
                 elif event.key() == Qt.Key_Left:
                     logging.info("Left key pressed in main window")
                     self.story_display.navigate_back_signal.emit()
@@ -694,9 +691,61 @@ class TaskRPG(QMainWindow):
                     super().keyPressEvent(event)
             else:
                 super().keyPressEvent(event)
+                
         except Exception as e:
             logging.error(f"Error handling key press in main window: {e}")
 
+    def closeEvent(self, event):
+        """Handle window close event."""
+        try:
+            # Save window settings
+            self.save_window_settings()
+            
+            # Cleanup components
+            cleanup_errors = []
+            
+            # Stop hotkey listener
+            try:
+                self.hotkey_listener.stop()
+                self.hotkey_listener.wait()
+            except Exception as e:
+                cleanup_errors.append(f"Hotkey listener cleanup failed: {str(e)}")
+                
+            # Cleanup battle manager
+            if self.battle_manager:
+                try:
+                    self.battle_manager.cleanup()
+                except Exception as e:
+                    cleanup_errors.append(f"Battle manager cleanup failed: {str(e)}")
+                    
+            if cleanup_errors:
+                error_msg = "Errors during cleanup:\n" + "\n".join(cleanup_errors)
+                logging.error(error_msg)
+                
+            event.accept()
+            
+        except Exception as e:
+            logging.critical(f"Critical error during window close: {str(e)}")
+            event.accept()
+
+    def save_window_settings(self):
+        """Save current window settings."""
+        try:
+            settings_file = os.path.join(DATA_DIR, 'settings.json')
+            settings = self._load_settings_file()
+            
+            # Update window dimensions
+            settings['window'] = {
+                'width': self.width(),
+                'height': self.height()
+            }
+            
+            # Save settings
+            with open(settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings, f, indent=4)
+                
+        except Exception as e:
+            logging.error(f"Error saving window settings: {e}")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
