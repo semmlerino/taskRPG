@@ -1,6 +1,9 @@
+# modules/ui/components/story_display.py
+
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QTextBrowser, QSizePolicy, QSplitter, 
-    QScrollArea, QPushButton, QHBoxLayout, QMessageBox
+    QWidget, QLabel, QVBoxLayout, QTextBrowser, 
+    QSizePolicy, QSplitter, QScrollArea, QPushButton, 
+    QHBoxLayout, QMessageBox
 )
 from PyQt5.QtGui import QFont, QPixmap, QTextCursor, QKeyEvent
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal
@@ -335,10 +338,6 @@ class StoryDisplay(QWidget):
         self.image_label.clear()
         self.current_image_path = None
         self.current_node_key = None
-
-    def clear_history(self):
-        """Clear display history."""
-        self.clear()
 
     def show_error(self, message: str):
         """Show error message to user."""

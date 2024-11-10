@@ -1,20 +1,20 @@
+# modules/story.py
+
 import os
 import json
 import logging
 from typing import Optional, Dict, Any, List, Union
 from enum import Enum, auto
+from typing import TYPE_CHECKING
+
+from modules.common.types import NavigationDirection
+
+if TYPE_CHECKING:
+    from core.battle.battle_manager import BattleManager
 
 from core.story.story_content import StoryContent
-from core.story.story_node import StoryNode  # Newly added import
-from core.battle.battle_manager import BattleManager  # Imported BattleManager
+from core.story.story_node import StoryNode
 from .image_generator import ImageGenerator
-
-
-class NavigationDirection(Enum):
-    """Enum for navigation directions."""
-    FORWARD = auto()
-    BACKWARD = auto()
-
 
 class StoryManager:
     """
@@ -27,14 +27,13 @@ class StoryManager:
         image_generator: ImageGenerator,
         image_folder: Optional[str] = None,
         ui_component: Optional[Any] = None,
-        battle_manager: Optional[BattleManager] = None  # Made battle_manager optional
+        battle_manager: Optional['BattleManager'] = None
     ):
         self.filepath = filepath
         self.ui = ui_component
         self.image_generator = image_generator
         self.image_folder = image_folder
-
-        self.battle_manager = battle_manager  # Store battle_manager reference
+        self.battle_manager = battle_manager
 
         # Initialize state
         self.story_data = self.load_story()
@@ -237,30 +236,10 @@ class StoryManager:
                 node_key=self.current_node_key
             )
 
-    def _update_ui_display(self, content: StoryContent):
-        """Update UI with node content."""
-        if not self.ui:
-            return
-
-        try:
-            html_content = content.to_html()
-            self.ui.story_display.set_page(
-                self.current_node_key,
-                html_content,
-                content.image_path
-            )
-        except Exception as e:
-            logging.error(f"Error updating UI display: {e}")
-
     def navigate(self, direction: NavigationDirection) -> bool:
         """Navigate through story history."""
         try:
-            logging.debug(f"Attempting navigation: direction={direction}, "
-                          f"history_index={self._history_index}, "
-                          f"history_length={len(self._history)}")
-
             if not self._can_navigate(direction):
-                logging.debug("Cannot navigate in this direction")
                 return False
 
             if direction == NavigationDirection.FORWARD:
@@ -274,7 +253,12 @@ class StoryManager:
             self._current_content = content
 
             if self.ui:
-                self._update_ui_display(content)
+                html_content = content.to_html()
+                self.ui.story_display.set_page(
+                    self.current_node_key,
+                    html_content,
+                    content.image_path
+                )
 
             return True
 
@@ -288,8 +272,6 @@ class StoryManager:
             return self._history_index < len(self._history) - 1
         else:
             return self._history_index > 0
-
-    # Getter methods for node content
 
     def get_text(self) -> str:
         """Get narrative text from current node."""
@@ -388,15 +370,13 @@ class StoryManager:
             self.image_generator.remove_from_cache(content.node_key)
             content.image_path = None
 
-    # New method added to mark battle as complete
     def mark_battle_complete(self, node_key: str):
         """Mark a battle node as completed."""
         self.completed_battle_nodes.add(node_key)
         logging.info(f"Marked battle node {node_key} as completed")
 
-    # New method added to handle story progression with battle integration
     def next_story_segment(self) -> bool:
-        """Progress to next story segment with proper battle integration."""
+        """Progress to next story segment with battle integration."""
         try:
             current_node = self.get_current_node()
 
@@ -426,7 +406,7 @@ class StoryManager:
             logging.error(f"Error in story progression: {e}")
             return False
 
-    def set_battle_manager(self, battle_manager: BattleManager) -> None:
+    def set_battle_manager(self, battle_manager: 'BattleManager') -> None:
         """Set the battle manager after initialization."""
         self.battle_manager = battle_manager
         logging.info("Battle manager set in StoryManager")

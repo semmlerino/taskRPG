@@ -7,22 +7,32 @@ from typing import Optional, Callable, Protocol, List, TYPE_CHECKING, Dict, Any,
 from enum import Enum, auto
 import random
 
+from PyQt5.QtWidgets import QApplication
+from PyQt5.QtCore import QRect
+
 # Core game system imports
 from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
 from modules.players.player import Player
 from modules.battle.enemy import Enemy
 from modules.battle.battle_state import BattleState
+from modules.ui.components.compact_battle_window import CompactBattleWindow
 
 # Type hints for UI components
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QStatusBar, QLabel
+    from PyQt5.QtWidgets import QStatusBar, QLabel, QApplication
     from modules.ui.components.story_display import StoryDisplay
     from modules.ui.components.enemy_panel import EnemyPanel
     from modules.ui.components.action_buttons import ActionButtons
     from modules.ui.components.player_panel import PlayerPanel
-    from modules.ui.components.compact_battle_window import CompactBattleWindow
     from modules.ui.main_window import TaskRPG
+
+# At the top of the file, add debug logging configuration
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%H:%M:%S'
+)
 
 class BattleEvent(Enum):
     """Battle system events."""
@@ -70,115 +80,122 @@ class BattleManager:
 
         logging.info("BattleManager initialized")
 
-    def start_battle(self, battle_info: Dict[str, Any]) -> bool:
+    def _initialize_enemy_hp(self, task: Task) -> int:
         """
-        Start a new battle with task integration.
+        Initialize enemy HP based on task count.
+        Args:
+            task (Task): The task object containing min/max counts
+        Returns:
+            int: The calculated HP value
+        """
+        hp = task.get_hp()
+        logging.debug(f"Initializing enemy HP for task '{task.name}': {hp}")
+        return hp
+
+    def start_battle(self, battle_info: dict) -> bool:
+        """
+        Start a new battle with a randomly selected active task.
         
         Args:
-            battle_info: Dictionary containing battle configuration
+            battle_info (dict): Dictionary containing battle configuration with:
+                - enemy: Name of the enemy (from story)
+                - message: Battle start message
             
         Returns:
-            bool: True if battle started successfully
+            bool: True if battle started successfully, False otherwise
         """
         try:
-            if not self._validate_battle_start():
-                return False
-
-            # Get random task
+            # Debug log to see what's in battle_info
+            logging.debug(f"Received battle_info: {battle_info}")
+            
+            # Get a random active task from the task manager
             task = self.task_manager.get_random_active_task()
             if not task:
-                logging.error("No active tasks available")
-                self._update_status("No tasks available for battle")
+                logging.warning("No active task available for battle")
                 return False
-
-            # Create enemy from task
-            enemy_name = battle_info.get("enemy", "Unknown Enemy")
-            max_hp = task.get_random_count()
-
+                
+            # Get enemy name from the correct key in battle_info
+            enemy_name = battle_info.get('enemy') or battle_info.get('enemy_name')
+            if not enemy_name:
+                logging.warning("No enemy name provided in battle_info")
+                enemy_name = f"Task: {task.name}"
+            
+            logging.debug(f"Using enemy_name: {enemy_name}")
+            
+            # Calculate initial HP based on task parameters
+            initial_hp = self._initialize_enemy_hp(task)
+            
+            # Create new enemy instance with all required parameters
             self.current_enemy = Enemy(
-                name=enemy_name,
-                max_hp=max_hp,
-                task_name=task.name,
-                task_description=task.description or "Complete the task!"
+                name=enemy_name,                                      # Use the enemy name from story
+                task_name=task.name,                                  # Name of the task
+                task_description=task.description or                  # Use task description if available
+                           f"Complete {task.name} task",          # Or create default description
+                max_hp=initial_hp,                                    # Maximum HP from task count
+                current_hp=initial_hp                                 # Current HP starts at maximum
             )
-
-            # Verify enemy creation
-            if not self.current_enemy or not hasattr(self.current_enemy, 'current_hp'):
-                logging.error("Enemy creation failed or invalid enemy state")
-                return False
-
+            
             # Update battle state
-            self.battle_state = BattleState(
-                is_active=True,
-                enemy_name=enemy_name,
-                enemy_hp=self.current_enemy.current_hp,
-                enemy_max_hp=max_hp,
-                task_name=task.name
-            )
-
-            # Debug logging
-            logging.debug(f"Enemy created with HP: {self.current_enemy.current_hp}")
-            logging.debug(f"Battle state HP: {self.battle_state.enemy_hp}")
-
-            # Update UI
-            self._update_ui_for_battle_start(battle_info)
-            logging.info(f"Battle started with {enemy_name}, Task: {task.name}")
+            self.battle_state.enemy_hp = initial_hp
+            self.battle_state.is_active = True
+            
+            # Update all UI elements with new battle information
+            self._update_battle_ui()
             return True
-
+            
         except Exception as e:
-            logging.error(f"Error starting battle: {e}")
-            self._update_status("Error starting battle")
+            logging.error(f"Failed to start battle: {e}")
             return False
 
     def perform_attack(self, is_heavy: bool = False) -> bool:
-        """
-        Perform an attack with complete update chain.
-        
-        Args:
-            is_heavy: Whether to perform a heavy attack
-            
-        Returns:
-            bool: True if attack was successful
-        """
+        """Perform an attack."""
         try:
+            logging.debug(f"Attempting {'heavy' if is_heavy else 'normal'} attack")
+            
             if not self._validate_attack():
-                logging.warning("Attack validation failed")
+                logging.warning("Attack validation failed - Current state: "
+                              f"battle_active={self.battle_state.is_active}, "
+                              f"enemy_exists={self.current_enemy is not None}, "
+                              f"paused={self.paused}")
                 return False
 
-            if not self.current_enemy:
-                logging.error("No current enemy for attack")
-                return False
+            # Log pre-attack state
+            logging.debug(f"Pre-attack state - Enemy: {self.current_enemy.name}, "
+                         f"HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}")
 
-            # Calculate and apply damage
+            # Calculate damage
             if is_heavy:
-                damage = random.randint(2, 4)  # Random damage between 2-4 for heavy attacks
+                damage = random.randint(2, 4)
+                logging.debug(f"Heavy attack damage rolled: {damage}")
             else:
-                damage = 1  # Normal attack damage remains 1
+                damage = 1
+                logging.debug("Normal attack damage: 1")
 
-            # Update both enemy object and battle state
+            # Update enemy HP
+            old_hp = self.current_enemy.current_hp
             self.current_enemy.take_damage(damage)
-            self.battle_state.enemy_hp = self.current_enemy.current_hp
-            self.battle_state.last_attack_type = "heavy" if is_heavy else "normal"
+            new_hp = self.current_enemy.current_hp
+            
+            logging.debug(f"HP change: {old_hp} -> {new_hp} (damage: {damage})")
 
-            # Debug logging
-            logging.debug(f"Current enemy HP after attack: {self.current_enemy.current_hp}")
-            logging.debug(f"Battle state HP after attack: {self.battle_state.enemy_hp}")
+            # Update battle state
+            self.battle_state.enemy_hp = new_hp
+            logging.debug(f"Battle state HP updated: {self.battle_state.enemy_hp}")
 
-            # Update UI after attack
+            # Update UI
             self._update_ui_after_attack(is_heavy)
+            logging.debug("UI updated after attack")
 
             # Check for victory
             if self.current_enemy.is_defeated():
+                logging.debug("Enemy defeated - handling victory")
                 self._handle_victory()
                 return True
 
-            logging.debug(f"Attack performed: {'heavy' if is_heavy else 'normal'}, "
-                          f"remaining HP: {self.current_enemy.current_hp}")
             return True
 
         except Exception as e:
-            logging.error(f"Error performing attack: {e}")
-            self._update_status("Attack failed")
+            logging.error(f"Error performing attack: {str(e)}", exc_info=True)
             return False
 
     def toggle_pause(self) -> None:
@@ -200,24 +217,40 @@ class BattleManager:
             logging.error(f"Error toggling pause: {e}")
 
     def show_compact_mode(self) -> None:
-        """Show compact battle window when main window loses focus."""
+        """Show compact battle window."""
         try:
-            if self.is_in_battle() and not self.compact_window:
+            if not self.compact_window:
+                # Import here to avoid circular import
                 from modules.ui.components.compact_battle_window import CompactBattleWindow
                 self.compact_window = CompactBattleWindow()
+                
+                # Get the screen geometry
+                screen = QApplication.primaryScreen()
+                screen_geo = screen.availableGeometry()
+                
+                # Get main window geometry
+                main_geo = self.main_window.geometry()
+                
+                # Calculate position that's visible on screen
+                x = min(main_geo.x() + main_geo.width() + 10, 
+                       screen_geo.width() - self.compact_window.width() - 10)
+                y = min(main_geo.y(),
+                       screen_geo.height() - self.compact_window.height() - 10)
+                
+                # Ensure x and y are not negative
+                x = max(10, x)
+                y = max(10, y)
+                
+                self.compact_window.move(x, y)
+                logging.info(f"Screen size: {screen_geo.width()}x{screen_geo.height()}")
+                logging.info(f"Positioning compact window at: ({x}, {y})")
 
-                # Position window relative to main window
-                if self.main_window:
-                    main_geo = self.main_window.geometry()
-                    self.compact_window.move(
-                        main_geo.x() + main_geo.width() + 10,
-                        main_geo.y()
-                    )
-
-                if self.current_enemy:
+                # Ensure current_enemy is an Enemy instance before updating
+                if self.current_enemy and hasattr(self.current_enemy, 'name'):
                     self.compact_window.update_display(self.current_enemy)
                 self.compact_window.show()
-                logging.info("Compact battle window shown")
+                self.compact_window.raise_()  # Bring window to front
+                logging.info(f"Compact window shown at position: {self.compact_window.pos()}")
 
         except Exception as e:
             logging.error(f"Error showing compact window: {e}")
@@ -252,51 +285,69 @@ class BattleManager:
             logging.error(f"Error updating tasks left: {e}")
 
     def _validate_attack(self) -> bool:
-        """
-        Validate attack conditions.
+        """Validate attack conditions."""
+        validation_results = {
+            "battle_active": self.battle_state.is_active,
+            "enemy_exists": self.current_enemy is not None,
+            "not_paused": not self.paused,
+            "has_hp_attribute": hasattr(self.current_enemy, 'current_hp') if self.current_enemy else False
+        }
         
-        Returns:
-            bool: True if attack can be performed
-        """
-        if not self.battle_state.is_active:
-            logging.warning("No active battle")
+        logging.debug(f"Attack validation results: {validation_results}")
+        
+        if not validation_results["battle_active"]:
+            logging.warning("Attack validation failed: No active battle")
             return False
-        if not self.current_enemy:
-            logging.warning("No current enemy")
+        if not validation_results["enemy_exists"]:
+            logging.warning("Attack validation failed: No current enemy")
             return False
-        if self.paused:
-            logging.warning("Battle is paused")
+        if not validation_results["not_paused"]:
+            logging.warning("Attack validation failed: Battle is paused")
             return False
-        if not hasattr(self.current_enemy, 'current_hp'):
-            logging.error("Enemy missing current_hp attribute")
+        if not validation_results["has_hp_attribute"]:
+            logging.error("Attack validation failed: Enemy missing current_hp attribute")
             return False
+            
+        logging.debug("Attack validation passed")
         return True
 
     def _handle_victory(self) -> None:
         """Handle victory with complete update chain."""
         try:
-            # Calculate and award XP
+            logging.debug("Processing victory")
+            
+            # Calculate XP
             xp_gained = max(10, self.current_enemy.max_hp * 2)
+            logging.debug(f"Calculated XP gain: {xp_gained}")
+            
+            # Award XP
+            old_xp = self.player.stats.experience
             self.player.gain_experience(xp_gained)
-            self.battle_state.xp_gained = xp_gained
-
+            new_xp = self.player.stats.experience
+            
+            logging.debug(f"Player XP change: {old_xp} -> {new_xp}")
+            
             # Update battle state
+            self.battle_state.xp_gained = xp_gained
             self.battle_state.is_active = False
             self.current_enemy = None
-
-            # Update UI for victory
+            
+            logging.debug("Battle state updated for victory")
+            
+            # Update UI
             self._update_ui_for_victory(xp_gained)
-
-            # Notify victory
+            logging.debug("UI updated for victory")
+            
+            # Trigger callbacks
             if self.on_victory:
+                logging.debug("Triggering victory callback")
                 self.on_victory()
             if self.on_battle_end:
+                logging.debug("Triggering battle end callback")
                 self.on_battle_end()
 
-            logging.info(f"Battle won! XP gained: {xp_gained}")
-
         except Exception as e:
-            logging.error(f"Error handling victory: {e}")
+            logging.error(f"Error handling victory: {str(e)}", exc_info=True)
             self._update_status("Error processing victory")
 
     def _validate_battle_start(self) -> bool:
@@ -363,8 +414,29 @@ class BattleManager:
             self.status_bar.showMessage(message)
 
     def is_in_battle(self) -> bool:
-        """Check if battle is active."""
-        return self.battle_state.is_active
+        """Check if currently in battle."""
+        try:
+            # First check if we have the basic requirements for a battle
+            if not self.battle_state.is_active or not self.current_enemy:
+                logging.debug("Battle check failed: No active battle state or no enemy")
+                return False
+                
+            # Safely check HP
+            current_hp = getattr(self.battle_state, 'enemy_hp', None)
+            if current_hp is None:
+                logging.debug("Battle check failed: enemy_hp is None")
+                return False
+                
+            battle_active = current_hp > 0
+            
+            logging.debug(f"Battle state check - Active: {self.battle_state.is_active}, "
+                         f"Enemy exists: {self.current_enemy is not None}, "
+                         f"HP: {current_hp}")
+            return battle_active
+            
+        except Exception as e:
+            logging.error(f"Error checking battle state: {e}")
+            return False
 
     def get_current_enemy(self) -> Optional[Enemy]:
         """
@@ -488,3 +560,71 @@ class BattleManager:
         self.on_victory = on_victory
         
         logging.debug("Battle callbacks registered")
+
+    def end_battle(self) -> None:
+        """End the current battle."""
+        try:
+            logging.debug("Ending battle")
+            self.battle_state.is_active = False
+            self.current_enemy = None
+            self.battle_state.enemy_hp = 0
+            
+            # Clean up compact window
+            self.hide_compact_mode()
+            
+            logging.info("Battle ended successfully")
+            
+        except Exception as e:
+            logging.error(f"Error ending battle: {e}")
+
+    def _update_battle_ui(self) -> None:
+        """
+        Update all UI components with current battle state.
+        
+        This method is responsible for:
+        - Updating the enemy panel with current enemy stats
+        - Refreshing the compact window display
+        - Updating the tasks remaining counter
+        - Showing attack buttons
+        - Setting the status bar message
+        
+        Each UI component is checked for existence before updating to prevent errors.
+        """
+        try:
+            # Update the main enemy panel showing enemy stats and HP bar
+            # This panel is typically in the main window
+            if hasattr(self, 'enemy_panel') and self.enemy_panel:
+                self.enemy_panel.update_panel(self.current_enemy)
+                logging.debug("Enemy panel updated")
+                
+            # Update the compact floating window if it exists
+            # This is the small window that can be positioned anywhere on screen
+            if hasattr(self, 'compact_window') and self.compact_window:
+                self.compact_window.update_display(self.current_enemy)
+                logging.debug("Compact window updated")
+                
+            # Update the counter showing remaining tasks/HP
+            # This is typically shown in both main and compact windows
+            if hasattr(self, 'update_tasks_left'):
+                self.update_tasks_left()
+                logging.debug("Tasks left counter updated")
+                
+            # Show the attack buttons for battle interaction
+            # These buttons allow the player to perform actions
+            if hasattr(self, 'action_buttons') and self.action_buttons:
+                self.action_buttons.show_attack_buttons()
+                logging.debug("Attack buttons displayed")
+                
+            # Update the status bar with battle information
+            # This provides feedback to the player about the current state
+            if hasattr(self, 'status_bar') and self.status_bar:
+                self.status_bar.showMessage("Battle started!")
+                logging.debug("Status bar message set")
+                
+            logging.debug(f"Battle UI successfully updated for enemy: {self.current_enemy.name}")
+            
+        except Exception as e:
+            # Log any errors that occur during UI updates
+            logging.error(f"Error updating battle UI: {e}")
+            # Include the full error traceback for debugging
+            logging.debug(f"Full error details:", exc_info=True)

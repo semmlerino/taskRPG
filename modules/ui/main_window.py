@@ -5,7 +5,7 @@ import json
 import logging
 import sys
 import traceback
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, TYPE_CHECKING
 
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
@@ -24,11 +24,14 @@ from modules.tasks.task_manager import TaskManager
 from modules.story import StoryManager, NavigationDirection
 from modules.hotkeys import GlobalHotkeys
 from modules.image_generator import ImageGenerator
-from modules.ui.components.player_panel import PlayerPanel
-from modules.ui.components.enemy_panel import EnemyPanel
-from modules.ui.components.story_display import StoryDisplay
-from modules.ui.components.action_buttons import ActionButtons
-from modules.ui.components.choices_panel import ChoicesPanel
+from modules.ui.components import (
+    PlayerPanel, 
+    EnemyPanel, 
+    StoryDisplay, 
+    ActionButtons, 
+    ChoicesPanel,
+    CompactBattleWindow
+)
 from modules.ui.dialogs.settings_dialog import SettingsDialog
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
@@ -36,7 +39,6 @@ from core.battle.battle_manager import BattleManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
 
 class TaskRPG(QMainWindow):
     """
@@ -136,26 +138,6 @@ class TaskRPG(QMainWindow):
         )
         self.story_image_folder = None
 
-    def init_managers(self):
-        """Initialize managers that depend on UI components."""
-        # Set up battle manager UI components
-        self.battle_manager.set_ui_components(
-            story_display=self.story_display,
-            enemy_panel=self.enemy_panel,
-            action_buttons=self.action_buttons,
-            player_panel=self.player_panel,
-            status_bar=self.status_bar,
-            tasks_left_label=self.tasks_left_label,
-            main_window=self
-        )
-
-        # Connect victory callback
-        self.battle_manager.register_callbacks(
-            on_victory=self.player_panel.update_panel
-        )
-
-        logging.info("Managers initialized with UI components")
-
     def init_ui(self):
         """Initialize the user interface components."""
         main_layout = QVBoxLayout()
@@ -191,9 +173,6 @@ class TaskRPG(QMainWindow):
 
         # Story Display
         self.story_display = StoryDisplay()
-        self.story_display.navigate_back_signal.connect(self.navigate_back)
-        self.story_display.navigate_forward_signal.connect(self.navigate_forward)
-        self.story_display.story_advance_signal.connect(self.next_story_segment)  # Added connection
         main_layout.addWidget(self.story_display)
 
         # Choices Panel
@@ -227,12 +206,25 @@ class TaskRPG(QMainWindow):
         # Set the layout on the central widget
         self.centralWidget().setLayout(main_layout)
 
-        # Connect action buttons to battle manager
-        # Note: This connection has been moved to init_managers()
+    def init_managers(self):
+        """Initialize managers that depend on UI components."""
+        # Set up battle manager UI components
+        self.battle_manager.set_ui_components(
+            story_display=self.story_display,
+            enemy_panel=self.enemy_panel,
+            action_buttons=self.action_buttons,
+            player_panel=self.player_panel,
+            status_bar=self.status_bar,
+            tasks_left_label=self.tasks_left_label,
+            main_window=self
+        )
 
-    def init_status_bar(self):
-        """Initialize the status bar with default messages."""
-        self.status_bar.showMessage("Welcome to Task RPG! Start your adventure.")
+        # Connect victory callback
+        self.battle_manager.register_callbacks(
+            on_victory=self.player_panel.update_panel
+        )
+
+        logging.info("Managers initialized with UI components")
 
     def init_hotkeys(self):
         """Initialize the global hotkeys listener."""
@@ -245,40 +237,6 @@ class TaskRPG(QMainWindow):
         self.hotkey_listener.next_story_signal.connect(self.next_story_segment)
 
         self.hotkey_listener.start()
-
-    def toggle_fullscreen_image(self):
-        """Handle fullscreen toggle."""
-        try:
-            logging.info("Attempting to toggle fullscreen image")
-
-            if not hasattr(self.story_display, 'current_image_path'):
-                logging.warning("No current_image_path attribute found in story_display")
-                return
-
-            if not self.story_display.current_image_path:
-                logging.warning("No current image path available")
-                return
-
-            logging.info(f"Creating fullscreen viewer for image: {self.story_display.current_image_path}")
-
-            viewer = FullscreenImageViewer(
-                self.story_display.current_image_path,
-                self.story_display.story_text.toPlainText()
-            )
-            viewer.showFullScreen()
-
-            # Keep a reference to prevent garbage collection
-            self._current_viewer = viewer
-
-            logging.info("Fullscreen viewer created and shown successfully")
-
-        except Exception as e:
-            logging.error(f"Error showing fullscreen image: {str(e)}\n{traceback.format_exc()}")
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to show fullscreen image: {str(e)}"
-            )
 
     def init_animations(self):
         """Initialize animation properties."""
@@ -311,94 +269,30 @@ class TaskRPG(QMainWindow):
             story_name = os.path.splitext(os.path.basename(selected_story))[0]
             self.story_image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
 
-            logging.info(f"Attempting to load story from: {selected_story}")
+            # Ensure the image folder exists
             os.makedirs(self.story_image_folder, exist_ok=True)
 
-            # Update the story manager with the selected story file
+            # Initialize the StoryManager with the selected story and existing BattleManager
             self.story_manager = StoryManager(
                 filepath=selected_story,
                 image_generator=self.image_generator,
                 image_folder=self.story_image_folder,
                 ui_component=self,
-                battle_manager=self.battle_manager
+                battle_manager=self.battle_manager  # Pass existing BattleManager
             )
+
+            # Display the initial story segment
             self.story_manager.display_story_segment()
-            self.update_navigation_buttons()
 
-        except FileNotFoundError as e:
-            error_msg = f"Story file not found: {selected_story}\nError: {str(e)}"
-            logging.error(error_msg)
-            QMessageBox.critical(self, "File Error", "The selected story file could not be found.")
-            raise
-        except json.JSONDecodeError as e:
-            error_msg = f"Invalid JSON in story file: {selected_story}\nError: {str(e)}"
-            logging.error(error_msg)
-            QMessageBox.critical(self, "Format Error", "The story file contains invalid JSON data.")
-            raise
-        except Exception as e:
-            error_msg = f"Failed to load story: {str(e)}\nTraceback:\n{traceback.format_exc()}"
-            logging.error(error_msg)
-            QMessageBox.critical(self, "Error", f"Failed to load story:\n{str(e)}")
-            raise
-
-    def generate_all_images(self):
-        """Generate missing images for the story."""
-        try:
-            image_prompts = self.story_manager.get_all_image_prompts()
-            missing_images = self._get_missing_images(image_prompts)
-
-            if not missing_images:
-                logging.info("All images already exist - skipping generation.")
-                return
-
-            self._generate_missing_images(missing_images)
+            logging.info(f"Story '{story_name}' loaded successfully.")
 
         except Exception as e:
-            logging.error(f"Error in generate_all_images: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to generate/load images: {e}")
-
-    def _get_missing_images(self, image_prompts: Dict[str, str]) -> List[tuple]:
-        """Identify which images need to be generated."""
-        missing_images = []
-        for node_key, prompt in image_prompts.items():
-            image_filename = f"{node_key}.png"
-            image_path = os.path.join(self.story_image_folder, image_filename)
-
-            if not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
-                missing_images.append((node_key, prompt))
-        return missing_images
-
-    def _generate_missing_images(self, missing_images: List[tuple]):
-        """Generate the missing images with progress dialog."""
-        progress_dialog = QProgressDialog(
-            f"Generating {len(missing_images)} missing images...",
-            "Cancel",
-            0,
-            len(missing_images),
-            self
-        )
-        progress_dialog.setWindowModality(Qt.WindowModal)
-        progress_dialog.setMinimumDuration(0)
-
-        for i, (node_key, prompt) in enumerate(missing_images):
-            if progress_dialog.wasCanceled():
-                logging.info("Image generation canceled by user.")
-                break
-
-            image_filename = f"{node_key}.png"
-            image_path = os.path.join(self.story_image_folder, image_filename)
-
-            image_path = self.image_generator.generate_image(prompt, save_path=image_path)
-            if image_path:
-                self.story_manager.set_generated_image(node_key, image_path)
-
-            progress_dialog.setValue(i + 1)
-            QApplication.processEvents()
-
-        progress_dialog.close()
+            logging.error(f"Failed to load selected story: {e}")
+            QMessageBox.critical(self, "Error",
+                                 f"Failed to load the selected story:\n{str(e)}")
 
     def next_story_segment(self):
-        """Proceed to the next segment of the story."""
+        """Progress to next story segment."""
         try:
             if not self._can_proceed():
                 logging.debug("Cannot proceed - conditions not met")
@@ -415,7 +309,7 @@ class TaskRPG(QMainWindow):
                         logging.info(f"Battle started successfully: {battle_info}")
                     return
                 except Exception as battle_e:
-                    logging.error(f"Battle initialization failed: {str(battle_e)}\n{traceback.format_exc()}")
+                    logging.error(f"Battle initialization failed: {str(battle_e)}")
                     raise
 
             # Simple linear progression
@@ -431,10 +325,8 @@ class TaskRPG(QMainWindow):
                 logging.info("Reached end of story branch")
                 self.handle_chapter_end()
 
-            self.update_navigation_buttons()
-
         except Exception as e:
-            error_msg = f"Story progression failed: {str(e)}\nTraceback:\n{traceback.format_exc()}"
+            error_msg = f"Story progression failed: {str(e)}"
             logging.error(error_msg)
             QMessageBox.critical(self, "Error", f"Failed to advance story: {str(e)}")
 
@@ -507,11 +399,7 @@ class TaskRPG(QMainWindow):
             self.task_manager = settings_dialog.task_manager
             self.task_manager.save_tasks()
 
-            settings_file = os.path.join(
-                os.path.dirname(self.task_manager.filepath),
-                'settings.json'
-            )
-
+            settings_file = os.path.join(DATA_DIR, 'settings.json')
             if os.path.exists(settings_file):
                 try:
                     with open(settings_file, 'r', encoding='utf-8') as f:
@@ -558,7 +446,7 @@ class TaskRPG(QMainWindow):
             if hasattr(self.story_display, 'image_label'):
                 self.story_display.image_label.setFont(QFont("Arial", font_size))
 
-            # Update fonts in Action Buttons - with safety checks
+            # Update fonts in Action Buttons
             if hasattr(self.action_buttons, 'next_button'):
                 self.action_buttons.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
             if hasattr(self.action_buttons, 'attack_button'):
@@ -581,10 +469,7 @@ class TaskRPG(QMainWindow):
     def trigger_shake_animation(self):
         """Trigger the shaking animation if enabled in settings."""
         try:
-            settings_file = os.path.join(
-                os.path.dirname(self.task_manager.filepath),
-                'settings.json'
-            )
+            settings_file = os.path.join(DATA_DIR, 'settings.json')
             shake_enabled = True  # Default to True
 
             if os.path.exists(settings_file):
@@ -599,15 +484,15 @@ class TaskRPG(QMainWindow):
                 # Define keyframes for shaking
                 keyframes = [
                     (0.0, QRect(original_geometry.x(), original_geometry.y(),
-                                original_geometry.width(), original_geometry.height())),
+                              original_geometry.width(), original_geometry.height())),
                     (0.25, QRect(original_geometry.x() + offset, original_geometry.y(),
-                                 original_geometry.width(), original_geometry.height())),
+                              original_geometry.width(), original_geometry.height())),
                     (0.5, QRect(original_geometry.x() - offset, original_geometry.y(),
-                                original_geometry.width(), original_geometry.height())),
+                              original_geometry.width(), original_geometry.height())),
                     (0.75, QRect(original_geometry.x() + offset, original_geometry.y(),
-                                 original_geometry.width(), original_geometry.height())),
+                              original_geometry.width(), original_geometry.height())),
                     (1.0, QRect(original_geometry.x(), original_geometry.y(),
-                                original_geometry.width(), original_geometry.height()))
+                              original_geometry.width(), original_geometry.height()))
                 ]
 
                 self.shake_animation.stop()  # Stop any ongoing animation
@@ -622,9 +507,15 @@ class TaskRPG(QMainWindow):
     def eventFilter(self, obj, event):
         """Handle window focus events."""
         if obj is self:
-            if event.type() == QEvent.WindowDeactivate and self.battle_manager.is_in_battle():
-                self.battle_manager.show_compact_mode()
+            if event.type() == QEvent.WindowDeactivate:
+                logging.debug("Window deactivated")
+                if self.battle_manager.is_in_battle():
+                    logging.debug("Battle is active, showing compact window")
+                    self.battle_manager.show_compact_mode()
+                else:
+                    logging.debug("Battle not active, skipping compact window")
             elif event.type() == QEvent.WindowActivate:
+                logging.debug("Window activated")
                 self.battle_manager.hide_compact_mode()
         return super().eventFilter(obj, event)
 
@@ -660,55 +551,32 @@ class TaskRPG(QMainWindow):
             event.accept()
 
     def focusOutEvent(self, event):
-        """Handle window losing focus - show compact battle window if in battle."""
+        """Handle window losing focus - show compact battle window."""
+        logging.debug("Focus lost - Checking battle state")
         if self.battle_manager.is_in_battle():
+            logging.debug("Battle active, showing compact window")
             self.battle_manager.show_compact_mode()
+        else:
+            logging.debug("No active battle during focus loss")
         super().focusOutEvent(event)
 
     def focusInEvent(self, event):
         """Handle window regaining focus - hide compact battle window."""
+        logging.debug("Focus gained - Hiding compact window")
         self.battle_manager.hide_compact_mode()
         super().focusInEvent(event)
-
-    def _setup_connections(self):
-        """Set up signal connections."""
-        self.action_buttons.back_button.clicked.connect(self.navigate_back)
-        self.action_buttons.forward_button.clicked.connect(self.navigate_forward)
-        # Update button states initially
-        self.update_navigation_buttons()
 
     def navigate_back(self):
         """Navigate to previous story segment."""
         if self._can_proceed():
             self.story_manager.navigate(NavigationDirection.BACKWARD)
-            self.update_navigation_buttons()
 
     def navigate_forward(self):
         """Navigate to next story segment."""
         if self._can_proceed():
             self.story_manager.navigate(NavigationDirection.FORWARD)
-            self.update_navigation_buttons()
 
-    def update_navigation_buttons(self):
-        """Update navigation button states."""
-        can_go_back = self.story_manager._can_navigate(NavigationDirection.BACKWARD)
-        can_go_forward = self.story_manager._can_navigate(NavigationDirection.FORWARD)
-
-        # Keep the action buttons hidden
-        if hasattr(self.action_buttons, 'back_button'):
-            self.action_buttons.back_button.setVisible(False)
-
-    def keyPressEvent(self, event: QKeyEvent):
-        """Handle key press events."""
-        if event.key() == Qt.Key_Left:
-            self.navigate_back()
-        elif event.key() == Qt.Key_Right:
-            self.navigate_forward()
-        elif self.story_display.hasFocus():
-            self.story_display.keyPressEvent(event)
-        super().keyPressEvent(event)
-
-    def load_window_settings(self):
+    def load_window_settings(self) -> dict:
         """Load settings including window dimensions."""
         settings_file = os.path.join(DATA_DIR, 'settings.json')
         try:
@@ -738,6 +606,18 @@ class TaskRPG(QMainWindow):
 
         except Exception as e:
             logging.error(f"Error saving window settings: {e}")
+
+    def show_compact_mode(self):
+        """Show compact battle window when main window loses focus."""
+        try:
+            logging.debug("Focus lost - Checking battle state")
+            if self.battle_manager.is_in_battle():
+                logging.debug("Battle active, showing compact window")
+                self.battle_manager.show_compact_mode()
+            else:
+                logging.debug("No active battle during focus loss")
+        except Exception as e:
+            logging.error(f"Error showing compact window: {e}")
 
 
 if __name__ == "__main__":

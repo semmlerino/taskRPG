@@ -44,3 +44,11 @@ class Task:
             'active': self.active,
             'description': self.description
         }
+
+    def get_task_count(self) -> int:
+        """Get the task count that will be used as HP."""
+        return self.get_random_count()
+
+    def get_hp(self) -> int:
+        """Get the HP value based on task count."""
+        return max(1, self.get_task_count())

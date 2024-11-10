@@ -106,11 +106,22 @@ class TaskManager:
                     logging.error(f"Missing required fields for task '{name}'")
                     return False
             
-            with open(self.filepath, 'w', encoding='utf-8') as f:
+            # Write to temp file first
+            temp_file = self.filepath + '.tmp'
+            with open(temp_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=4)
+            
+            # Backup existing file if it exists
+            if os.path.exists(self.filepath):
+                backup_file = self.filepath + '.bak'
+                os.replace(self.filepath, backup_file)
+            
+            # Rename temp file to actual file
+            os.rename(temp_file, self.filepath)
             
             logging.info(f"Saved {len(self.tasks)} tasks to {self.filepath}")
             return True
+            
         except Exception as e:
             logging.error(f"Error saving tasks: {e}")
             return False
@@ -152,9 +163,15 @@ class TaskManager:
         if not active_tasks:
             logging.warning("No active tasks available")
             return None
-        chosen_task = random.choice(list(active_tasks.values()))
-        logging.debug(f"Selected random task: {chosen_task.name}")
-        return chosen_task
+        
+        try:
+            chosen_task = random.choice(list(active_tasks.values()))
+            logging.debug(f"Selected random task: {chosen_task.name}")
+            return chosen_task
+            
+        except Exception as e:
+            logging.error(f"Error selecting random task: {e}")
+            return None
 
     def get_task_count(self, active_only: bool = True) -> int:
         """
@@ -169,15 +186,6 @@ class TaskManager:
         if active_only:
             return len(self.get_active_tasks())
         return len(self.tasks)
-
-    def get_active_tasks_count(self) -> int:
-        """
-        Get count of active tasks.
-        
-        Returns:
-            int: Number of active tasks.
-        """
-        return self.get_task_count(active_only=True)
 
     def add_task(self, name: str, min_steps: int, max_steps: int, 
                  active: bool = True, description: Optional[str] = None) -> bool:
@@ -205,55 +213,55 @@ class TaskManager:
             
             self.tasks[name] = Task(
                 name=name,
-                min_steps=min_steps,
-                max_steps=max_steps,
+                min_count=min_steps,
+                max_count=max_steps,
                 active=active,
                 description=description
             )
+            
             logging.info(f"Added new task: {name}")
             return True
         except Exception as e:
             logging.error(f"Error adding task: {e}")
             return False
 
-    def update_task(self, name: str, **kwargs) -> bool:
+    def update_task(self, name: str, min_steps: Optional[int] = None, 
+                   max_steps: Optional[int] = None, active: Optional[bool] = None, 
+                   description: Optional[str] = None) -> bool:
         """
-        Update an existing task with provided parameters.
+        Update an existing task.
         
         Args:
             name: Task name
-            **kwargs: Fields to update (min_steps, max_steps, active, description)
+            min_steps: New minimum steps (optional)
+            max_steps: New maximum steps (optional)
+            active: New active state (optional)
+            description: New description (optional)
             
         Returns:
             bool: True if update successful, False otherwise.
         """
         try:
-            if name not in self.tasks:
+            task = self.tasks.get(name)
+            if not task:
                 logging.warning(f"Task '{name}' not found")
                 return False
             
-            task = self.tasks[name]
+            if min_steps is not None:
+                task.min_count = max(1, int(min_steps))
             
-            # Handle min/max steps together to maintain consistency
-            if 'min_steps' in kwargs or 'max_steps' in kwargs:
-                new_min = kwargs.get('min_steps', task.min_steps)
-                new_max = kwargs.get('max_steps', task.max_steps)
-                
-                # Ensure min <= max
-                new_min = max(1, int(new_min))
-                new_max = max(new_min, int(new_max))
-                
-                task.min_steps = new_min
-                task.max_steps = new_max
+            if max_steps is not None:
+                task.max_count = max(task.min_count, int(max_steps))
             
-            # Update other fields
-            if 'active' in kwargs:
-                task.active = bool(kwargs['active'])
-            if 'description' in kwargs:
-                task.description = kwargs['description']
+            if active is not None:
+                task.active = bool(active)
                 
+            if description is not None:
+                task.description = description
+            
             logging.info(f"Updated task: {name}")
             return True
+            
         except Exception as e:
             logging.error(f"Error updating task: {e}")
             return False
@@ -287,6 +295,7 @@ class TaskManager:
             for name, task_data in DEFAULT_TASKS.items()
         }
         logging.info("Created default tasks")
+        self.save_tasks()
 
     def _validate_task_data(self, data: Dict[str, Any]) -> bool:
         """
@@ -298,5 +307,89 @@ class TaskManager:
         Returns:
             bool: True if data is valid, False otherwise.
         """
-        required_fields = ['min', 'max']
-        return all(field in data for field in required_fields)
+        try:
+            # Check required fields exist
+            required_fields = ['min', 'max', 'active']
+            if not all(field in data for field in required_fields):
+                return False
+                
+            # Validate types
+            if not isinstance(data['min'], int) or not isinstance(data['max'], int):
+                return False
+            if not isinstance(data['active'], bool):
+                return False
+                
+            # Validate values
+            if data['min'] < 1 or data['max'] < data['min']:
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error validating task data: {e}")
+            return False
+
+    def import_tasks(self, import_file: str) -> bool:
+        """
+        Import tasks from another JSON file.
+        
+        Args:
+            import_file: Path to JSON file to import
+            
+        Returns:
+            bool: True if import successful, False otherwise.
+        """
+        try:
+            if not os.path.exists(import_file):
+                logging.error(f"Import file not found: {import_file}")
+                return False
+                
+            with open(import_file, 'r', encoding='utf-8') as f:
+                import_data = json.load(f)
+                
+            if not isinstance(import_data, dict):
+                logging.error("Invalid import data format")
+                return False
+                
+            # Import tasks
+            for name, task_data in import_data.items():
+                if self._validate_task_data(task_data):
+                    self.tasks[name] = Task.from_dict(name, task_data)
+                else:
+                    logging.warning(f"Skipping invalid task during import: {name}")
+                    
+            logging.info(f"Imported tasks from {import_file}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error importing tasks: {e}")
+            return False
+
+    def export_tasks(self, export_file: str) -> bool:
+        """
+        Export tasks to JSON file.
+        
+        Args:
+            export_file: Path to export tasks to
+            
+        Returns:
+            bool: True if export successful, False otherwise.
+        """
+        try:
+            export_data = {
+                name: task.to_dict()
+                for name, task in self.tasks.items()
+            }
+            
+            # Create directory if needed
+            os.makedirs(os.path.dirname(export_file), exist_ok=True)
+            
+            with open(export_file, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=4)
+                
+            logging.info(f"Exported tasks to {export_file}")
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error exporting tasks: {e}")
+            return False

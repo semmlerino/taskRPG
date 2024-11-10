@@ -5,6 +5,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 from typing import Optional
+import logging
 
 from modules.battle.enemy import Enemy
 
@@ -58,12 +59,14 @@ class EnemyPanel(QWidget):
     def update_panel(self, enemy: Optional[Enemy]):
         """Update panel with enemy information."""
         if enemy:
+            logging.debug(f"Updating enemy panel - Name: {enemy.name}, HP: {enemy.current_hp}/{enemy.max_hp}")
             self.enemy_label.setText(enemy.name)
             self.task_label.setText(enemy.task_name)
             self.hp_bar.setMaximum(enemy.max_hp)
             self.hp_bar.setValue(enemy.current_hp)
             self.hp_bar.setFormat(f"{enemy.current_hp}/{enemy.max_hp}")
         else:
+            logging.debug("No enemy provided to update_panel")
             self.enemy_label.setText("No Enemy")
             self.task_label.setText("")
             self.hp_bar.setMaximum(100)

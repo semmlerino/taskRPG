@@ -1,3 +1,7 @@
 {
-    "shake_animation": true
+    "shake_animation": true,
+    "window": {
+        "width": 2560,
+        "height": 700
+    }
 }

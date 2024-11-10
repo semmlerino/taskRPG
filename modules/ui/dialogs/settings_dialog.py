@@ -25,7 +25,7 @@ class SettingsDialog(QDialog):
         self.task_manager = task_manager
         self.saved = False
         self.updated_tasks = {k: v for k, v in task_manager.tasks.items()}
-        self.init_ui()  # This line is causing the error
+        self.init_ui()
 
     def init_ui(self):
         """Initialize the UI components."""
@@ -154,6 +154,7 @@ class SettingsDialog(QDialog):
         if not selected_items:
             QMessageBox.warning(self, "No Selection", "Please select a task to remove.")
             return
+            
         selected_row = selected_items[0].row()
         task_name = self.task_table.item(selected_row, 0).text()
         if task_name in self.updated_tasks:
@@ -162,18 +163,18 @@ class SettingsDialog(QDialog):
 
     def load_shaking_setting(self):
         """Load shake animation setting."""
-        settings_file = os.path.join(os.path.dirname(self.task_manager.filepath), 'settings.json')
-        if os.path.exists(settings_file):
-            try:
+        try:
+            settings_file = os.path.join(os.path.dirname(self.task_manager.filepath), 'settings.json')
+            if os.path.exists(settings_file):
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
                 shake_enabled = settings.get('shake_animation', True)
                 self.shake_checkbox.setChecked(shake_enabled)
-            except Exception as e:
-                logging.error(f"Failed to load shaking setting: {e}")
-                self.shake_checkbox.setChecked(True)
-        else:
-            self.shake_checkbox.setChecked(True)
+            else:
+                self.shake_checkbox.setChecked(True)  # Default to enabled
+        except Exception as e:
+            logging.error(f"Error loading shake setting: {e}")
+            self.shake_checkbox.setChecked(True)  # Default to enabled on error
 
     def save_settings(self):
         """Save settings and tasks."""
@@ -195,9 +196,12 @@ class SettingsDialog(QDialog):
                 try:
                     min_val = int(self.task_table.item(row, 1).text())
                     max_val = int(self.task_table.item(row, 2).text())
-                except ValueError:
-                    QMessageBox.warning(self, "Invalid Input", 
-                                      "Min and Max values must be integers.")
+                    if min_val < 1:
+                        raise ValueError("Minimum value must be at least 1")
+                    if max_val < min_val:
+                        raise ValueError("Maximum value must be greater than or equal to minimum")
+                except ValueError as e:
+                    QMessageBox.warning(self, "Invalid Input", str(e))
                     return
                 
                 # Get active state
@@ -225,11 +229,18 @@ class SettingsDialog(QDialog):
                 raise Exception("Failed to save tasks")
 
             # Save settings
-            settings = {'shake_animation': self.shake_checkbox.isChecked()}
             settings_file = os.path.join(
                 os.path.dirname(self.task_manager.filepath), 
                 'settings.json'
             )
+            
+            settings = {
+                'shake_animation': self.shake_checkbox.isChecked(),
+                'window': {
+                    'width': self.parent().width(),
+                    'height': self.parent().height()
+                }
+            }
             
             with open(settings_file, 'w', encoding='utf-8') as f:
                 json.dump(settings, f, indent=4)
@@ -241,5 +252,4 @@ class SettingsDialog(QDialog):
             
         except Exception as e:
             logging.error(f"Failed to save settings: {e}")
-            QMessageBox.critical(self, "Error", "Failed to save settings.")
-
+            QMessageBox.critical(self, "Error", f"Failed to save settings: {str(e)}")
