@@ -414,6 +414,10 @@ class TaskRPG(QMainWindow):
     def handle_chapter_end(self):
         """Handle the end of a chapter."""
         try:
+            # First ensure any fullscreen viewer is closed
+            if hasattr(self, 'story_display') and hasattr(self.story_display, '_fullscreen_viewer'):
+                self.story_display.cleanup_viewer()
+                
             self.story_display.append_text(
                 "<br><b>Chapter Complete!</b><br>"
                 "<p>You have completed all available tasks for now.</p>"

@@ -27,7 +27,7 @@ class OutlinedTextBrowser(QTextBrowser):
                 background: transparent;
                 border: none;
                 color: white;
-                font-size: 18pt;
+                font-size: 26pt;
             }
         """)
 
@@ -129,13 +129,13 @@ class FullscreenImageViewer(QMainWindow):
         
         # Position text at the bottom with wider margins
         text_height = int(screen_rect.height() * 0.3)  # 30% of screen height
-        side_margin = 120  # Wide side margins
-        bottom_margin = 5  # Reduced from 10 to 5 pixels from bottom
+        side_margin = 240  # Increased from 120 to 240 for narrower text
+        bottom_margin = 5
         self.text_browser.setGeometry(
             side_margin,  # Left margin
-            screen_rect.height() - text_height - bottom_margin,  # Closer to bottom
+            screen_rect.height() - text_height - bottom_margin,
             screen_rect.width() - (side_margin * 2),  # Width (with margins on both sides)
-            text_height  # Height
+            text_height
         )
 
     def resizeEvent(self, event):
@@ -215,11 +215,15 @@ class FullscreenImageViewer(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event."""
         try:
+            # Release keyboard grab before cleanup
+            self.releaseKeyboard()
             self.cleanup_resources()
             super().closeEvent(event)
             logging.info("FullscreenImageViewer closed successfully")
         except Exception as e:
             logging.error(f"Error during FullscreenImageViewer cleanup: {e}")
+            # Force release keyboard and accept event
+            self.releaseKeyboard()
             event.accept()
 
     def cleanup_resources(self):

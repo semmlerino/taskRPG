@@ -214,13 +214,17 @@ class SettingsDialog(QDialog):
                         if isinstance(checkbox, QCheckBox):
                             active = checkbox.isChecked()
 
+                # Find the original task name for this row to preserve description
+                original_name = list(self.updated_tasks.keys())[row]
+                original_task = self.updated_tasks[original_name]
+
                 # Create new task
                 new_tasks[name] = Task(
                     name=name,
                     min_count=min_val,
                     max_count=max_val,
                     active=active,
-                    description=self.updated_tasks[name].description if name in self.updated_tasks else None
+                    description=original_task.description
                 )
 
             # Update task manager

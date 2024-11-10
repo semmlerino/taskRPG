@@ -85,14 +85,14 @@ class StoryDisplay(QWidget):
         """
         try:
             self.current_node_key = node_key
-            self.clear()
+            self.story_text.clear()
             
-            if image_path and os.path.exists(image_path):
+            # Only update image if we have a new one
+            if image_path:
                 self.current_image_path = image_path
                 self.load_image()
-            else:
-                self.current_image_path = None
-                
+            # Don't clear the image if no new image is provided
+            
             self.story_text.append(html_content)
             
             # Update fullscreen viewer if active
@@ -102,7 +102,6 @@ class StoryDisplay(QWidget):
                     self.story_text.toPlainText()
                 )
                 
-            # Set focus after updating content
             self.setFocus()
             
         except Exception as e:
@@ -218,16 +217,28 @@ class StoryDisplay(QWidget):
     def _handle_fullscreen_close(self, event):
         """Handle fullscreen viewer close event."""
         try:
+            # Release keyboard grab
+            if self._fullscreen_viewer:
+                self._fullscreen_viewer.releaseKeyboard()
+                
             # Re-enable global G hotkey
             main_window = self.window()
             if hasattr(main_window, 'hotkey_listener'):
                 main_window.hotkey_listener.set_next_story_enabled(True)
                 logging.info("Re-enabled global G hotkey")
             
+            # Force cleanup of viewer
+            self.cleanup_viewer()
+            
             # Call original close event
             event.accept()
         except Exception as e:
             logging.error(f"Error handling fullscreen close: {e}")
+            # Emergency cleanup
+            if self._fullscreen_viewer:
+                self._fullscreen_viewer.releaseKeyboard()
+                self._fullscreen_viewer.close()
+                self._fullscreen_viewer = None
 
     def cleanup_viewer(self):
         """Clean up any existing fullscreen viewer instance."""

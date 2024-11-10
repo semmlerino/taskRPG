@@ -48,6 +48,10 @@ class StoryManager:
         # Track completed battles
         self.completed_battle_nodes = set()
 
+        # Add after the __init__ method initialization
+        self._last_valid_image = None
+        self._next_valid_image = None
+
         logging.info(f"StoryManager initialized with filepath: {filepath}")
 
     def load_story(self) -> Dict[str, Any]:
@@ -148,6 +152,16 @@ class StoryManager:
             if not content:
                 logging.error("Failed to create node content")
                 return False
+
+            # Handle image persistence
+            current_image = self.get_generated_image(self.current_node_key)
+            if current_image:
+                self._last_valid_image = current_image
+            elif not self._last_valid_image:
+                self._next_valid_image = self._find_next_valid_image(self.current_node_key)
+
+            # Use the most appropriate image
+            content.image_path = current_image or self._last_valid_image or self._next_valid_image
 
             self._current_content = content
 
@@ -444,3 +458,20 @@ class StoryManager:
         """Set the battle manager after initialization."""
         self.battle_manager = battle_manager
         logging.info("Battle manager set in StoryManager")
+
+    # Add new method to find next valid image
+    def _find_next_valid_image(self, current_node_key: str) -> Optional[str]:
+        try:
+            # Start from next node
+            next_key = self.story_data[current_node_key].get('next')
+            while next_key and next_key in self.story_data:
+                node = self.story_data[next_key]
+                if 'image_prompt' in node:
+                    image_path = self.get_generated_image(next_key)
+                    if image_path:
+                        return image_path
+                next_key = node.get('next')
+            return None
+        except Exception as e:
+            logging.error(f"Error finding next valid image: {e}")
+            return None
