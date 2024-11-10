@@ -194,11 +194,14 @@ class StoryDisplay(QWidget):
                     )
                     logging.info("Story advance signal connected")
                 
-                # Connect navigate back signal to StoryDisplay's signal
+                # Connect navigation signals
                 self._fullscreen_viewer.navigate_back_signal.connect(
                     self.navigate_back_signal.emit
                 )
-                logging.info("Navigate back signal connected to StoryDisplay")
+                self._fullscreen_viewer.navigate_forward_signal.connect(
+                    self.navigate_forward_signal.emit
+                )
+                logging.info("Navigation signals connected")
             
             # Handle global hotkeys
             if hasattr(main_window, 'hotkey_listener'):
