@@ -9,6 +9,7 @@ import random
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QRect
+from PyQt5.QtCore import QTimer
 
 # Core game system imports
 from modules.tasks.task_manager import TaskManager
@@ -217,7 +218,7 @@ class BattleManager:
             logging.error(f"Error toggling pause: {e}")
 
     def show_compact_mode(self) -> None:
-        """Show compact battle window."""
+        """Show compact battle window in top right corner."""
         try:
             if not self.compact_window:
                 # Import here to avoid circular import
@@ -228,21 +229,13 @@ class BattleManager:
                 screen = QApplication.primaryScreen()
                 screen_geo = screen.availableGeometry()
                 
-                # Get main window geometry
-                main_geo = self.main_window.geometry()
-                
-                # Calculate position that's visible on screen
-                x = min(main_geo.x() + main_geo.width() + 10, 
-                       screen_geo.width() - self.compact_window.width() - 10)
-                y = min(main_geo.y(),
-                       screen_geo.height() - self.compact_window.height() - 10)
-                
-                # Ensure x and y are not negative
-                x = max(10, x)
-                y = max(10, y)
+                # Calculate position for top right corner
+                # Leave a small margin from the edges
+                margin = 10
+                x = screen_geo.width() - self.compact_window.width() - margin
+                y = margin  # Position at top with margin
                 
                 self.compact_window.move(x, y)
-                logging.info(f"Screen size: {screen_geo.width()}x{screen_geo.height()}")
                 logging.info(f"Positioning compact window at: ({x}, {y})")
 
                 # Ensure current_enemy is an Enemy instance before updating
@@ -332,6 +325,23 @@ class BattleManager:
             self.battle_state.is_active = False
             self.current_enemy = None
             
+            # Hide compact window if it exists
+            if self.compact_window:
+                self.hide_compact_mode()
+            
+            # Ensure main window is visible and focused
+            if self.main_window:
+                self.main_window.show()
+                self.main_window.raise_()
+                self.main_window.activateWindow()
+                
+                # Use a timer to force focus after a short delay
+                QTimer.singleShot(100, lambda: (
+                    self.main_window.show(),
+                    self.main_window.raise_(),
+                    self.main_window.activateWindow()
+                ))
+            
             logging.debug("Battle state updated for victory")
             
             # Update UI
@@ -347,8 +357,7 @@ class BattleManager:
                 self.on_battle_end()
 
         except Exception as e:
-            logging.error(f"Error handling victory: {str(e)}", exc_info=True)
-            self._update_status("Error processing victory")
+            logging.error(f"Error handling victory: {str(e)}")
 
     def _validate_battle_start(self) -> bool:
         """
@@ -569,8 +578,24 @@ class BattleManager:
             self.current_enemy = None
             self.battle_state.enemy_hp = 0
             
-            # Clean up compact window
-            self.hide_compact_mode()
+            # Hide compact window if it exists
+            if self.compact_window:
+                self.hide_compact_mode()
+            
+            # Reset battle state
+            self.current_enemy = None
+            self.in_battle = False
+            
+            # Ensure main window is visible and focused
+            self.main_window.show()
+            self.main_window.raise_()
+            self.main_window.activateWindow()
+            
+            # Force focus to the main window
+            QTimer.singleShot(100, lambda: (
+                self.main_window.raise_(),
+                self.main_window.activateWindow()
+            ))
             
             logging.info("Battle ended successfully")
             

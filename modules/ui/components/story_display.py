@@ -10,36 +10,43 @@ from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.ui.components.story_text_browser import StoryTextBrowser
 
 class StoryDisplay(QWidget):
-    """Widget for displaying story content with text and images."""
+    """Widget for displaying story content with text and images.
     
+    This widget provides a split view with an image display area on top
+    and a text display area below. It supports fullscreen image viewing,
+    keyboard navigation, and dynamic resizing.
+    """
+    
+    # Signals for story navigation
     story_advance_signal = pyqtSignal()
     navigate_back_signal = pyqtSignal()
     navigate_forward_signal = pyqtSignal()
     
     def __init__(self, parent=None):
+        """Initialize the story display widget."""
         super().__init__(parent)
         self.current_node_key = None
         self.current_image_path = None
         self._fullscreen_viewer = None
         
-        # Enable keyboard focus
+        # Enable keyboard focus for hotkey support
         self.setFocusPolicy(Qt.StrongFocus)
         
-        # Create fullscreen shortcut
+        # Setup fullscreen shortcut (F key)
         self.fullscreen_shortcut = QShortcut(QKeySequence('F'), self)
         self.fullscreen_shortcut.activated.connect(self._show_fullscreen_viewer)
         
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the user interface."""
+        """Initialize the user interface components."""
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create splitter
+        # Create vertical splitter for image/text areas
         self.splitter = QSplitter(Qt.Vertical)
         
-        # Image display
+        # Setup image display area
         self.image_scroll = QScrollArea()
         self.image_scroll.setWidgetResizable(True)
         self.image_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
@@ -49,26 +56,30 @@ class StoryDisplay(QWidget):
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_scroll.setWidget(self.image_label)
         
-        # Story text display
+        # Setup text display area
         self.story_text = StoryTextBrowser()
         
-        # Add widgets to splitter
+        # Add both components to splitter
         self.splitter.addWidget(self.image_scroll)
         self.splitter.addWidget(self.story_text)
         
-        # Set initial sizes
+        # Set default split positions
         self.splitter.setSizes([300, 400])
         
-        # Connect splitter's splitterMoved signal
+        # Connect splitter movement to image resize
         self.splitter.splitterMoved.connect(self.load_image)
         
-        # Add splitter to layout
         layout.addWidget(self.splitter)
-        
         self.setLayout(layout)
 
     def set_page(self, node_key: str, html_content: str, image_path: str = None):
-        """Set the content for the current story page."""
+        """Set the content for the current story page.
+        
+        Args:
+            node_key: Identifier for the current story node
+            html_content: HTML formatted text content
+            image_path: Path to the image file (optional)
+        """
         try:
             self.current_node_key = node_key
             self.clear()
@@ -81,6 +92,7 @@ class StoryDisplay(QWidget):
                 
             self.story_text.append(html_content)
             
+            # Update fullscreen viewer if active
             if self._fullscreen_viewer:
                 self._fullscreen_viewer.update_content(
                     self.current_image_path,
@@ -89,7 +101,7 @@ class StoryDisplay(QWidget):
                 
         except Exception as e:
             logging.error(f"Error setting page: {e}")
-            QMessageBox.critical(self, "Error", "Failed to set page content")
+            self.show_error("Failed to set page content")
 
     def clear(self):
         """Clear all content from the display."""
@@ -98,7 +110,7 @@ class StoryDisplay(QWidget):
         self.current_image_path = None
 
     def load_image(self):
-        """Load and display the current image."""
+        """Load and scale the current image to fit the display area."""
         try:
             if not self.current_image_path:
                 return
@@ -108,10 +120,10 @@ class StoryDisplay(QWidget):
                 logging.error(f"Failed to load image: {self.current_image_path}")
                 return
             
-            # Get the current size of the image scroll area
+            # Get current scroll area size
             scroll_size = self.image_scroll.size()
             
-            # Scale image to fit the scroll area while maintaining aspect ratio
+            # Scale image to fit while maintaining aspect ratio
             scaled_pixmap = pixmap.scaled(
                 scroll_size.width(),
                 scroll_size.height(),
@@ -132,7 +144,14 @@ class StoryDisplay(QWidget):
             self.load_image()
 
     def keyPressEvent(self, event: QKeyEvent):
-        """Handle keyboard navigation and fullscreen toggle."""
+        """Handle keyboard navigation and shortcuts.
+        
+        Supported keys:
+            F: Toggle fullscreen image view
+            Left: Navigate back
+            Right: Navigate forward
+            G: Advance story
+        """
         try:
             if event.key() == Qt.Key_F:
                 if hasattr(self, 'current_image_path') and self.current_image_path:
@@ -147,22 +166,25 @@ class StoryDisplay(QWidget):
                 super().keyPressEvent(event)
         except Exception as e:
             logging.error(f"Error handling key press: {e}")
-            QMessageBox.critical(self, "Error", "Failed to handle key press")
+            self.show_error("Failed to handle key press")
 
     def _show_fullscreen_viewer(self):
-        """Show the fullscreen image viewer."""
+        """Create and display the fullscreen image viewer."""
         try:
             if not os.path.exists(self.current_image_path):
                 logging.error(f"Image file not found: {self.current_image_path}")
+                self.show_error("Image file not found")
                 return
 
             self.cleanup_viewer()
             
+            # Create new fullscreen viewer
             self._fullscreen_viewer = FullscreenImageViewer(
                 self.current_image_path,
                 self.story_text.toPlainText()
             )
             
+            # Connect story advance signal
             self._fullscreen_viewer.story_advance_signal.connect(
                 self.story_advance_signal.emit
             )
@@ -172,10 +194,10 @@ class StoryDisplay(QWidget):
             
         except Exception as e:
             logging.error(f"Error showing fullscreen viewer: {e}")
-            QMessageBox.critical(self, "Error", "Failed to show fullscreen view")
+            self.show_error("Failed to show fullscreen view")
 
     def cleanup_viewer(self):
-        """Clean up any existing fullscreen viewer."""
+        """Clean up any existing fullscreen viewer instance."""
         if self._fullscreen_viewer:
             try:
                 self._fullscreen_viewer.close()
@@ -186,6 +208,24 @@ class StoryDisplay(QWidget):
                 self._fullscreen_viewer = None
 
     def show_error(self, message: str):
-        """Display an error message."""
+        """Display an error message dialog.
+        
+        Args:
+            message: The error message to display
+        """
         logging.error(message)
         QMessageBox.critical(self, "Error", message)
+
+    def append_text(self, text: str) -> None:
+        """Append text to the story display."""
+        current_text = self.story_text.toPlainText()
+        if current_text:
+            # Add a newline if there's existing text
+            self.story_text.setPlainText(f"{current_text}\n{text}")
+        else:
+            # Just set the text if the display is empty
+            self.story_text.setPlainText(text)
+        
+        # Scroll to the bottom to show new text
+        scrollbar = self.story_text.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
