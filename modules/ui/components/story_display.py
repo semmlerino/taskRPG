@@ -1,7 +1,7 @@
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTextBrowser, 
                             QScrollArea, QShortcut, QMessageBox, QSizePolicy,
                             QSplitter)
-from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QTimer
 from PyQt5.QtGui import QPixmap, QKeySequence, QKeyEvent
 import logging
 import os
@@ -37,6 +37,9 @@ class StoryDisplay(QWidget):
         self.fullscreen_shortcut.activated.connect(self._show_fullscreen_viewer)
         
         self.init_ui()
+        
+        # Schedule focus check after initialization
+        QTimer.singleShot(100, self._ensure_focus)
 
     def init_ui(self):
         """Initialize the user interface components."""
@@ -99,6 +102,9 @@ class StoryDisplay(QWidget):
                     self.story_text.toPlainText()
                 )
                 
+            # Set focus after updating content
+            self.setFocus()
+            
         except Exception as e:
             logging.error(f"Error setting page: {e}")
             self.show_error("Failed to set page content")
@@ -144,23 +150,17 @@ class StoryDisplay(QWidget):
             self.load_image()
 
     def keyPressEvent(self, event: QKeyEvent):
-        """Handle keyboard navigation and shortcuts.
-        
-        Supported keys:
-            F: Toggle fullscreen image view
-            Left: Navigate back
-            Right: Navigate forward
-            G: Advance story
-        """
+        """Handle keyboard navigation and shortcuts."""
+        logging.info(f"StoryDisplay received key press: {event.key()}")
         try:
             if event.key() == Qt.Key_F:
                 if hasattr(self, 'current_image_path') and self.current_image_path:
                     self._show_fullscreen_viewer()
             elif event.key() == Qt.Key_Left:
+                logging.info("Left key pressed in StoryDisplay")
                 self.navigate_back_signal.emit()
-            elif event.key() == Qt.Key_Right:
-                self.navigate_forward_signal.emit()
-            elif event.key() == Qt.Key_G:
+            elif event.key() in (Qt.Key_Right, Qt.Key_G):
+                logging.info("Advance key pressed in StoryDisplay")
                 self.story_advance_signal.emit()
             else:
                 super().keyPressEvent(event)
@@ -194,14 +194,11 @@ class StoryDisplay(QWidget):
                     )
                     logging.info("Story advance signal connected")
                 
-                # Connect navigation signals
+                # Connect back navigation signal
                 self._fullscreen_viewer.navigate_back_signal.connect(
                     self.navigate_back_signal.emit
                 )
-                self._fullscreen_viewer.navigate_forward_signal.connect(
-                    self.navigate_forward_signal.emit
-                )
-                logging.info("Navigation signals connected")
+                logging.info("Back navigation signal connected")
             
             # Handle global hotkeys
             if hasattr(main_window, 'hotkey_listener'):
@@ -271,3 +268,16 @@ class StoryDisplay(QWidget):
             
         except Exception as e:
             logging.error(f"Error appending HTML text: {e}")
+
+    def showEvent(self, event):
+        """Handle widget show event."""
+        super().showEvent(event)
+        # Schedule focus set after show
+        QTimer.singleShot(100, self._ensure_focus)
+        logging.info("StoryDisplay shown")
+
+    def _ensure_focus(self):
+        """Ensure widget has focus."""
+        self.setFocus()
+        self.activateWindow()
+        logging.info("StoryDisplay focus ensured")

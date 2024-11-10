@@ -72,7 +72,6 @@ class FullscreenImageViewer(QMainWindow):
     # Define all signals at class level
     story_advance_signal = pyqtSignal()
     navigate_back_signal = pyqtSignal()
-    navigate_forward_signal = pyqtSignal()
     
     def __init__(self, image_path, story_text, parent=None):
         super().__init__(parent)
@@ -181,15 +180,12 @@ class FullscreenImageViewer(QMainWindow):
         logging.info(f"Key pressed in fullscreen: {event.key()}")
         
         try:
-            if event.key() == Qt.Key_G:
-                logging.info("G key detected in fullscreen viewer")
+            if event.key() in (Qt.Key_G, Qt.Key_Right):  # Both G and right arrow advance story
+                logging.info("Story advance key detected in fullscreen viewer")
                 self.advance_story()
             elif event.key() == Qt.Key_Left:
                 logging.info("Left arrow detected in fullscreen viewer")
                 self.navigate_back()
-            elif event.key() == Qt.Key_Right:
-                logging.info("Right arrow detected in fullscreen viewer")
-                self.navigate_forward()
             elif event.key() == Qt.Key_T:
                 self.toggle_text()
             elif event.key() in (Qt.Key_Escape, Qt.Key_F):
@@ -207,15 +203,6 @@ class FullscreenImageViewer(QMainWindow):
             logging.info("Navigate back signal emitted")
         except Exception as e:
             logging.error(f"Error navigating back from fullscreen view: {e}", exc_info=True)
-
-    def navigate_forward(self):
-        """Handle navigation forward request."""
-        try:
-            logging.info("Navigate forward requested from fullscreen viewer")
-            self.navigate_forward_signal.emit()
-            logging.info("Navigate forward signal emitted")
-        except Exception as e:
-            logging.error(f"Error navigating forward from fullscreen view: {e}", exc_info=True)
 
     def showEvent(self, event):
         """Handle window show event."""

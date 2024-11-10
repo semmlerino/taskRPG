@@ -112,6 +112,12 @@ class TaskRPG(QMainWindow):
         self.setFocusPolicy(Qt.StrongFocus)
         self.grabKeyboard()
 
+        # After initializing story_display
+        self.story_display.setFocusPolicy(Qt.StrongFocus)
+        
+        # Create a timer to set focus after window is shown
+        QTimer.singleShot(100, self._ensure_focus)
+
     def init_core_components(self):
         """Initialize core components that don't depend on UI."""
         # Task Manager
@@ -262,6 +268,9 @@ class TaskRPG(QMainWindow):
             QMessageBox.critical(self, "Critical Error",
                                  "A critical error occurred during story selection.")
             self.close()
+
+        # After loading the story, set focus to story display
+        self.story_display.setFocus()
 
     def _load_selected_story(self, selected_story: str):
         """Load the selected story file."""
@@ -617,6 +626,43 @@ class TaskRPG(QMainWindow):
                 logging.debug("No active battle during focus loss")
         except Exception as e:
             logging.error(f"Error showing compact window: {e}")
+
+    def _ensure_focus(self):
+        """Ensure proper focus is set after window is shown."""
+        try:
+            if hasattr(self, 'story_display'):
+                logging.info("Setting initial focus to StoryDisplay")
+                self.story_display.setFocus()
+                self.story_display.activateWindow()
+        except Exception as e:
+            logging.error(f"Error setting initial focus: {e}")
+
+    def showEvent(self, event):
+        """Handle window show event."""
+        super().showEvent(event)
+        # Schedule another focus check
+        QTimer.singleShot(200, self._ensure_focus)
+
+    def keyPressEvent(self, event: QKeyEvent):
+        """Handle key events at the main window level."""
+        try:
+            # If we have a story display, delegate key events to it
+            if hasattr(self, 'story_display'):
+                if event.key() == Qt.Key_F:
+                    if hasattr(self.story_display, 'current_image_path') and self.story_display.current_image_path:
+                        self.story_display._show_fullscreen_viewer()
+                elif event.key() == Qt.Key_Left:
+                    logging.info("Left key pressed in main window")
+                    self.story_display.navigate_back_signal.emit()
+                elif event.key() in (Qt.Key_Right, Qt.Key_G):
+                    logging.info("Advance key pressed in main window")
+                    self.story_display.story_advance_signal.emit()
+                else:
+                    super().keyPressEvent(event)
+            else:
+                super().keyPressEvent(event)
+        except Exception as e:
+            logging.error(f"Error handling key press in main window: {e}")
 
 
 if __name__ == "__main__":
