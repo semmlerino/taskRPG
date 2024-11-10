@@ -54,8 +54,12 @@ class GlobalHotkeys(QThread):
 
     def set_next_story_enabled(self, enabled: bool):
         """Enable/disable the next story hotkey."""
-        self.next_story_enabled = enabled
-        self._register_next_story_hotkey()
+        try:
+            logging.info(f"Setting next story hotkey enabled: {enabled}")
+            self.next_story_enabled = enabled
+            self._register_next_story_hotkey()
+        except Exception as e:
+            logging.error(f"Error setting next story enabled: {e}")
 
     def set_attack_hotkeys_enabled(self, enabled: bool):
         """Enable/disable attack hotkeys."""
@@ -67,6 +71,7 @@ class GlobalHotkeys(QThread):
             if hasattr(self, '_next_story_hotkey') and self._next_story_hotkey:
                 keyboard.remove_hotkey(self._next_story_hotkey)
                 self._next_story_hotkey = None
+                logging.debug("Next story hotkey removed")
             
             if self.next_story_enabled:
                 self._next_story_hotkey = keyboard.add_hotkey(

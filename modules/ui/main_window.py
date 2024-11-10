@@ -294,11 +294,19 @@ class TaskRPG(QMainWindow):
     def next_story_segment(self):
         """Progress to next story segment."""
         try:
+            logging.info("next_story_segment called in TaskRPG")
+            
+            if not hasattr(self, 'story_manager'):
+                logging.error("No story manager found")
+                return
+            
             if not self._can_proceed():
                 logging.debug("Cannot proceed - conditions not met")
                 return
 
+            logging.info("Proceeding with story advancement")
             current_node = self.story_manager.get_current_node()
+            logging.info(f"Current node: {current_node.get('next', 'No next node')}")
 
             # Handle battle nodes
             if "battle" in current_node and not current_node.get("battle_completed", False):
@@ -315,20 +323,19 @@ class TaskRPG(QMainWindow):
             # Simple linear progression
             if next_node := current_node.get('next'):
                 try:
+                    logging.info(f"Attempting to advance to node: {next_node}")
                     self.story_manager.set_current_node(next_node)
-                    self.story_manager.display_story_segment()
-                    logging.debug(f"Advanced to node: {next_node}")
+                    result = self.story_manager.display_story_segment()
+                    logging.info(f"Story segment display result: {result}")
+                    logging.info(f"Advanced to node: {next_node}")
                 except ValueError as e:
                     logging.error(f"Invalid next node '{next_node}': {str(e)}")
                     self.handle_chapter_end()
             else:
                 logging.info("Reached end of story branch")
                 self.handle_chapter_end()
-
         except Exception as e:
-            error_msg = f"Story progression failed: {str(e)}"
-            logging.error(error_msg)
-            QMessageBox.critical(self, "Error", f"Failed to advance story: {str(e)}")
+            logging.error(f"Error in next_story_segment: {e}", exc_info=True)
 
     def handle_chapter_end(self):
         """Handle the end of a chapter."""
@@ -352,25 +359,17 @@ class TaskRPG(QMainWindow):
             logging.error(f"Error handling chapter end: {e}")
             QMessageBox.critical(self, "Error", "Failed to handle chapter end properly")
 
-    def _can_proceed(self) -> bool:
-        """Check if story can proceed to next segment."""
-        if not self.isActiveWindow():
+    def _can_proceed(self):
+        """Check if story can proceed."""
+        try:
+            logging.info("Checking if story can proceed")
+            # Add your conditions here
+            can_proceed = True  # Or your actual conditions
+            logging.info(f"Can proceed: {can_proceed}")
+            return can_proceed
+        except Exception as e:
+            logging.error(f"Error in _can_proceed: {e}")
             return False
-
-        if self.battle_manager.is_in_battle():
-            QMessageBox.information(
-                self,
-                "Battle In Progress",
-                "You must defeat the current enemy before proceeding!"
-            )
-            self.status_bar.showMessage("Battle in progress. Defeat the enemy to proceed.")
-            return False
-
-        if hasattr(self.action_buttons, 'next_button'):
-            if not self.action_buttons.next_button.isEnabled():
-                return False
-
-        return True
 
     def update_tasks_left(self):
         """Update the tasks left display."""

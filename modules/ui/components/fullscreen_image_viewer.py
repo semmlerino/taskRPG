@@ -69,6 +69,7 @@ class OutlinedTextBrowser(QTextBrowser):
 class FullscreenImageViewer(QMainWindow):
     """Fullscreen image viewer with story progression capability."""
     
+    # Define signal as class variable
     story_advance_signal = pyqtSignal()
     
     def __init__(self, image_path, story_text, parent=None):
@@ -107,6 +108,9 @@ class FullscreenImageViewer(QMainWindow):
         
         # Initialize state
         self.text_visible = True
+
+        # Set focus policy to accept keyboard input
+        self.setFocusPolicy(Qt.StrongFocus)
 
     def setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -164,32 +168,37 @@ class FullscreenImageViewer(QMainWindow):
     def advance_story(self):
         """Handle story progression request."""
         try:
-            logging.debug("Story advance requested from fullscreen viewer")
+            logging.info("Advance story method called in FullscreenImageViewer")
             self.story_advance_signal.emit()
-            self.close()
+            logging.info("Story advance signal emitted from FullscreenImageViewer")
         except Exception as e:
-            logging.error(f"Error advancing story from fullscreen view: {e}")
+            logging.error(f"Error advancing story: {e}", exc_info=True)
 
     def keyPressEvent(self, event):
         """Handle key press events."""
+        logging.info(f"Key pressed in fullscreen: {event.key()}")  # Debug log
+        
         try:
             if event.key() == Qt.Key_G:
+                logging.info("G key detected in fullscreen viewer")
                 self.advance_story()
             elif event.key() == Qt.Key_T:
+                logging.info("T key detected in fullscreen viewer")
                 self.toggle_text()
             elif event.key() in (Qt.Key_Escape, Qt.Key_F):
                 self.close()
             else:
                 super().keyPressEvent(event)
         except Exception as e:
-            logging.error(f"Error handling key press in fullscreen viewer: {e}")
+            logging.error(f"Error handling key press in fullscreen viewer: {e}", exc_info=True)
 
     def showEvent(self, event):
-        """Handle window show event to ensure proper focus."""
+        """Handle window show event."""
         super().showEvent(event)
         self.setFocus()
         self.activateWindow()
-        self.raise_()
+        self.grabKeyboard()  # Force keyboard focus
+        logging.info("Fullscreen viewer activated and focused")
 
     def closeEvent(self, event):
         """Handle window close event."""
@@ -220,16 +229,15 @@ class FullscreenImageViewer(QMainWindow):
             Qt.SmoothTransformation
         )
 
-    def update_content(self, image_path: str, story_text: str):
-        """Update the viewer's content."""
+    def update_content(self, image_path: str, text: str):
+        """Update the viewer content."""
         try:
-            if os.path.exists(image_path):
+            if image_path and os.path.exists(image_path):
                 self.original_pixmap = QPixmap(image_path)
                 self.scale_image()
-            self.text_browser.setText(story_text)
-            logging.debug("Fullscreen viewer content updated")
+            self.text_browser.setText(text)
         except Exception as e:
-            logging.error(f"Error updating fullscreen viewer content: {e}")
+            logging.error(f"Error updating fullscreen content: {e}")
 
     def format_story_text(self, text: str) -> str:
         """Format the story text into multiple lines with proper wrapping."""

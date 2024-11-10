@@ -39,7 +39,6 @@ HOTKEYS = {
     'normal_attack': 'd',
     'heavy_attack': 'shift+d',
     'toggle_pause': '#',
-    'next_story': 'g',
     'open_settings': 's',
     'fullscreen': 'f'
 }

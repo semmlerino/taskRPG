@@ -178,16 +178,27 @@ class StoryDisplay(QWidget):
 
             self.cleanup_viewer()
             
+            # Disable global G hotkey
+            main_window = self.window()
+            if hasattr(main_window, 'hotkey_listener'):
+                main_window.hotkey_listener.set_next_story_enabled(False)
+                logging.info("Disabled global G hotkey for fullscreen mode")
+            
             # Create new fullscreen viewer
             self._fullscreen_viewer = FullscreenImageViewer(
                 self.current_image_path,
                 self.story_text.toPlainText()
             )
             
+            # Connect close event to re-enable hotkey
+            self._fullscreen_viewer.closeEvent = lambda event: self._handle_fullscreen_close(event)
+            
             # Connect story advance signal
-            self._fullscreen_viewer.story_advance_signal.connect(
-                self.story_advance_signal.emit
-            )
+            if main_window and hasattr(main_window, 'next_story_segment'):
+                self._fullscreen_viewer.story_advance_signal.connect(
+                    main_window.next_story_segment
+                )
+                logging.info("Signal connected to next_story_segment")
             
             self._fullscreen_viewer.showFullScreen()
             logging.info("Fullscreen viewer displayed")
@@ -195,6 +206,20 @@ class StoryDisplay(QWidget):
         except Exception as e:
             logging.error(f"Error showing fullscreen viewer: {e}")
             self.show_error("Failed to show fullscreen view")
+
+    def _handle_fullscreen_close(self, event):
+        """Handle fullscreen viewer close event."""
+        try:
+            # Re-enable global G hotkey
+            main_window = self.window()
+            if hasattr(main_window, 'hotkey_listener'):
+                main_window.hotkey_listener.set_next_story_enabled(True)
+                logging.info("Re-enabled global G hotkey")
+            
+            # Call original close event
+            event.accept()
+        except Exception as e:
+            logging.error(f"Error handling fullscreen close: {e}")
 
     def cleanup_viewer(self):
         """Clean up any existing fullscreen viewer instance."""
