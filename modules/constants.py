@@ -1,5 +1,5 @@
 import os
-import keyboard
+
 # Base directory (one level above 'modules')
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -17,6 +17,7 @@ IMAGES_DIR = os.path.join(ASSETS_DIR, 'images')
 
 # Paths to JSON files
 TASKS_FILE = os.path.join(DATA_DIR, 'tasks.json')
+SETTINGS_FILE = os.path.join(DATA_DIR, 'settings.json')
 STORY_DEFAULT_FILE = os.path.join(DATA_DIR, 'story_linear.json')
 
 # Default tasks in case tasks.json fails to load

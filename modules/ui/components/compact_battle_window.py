@@ -34,6 +34,7 @@ class CompactBattleWindow(QWidget):
             QLabel {
                 color: #2f4f4f;
                 padding: 2px;
+                qproperty-alignment: AlignCenter;
             }
         """)
         layout.addWidget(self.enemy_label)
@@ -85,7 +86,7 @@ class CompactBattleWindow(QWidget):
         """Update the display with enemy information."""
         try:
             if enemy and hasattr(enemy, 'name') and hasattr(enemy, 'task_name'):
-                self.enemy_label.setText(f"{enemy.name} - {enemy.task_name}")
+                self.enemy_label.setText(enemy.task_name)
                 self.hp_bar.setMaximum(enemy.max_hp)
                 self.hp_bar.setValue(enemy.current_hp)
                 self.hp_bar.setFormat(f"{enemy.current_hp}/{enemy.max_hp}")

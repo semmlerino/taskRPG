@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+# Standard library imports
 import os
 import json
 import logging
@@ -7,17 +8,47 @@ import sys
 import traceback
 from typing import Dict, List, Tuple, Optional
 
+# PyQt5 imports
 from PyQt5.QtWidgets import (
-    QApplication, QDialog, QGroupBox, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QPushButton, QStatusBar, QVBoxLayout, QWidget, QProgressDialog
+    QApplication,
+    QDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QShortcut,
+    QStatusBar,
+    QVBoxLayout,
+    QWidget
 )
 from PyQt5.QtCore import (
-    QEasingCurve, QEvent, QPropertyAnimation, QRect, QTimer, Qt, pyqtSlot
+    QEasingCurve,
+    QEvent,
+    QPropertyAnimation,
+    QRect,
+    QTimer,
+    Qt,
+    pyqtSlot
 )
-from PyQt5.QtGui import QFont, QIcon, QKeyEvent, QPalette, QColor
+from PyQt5.QtGui import (
+    QFont,
+    QIcon,
+    QKeyEvent,
+    QKeySequence,
+    QPalette,
+    QColor
+)
 
+# Local application imports
 from modules.constants import (
-    WINDOW_ICON, WINDOW_TITLE, ASSETS_DIR, STORIES_DIR, DATA_DIR
+    WINDOW_ICON,
+    WINDOW_TITLE,
+    ASSETS_DIR,
+    STORIES_DIR,
+    DATA_DIR
 )
 from modules.players.player import Player
 from modules.tasks.task_manager import TaskManager
@@ -25,10 +56,10 @@ from modules.story import StoryManager, NavigationDirection
 from modules.hotkeys import GlobalHotkeys
 from modules.image_generator import ImageGenerator
 from modules.ui.components import (
-    PlayerPanel, 
-    EnemyPanel, 
-    StoryDisplay, 
-    ActionButtons, 
+    PlayerPanel,
+    EnemyPanel,
+    StoryDisplay,
+    ActionButtons,
     ChoicesPanel,
     CompactBattleWindow
 )
@@ -46,59 +77,59 @@ logging.basicConfig(
 class TaskRPG(QMainWindow):
     """
     Main game window handling UI coordination and game state management.
-    
+
     Manages the overall game state, window behavior, and component interactions.
     Handles fullscreen transitions, battle states, and focus management.
     """
-    
+
     def __init__(self):
         """Initialize the main game window."""
         super().__init__()
         logging.info("Initializing TaskRPG main window")
-        
+
         self.setWindowTitle(WINDOW_TITLE)
         self.setWindowIcon(QIcon(WINDOW_ICON))
         self.setMinimumSize(900, 700)
-        
+
         # Load window settings first
         self._load_window_settings()
-        
+
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         # Initialize Status Bar (needed by UI)
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        
+
         # Initialize core components that don't depend on UI
         self.init_core_components()
-        
+
         # Initialize UI Components
         self.init_ui()
-        
+
         # Initialize managers that depend on UI components
         self.init_managers()
-        
+
         # Initialize and start global hotkeys listener
         self.init_hotkeys()
-        
+
         # Initialize Shaking Animation
         self.init_animations()
-        
+
         # Dynamic Font Scaling Timer
         self.init_font_scaling()
-        
+
         # Install event filter for window state management
         self.installEventFilter(self)
-        
+
         # Add focus and keyboard handling
         self.setFocusPolicy(Qt.StrongFocus)
-        
+
         # Schedule story selection and focus setup
         QTimer.singleShot(0, self.select_story)
         QTimer.singleShot(100, self._ensure_focus)
-        
+
         logging.info("TaskRPG main window initialization complete")
 
     def init_core_components(self):
@@ -110,8 +141,13 @@ class TaskRPG(QMainWindow):
             # Player and Game State
             self.player = Player()
             
-            # Image Generator
-            self.image_generator = ImageGenerator()
+            # Image Generator with proper path handling
+            comfyui_path = os.getenv('COMFYUI_PATH', 
+                r"C:\StableDiffusion\ComfyUI_windows_portable_nvidia_cu121_or_cpu\ComfyUI_windows_portable\ComfyUI")
+            
+            self.image_generator = ImageGenerator(
+                checkpoints_dir=os.path.join(comfyui_path, 'models', 'checkpoints')
+            )
             
             # Battle Manager - initialize before StoryManager
             self.battle_manager = BattleManager(self.task_manager, self.player)
@@ -379,11 +415,11 @@ class TaskRPG(QMainWindow):
             if not hasattr(self, 'story_manager'):
                 logging.error("No story manager found")
                 return
-                
+            
             if not self._can_proceed():
                 logging.debug("Cannot proceed - conditions not met")
                 return
-                
+            
             current_node = self.story_manager.get_current_node()
             
             # Handle battle nodes
@@ -393,7 +429,7 @@ class TaskRPG(QMainWindow):
                     current_node["battle_completed"] = True
                     logging.info("Battle started successfully")
                 return
-                
+            
             # Handle story progression
             if next_node := current_node.get('next'):
                 try:
@@ -406,7 +442,7 @@ class TaskRPG(QMainWindow):
             else:
                 logging.info("Reached end of story branch")
                 self.handle_chapter_end()
-                
+            
         except Exception as e:
             logging.error(f"Error in story progression: {e}")
             self.status_bar.showMessage("Error progressing story")
@@ -417,30 +453,63 @@ class TaskRPG(QMainWindow):
             # First ensure any fullscreen viewer is closed
             if hasattr(self, 'story_display') and hasattr(self.story_display, '_fullscreen_viewer'):
                 self.story_display.cleanup_viewer()
-                
+            
             self.story_display.append_text(
                 "<br><b>Chapter Complete!</b><br>"
                 "<p>You have completed all available tasks for now.</p>"
-                "<p>Feel free to start a new chapter or take a break!</p>"
+                "<p>Press G or click 'Select New Chapter' to continue your adventure!</p>"
             )
             
             # Update UI state
             self.action_buttons.hide_attack_buttons()
             self.action_buttons.next_button.hide()
             self.settings_button.setEnabled(True)
-            self.status_bar.showMessage("All tasks completed! Well done!")
+            self.status_bar.showMessage("Chapter complete! Select a new one to continue.")
             
-            # Show completion dialog
-            QMessageBox.information(
-                self,
-                "Tasks Complete",
-                "Congratulations! You have completed all available tasks.\n\n"
-                "You can start a new chapter when you're ready!"
-            )
+            # Remove any existing chapter selection button before adding a new one
+            for child in self.story_display.findChildren(QPushButton):
+                if child.text() == "Select New Chapter":
+                    return  # Button already exists, don't add another
+            
+            # Create and show Select New Chapter button
+            select_chapter_button = QPushButton("Select New Chapter")
+            select_chapter_button.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    padding: 10px;
+                    border: none;
+                    border-radius: 5px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #45a049;
+                }
+            """)
+            select_chapter_button.clicked.connect(self._show_story_selection)
+            
+            # Add button to the story display
+            self.story_display.layout().addWidget(select_chapter_button)
+            
+            # Add shortcut for G key
+            self.select_chapter_shortcut = QShortcut(QKeySequence('G'), self)
+            self.select_chapter_shortcut.activated.connect(self._show_story_selection)
             
         except Exception as e:
             logging.error(f"Error handling chapter end: {e}")
             QMessageBox.critical(self, "Error", "Failed to handle chapter end properly")
+
+    def _show_story_selection(self):
+        """Show the story selection dialog."""
+        try:
+            # Show story selection dialog
+            dialog = StorySelectionDialog(self)
+            if dialog.exec_() == QDialog.Accepted:
+                self._load_selected_story(dialog.selected_story)
+                
+        except Exception as e:
+            logging.error(f"Error showing story selection: {e}")
+            QMessageBox.critical(self, "Error", "Failed to show story selection")
 
     def _can_proceed(self) -> bool:
         """Check if story can proceed."""
@@ -452,7 +521,7 @@ class TaskRPG(QMainWindow):
             if not hasattr(self, 'story_manager'):
                 logging.debug("No story manager available")
                 return False
-                
+            
             return True
             
         except Exception as e:
@@ -468,7 +537,7 @@ class TaskRPG(QMainWindow):
                     self.battle_manager.hide_compact_mode()
             else:
                 self.showFullScreen()
-                
+            
             self._ensure_focus()
             logging.debug(f"Fullscreen toggled: {self.isFullScreen()}")
             
@@ -574,7 +643,7 @@ class TaskRPG(QMainWindow):
                 font_size = 12
             elif width < 1200:
                 font_size = 14
-                
+            
             # Update Player Panel fonts
             self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
             self.player_panel.xp_label.setFont(QFont("Arial", font_size))
@@ -594,7 +663,7 @@ class TaskRPG(QMainWindow):
                 self.action_buttons.attack_button.setFont(QFont("Arial", font_size))
             if hasattr(self.action_buttons, 'heavy_attack_button'):
                 self.action_buttons.heavy_attack_button.setFont(QFont("Arial", font_size))
-                
+            
             # Update Settings Button font
             self.settings_button.setFont(QFont("Arial", font_size))
             
@@ -678,7 +747,7 @@ class TaskRPG(QMainWindow):
                         self.battle_manager.hide_compact_mode()
                     self._ensure_focus()
                     return
-                    
+                
             if hasattr(self, 'story_display'):
                 if event.key() == Qt.Key_F:
                     if hasattr(self.story_display, 'current_image_path') and self.story_display.current_image_path:

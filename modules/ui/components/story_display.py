@@ -1,11 +1,24 @@
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTextBrowser, 
-                            QScrollArea, QShortcut, QMessageBox, QSizePolicy,
-                            QSplitter)
-from PyQt5.QtCore import Qt, pyqtSignal, QSize, QTimer
-from PyQt5.QtGui import QPixmap, QKeySequence, QKeyEvent
+# Standard library imports
 import logging
 import os
 
+# PyQt5 imports
+from PyQt5.QtCore import Qt, pyqtSignal, QSize, QTimer
+from PyQt5.QtGui import QPixmap, QKeySequence, QKeyEvent
+from PyQt5.QtWidgets import (
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QTextBrowser,
+    QScrollArea,
+    QShortcut,
+    QMessageBox,
+    QSizePolicy,
+    QSplitter,
+    QPushButton
+)
+
+# Local imports
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.ui.components.story_text_browser import StoryTextBrowser
 
@@ -292,3 +305,12 @@ class StoryDisplay(QWidget):
         self.setFocus()
         self.activateWindow()
         logging.info("StoryDisplay focus ensured")
+
+    def clear_content(self):
+        """Clear all content from the display."""
+        self.story_text.clear()
+        self.image_label.clear()
+        # Remove any existing chapter selection button
+        for child in self.findChildren(QPushButton):
+            if child.text() == "Select New Chapter":
+                child.deleteLater()

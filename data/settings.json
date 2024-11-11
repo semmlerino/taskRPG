@@ -1,5 +1,6 @@
 {
     "shake_animation": true,
+    "image_generation": true,
     "window": {
         "width": 2560,
         "height": 1494
