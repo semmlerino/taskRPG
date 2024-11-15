@@ -435,8 +435,10 @@ class StoryManager:
                     # Mark this battle as completed
                     current_node["battle_completed"] = True
                     self.mark_battle_complete(self.current_node_key)
-                else:
-                    return False  # Battle couldn't start
+                    # If this is the last node, return True to indicate successful progression
+                    if not current_node.get('next'):
+                        return True
+                return False  # Battle in progress or couldn't start
 
             # Normal story progression
             next_node = current_node.get('next')
@@ -447,8 +449,10 @@ class StoryManager:
                 except ValueError as e:
                     logging.error(f"Invalid next node: {e}")
                     return False
-
-            return False
+            
+            # No next node available
+            logging.info("Reached end of story branch")
+            return True
 
         except Exception as e:
             logging.error(f"Error in story progression: {e}")

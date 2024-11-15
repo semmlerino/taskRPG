@@ -428,6 +428,9 @@ class TaskRPG(QMainWindow):
                 if self.battle_manager.start_battle(battle_info):
                     current_node["battle_completed"] = True
                     logging.info("Battle started successfully")
+                    # Check if this is the last node
+                    if not current_node.get('next'):
+                        self.handle_chapter_end()
                 return
             
             # Handle story progression
