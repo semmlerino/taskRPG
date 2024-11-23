@@ -3,6 +3,7 @@
 import os
 import json
 import logging
+import shutil
 from typing import Optional, Dict, Any, List, Union
 from enum import Enum, auto
 from typing import TYPE_CHECKING
@@ -479,3 +480,59 @@ class StoryManager:
         except Exception as e:
             logging.error(f"Error finding next valid image: {e}")
             return None
+
+    def move_to_completed(self) -> bool:
+        """
+        Move the current story file and its associated images to the oldstories folder.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if not self.filepath or not os.path.exists(self.filepath):
+                logging.error("No valid story file path to move")
+                return False
+
+            # Create oldstories directory structure
+            oldstories_dir = os.path.join(os.path.dirname(os.path.dirname(self.filepath)), 'oldstories')
+            old_images_dir = os.path.join(oldstories_dir, 'images')
+            
+            logging.info(f"Creating oldstories directories: {oldstories_dir}")
+            os.makedirs(oldstories_dir, exist_ok=True)
+            os.makedirs(old_images_dir, exist_ok=True)
+
+            # Get the story filename and name
+            story_filename = os.path.basename(self.filepath)
+            story_name = os.path.splitext(story_filename)[0]
+            
+            # Move story file
+            new_filepath = os.path.join(oldstories_dir, story_filename)
+            logging.info(f"Moving story file from {self.filepath} to {new_filepath}")
+            
+            if os.path.exists(new_filepath):
+                logging.warning(f"Story already exists in oldstories, removing: {new_filepath}")
+                os.remove(new_filepath)
+                
+            shutil.move(self.filepath, new_filepath)
+            logging.info(f"Successfully moved story file to: {new_filepath}")
+
+            # Move associated images if they exist
+            if self.image_folder and os.path.exists(self.image_folder):
+                old_image_folder = os.path.join(old_images_dir, story_name)
+                logging.info(f"Moving images from {self.image_folder} to {old_image_folder}")
+                
+                if os.path.exists(old_image_folder):
+                    logging.warning(f"Image folder already exists, removing: {old_image_folder}")
+                    shutil.rmtree(old_image_folder)
+                    
+                shutil.move(self.image_folder, old_image_folder)
+                logging.info(f"Successfully moved images to: {old_image_folder}")
+                self.image_folder = old_image_folder
+
+            # Update filepath
+            self.filepath = new_filepath
+            return True
+
+        except Exception as e:
+            logging.error(f"Error moving story to completed: {e}", exc_info=True)
+            return False
