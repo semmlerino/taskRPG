@@ -1,11 +1,44 @@
 # core/battle/battle_manager.py
 
+from dataclasses import dataclass
+from typing import Optional
+import logging
+
+@dataclass
+class Enemy:
+    """Represents an enemy in battle."""
+    name: str
+    max_hp: int
+    task_name: str
+    task_description: str
+    current_hp: Optional[int] = None
+
+    def __post_init__(self):
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        logging.debug(f"Enemy initialized - Name: {self.name}, Task: {self.task_name}, Max HP: {self.max_hp}, Current HP: {self.current_hp}")
+
+    def take_damage(self, amount: int) -> None:
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        self.current_hp = max(0, self.current_hp - amount)
+        logging.debug(f"{self.name} takes {amount} damage. Current HP: {self.current_hp}")
+
+    def is_defeated(self) -> bool:
+        return self.current_hp <= 0
+
+    def heal(self, amount: int) -> None:
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        self.current_hp = min(self.max_hp, self.current_hp + amount)
+
 import os
 import logging
 from dataclasses import dataclass
 from typing import Optional, Callable, Protocol, List, TYPE_CHECKING, Dict, Any, Union
 from enum import Enum, auto
 import random
+import time
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import QRect, QTimer, Qt
@@ -13,8 +46,6 @@ from PyQt5.QtCore import QRect, QTimer, Qt
 from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
 from modules.players.player import Player
-from modules.battle.enemy import Enemy
-from modules.battle.battle_state import BattleState
 from modules.ui.components.compact_battle_window import CompactBattleWindow
 
 if TYPE_CHECKING:
@@ -32,6 +63,37 @@ class BattleEvent(Enum):
     ATTACK_PERFORMED = auto()
     STATE_CHANGED = auto()
     ENEMY_DEFEATED = auto()
+
+@dataclass
+class BattleState:
+    """
+    Represents the current state of a battle.
+    
+    Attributes:
+        is_active: Whether a battle is currently in progress
+        enemy_name: Name of current enemy
+        enemy_hp: Current enemy HP
+        enemy_max_hp: Maximum enemy HP
+        task_name: Name of associated task
+        last_attack_type: Type of last attack performed
+        xp_gained: Amount of XP gained in battle
+        turns_taken: Number of turns in battle
+        attacks_performed: Number of attacks performed
+    """
+    is_active: bool = False
+    enemy_name: Optional[str] = None
+    enemy_hp: Optional[int] = None
+    enemy_max_hp: Optional[int] = None
+    task_name: Optional[str] = None
+    last_attack_type: Optional[str] = None
+    xp_gained: int = 0
+    turns_taken: int = 0
+    attacks_performed: int = 0
+
+    def __post_init__(self):
+        """Validate state after initialization."""
+        if self.enemy_hp is not None and self.enemy_max_hp is not None:
+            self.enemy_hp = max(0, min(self.enemy_hp, self.enemy_max_hp))
 
 class BattleManager:
     """Unified battle management system handling both core logic and UI coordination."""
@@ -210,8 +272,11 @@ class BattleManager:
 
             if self.action_buttons:
                 self.action_buttons.setEnabled(not self.paused)
+            
             if self.compact_window:
-                self.compact_window.setEnabled(not self.paused)
+                self.compact_window.update_pause_state(self.paused)
+                if not self.paused:
+                    self.compact_window.update_display(self.current_enemy)
 
             self._update_status(f"Battle {status}")
             

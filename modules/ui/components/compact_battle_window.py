@@ -4,7 +4,7 @@ from PyQt5.QtGui import QFont
 from typing import Optional
 import logging
 
-from modules.battle.enemy import Enemy
+from core.battle.battle_manager import Enemy
 
 class CompactBattleWindow(QWidget):
     """A compact overlay window displaying battle stats when main window loses focus."""
@@ -104,6 +104,41 @@ class CompactBattleWindow(QWidget):
         """Update the tasks remaining display."""
         self.tasks_label.setText(f"Tasks remaining: {tasks_left}")
         self.hp_bar.setValue(tasks_left)
+        
+    def update_pause_state(self, is_paused: bool):
+        """Update the display to show pause state."""
+        if is_paused:
+            self.enemy_label.setText("PAUSED")
+            self.hp_bar.setStyleSheet("""
+                QProgressBar {
+                    border: 2px solid #BDBDBD;
+                    border-radius: 5px;
+                    text-align: center;
+                    background-color: #f5f5f5;
+                    height: 20px;
+                    font-weight: bold;
+                }
+                QProgressBar::chunk {
+                    background-color: #FF9800;
+                    border-radius: 3px;
+                }
+            """)
+        else:
+            # Restore original style
+            self.hp_bar.setStyleSheet("""
+                QProgressBar {
+                    border: 2px solid #BDBDBD;
+                    border-radius: 5px;
+                    text-align: center;
+                    background-color: #f5f5f5;
+                    height: 20px;
+                    font-weight: bold;
+                }
+                QProgressBar::chunk {
+                    background-color: #76FF03;
+                    border-radius: 3px;
+                }
+            """)
         
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging."""
