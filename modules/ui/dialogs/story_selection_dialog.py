@@ -2,7 +2,6 @@
 Story selection dialog for TaskRPG.
 
 Handles story file selection and image generation for story nodes.
-
 """
 
 import os
@@ -22,16 +21,24 @@ from PyQt5.QtWidgets import (
     QLineEdit,
     QTextBrowser,
     QLabel,
-    QWidget
+    QWidget,
+    QSplitter,
+    QSizePolicy
 )
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtCore import Qt, QSize, QByteArray
 
 # Project imports
-from modules.constants import STORIES_DIR, ASSETS_DIR
+from modules.constants import STORIES_DIR, ASSETS_DIR, DATA_DIR
 from modules.ui.dialogs.settings_dialog import SettingsDialog
 from modules.story import StoryManager
 from modules.image_generator import ImageGenerator
+
+
+class StoryGroup:
+    def __init__(self, main_title):
+        self.main_title = main_title
+        self.stories = []  # List of (display_name, full_path) tuples
 
 
 class StorySelectionDialog(QDialog):
@@ -40,29 +47,52 @@ class StorySelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Story")
-        self.setMinimumSize(600, 500)  # Increased size for better readability
+
+        # Load saved dimensions or use defaults
+        settings = self._load_settings()
+        width = settings.get('width', 600)
+        height = settings.get('height', 500)
+        self.resize(width, height)
+
         self.selected_story = None
         self.init_ui()
 
     def init_ui(self):
         """Initialize the dialog UI with improved layout and styling."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(15)
+        main_layout.setContentsMargins(10, 10, 10, 10)  # Original margins
+        main_layout.setSpacing(8)  # Original spacing
+
+        # Title Layout to control space around the title
+        title_layout = QHBoxLayout()
+        title_layout.setContentsMargins(0, 0, 0, 0)  # No margins
+        title_layout.setSpacing(0)  # No spacing
 
         # Title Label
         title_label = QLabel("Available Stories")
         title_label.setFont(QFont("Arial", 14, QFont.Bold))
-        title_label.setStyleSheet("color: #2196F3;")
-        main_layout.addWidget(title_label)
+        title_label.setStyleSheet("""
+            color: #2196F3;
+            padding: 0;
+            margin: 0;
+        """)
+        title_label.setAlignment(Qt.AlignCenter)  # Center align the title
+        title_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)  # Prevent vertical expansion
+        title_layout.addWidget(title_label)
 
-        # Story list with preview panel
-        split_layout = QHBoxLayout()
-        
-        # Left side - Story List
+        # Add title layout to main layout
+        main_layout.addLayout(title_layout)
+
+        # Create splitter
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.setChildrenCollapsible(False)
+
+        # Left side - Story List Container
         list_container = QWidget()
         list_layout = QVBoxLayout(list_container)
-        
+        list_layout.setContentsMargins(0, 0, 0, 0)
+        list_layout.setSpacing(10)
+
         # Search box
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search stories...")
@@ -102,15 +132,17 @@ class StorySelectionDialog(QDialog):
             }
         """)
         list_layout.addWidget(self.story_list)
-        
-        # Right side - Preview Panel
+
+        # Right side - Preview Container
         preview_container = QWidget()
         preview_layout = QVBoxLayout(preview_container)
-        
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(10)
+
         preview_label = QLabel("Story Preview")
         preview_label.setFont(QFont("Arial", 12, QFont.Bold))
         preview_layout.addWidget(preview_label)
-        
+
         self.preview_text = QTextBrowser()
         self.preview_text.setStyleSheet("""
             QTextBrowser {
@@ -121,11 +153,16 @@ class StorySelectionDialog(QDialog):
             }
         """)
         preview_layout.addWidget(self.preview_text)
-        
-        # Add both containers to split layout
-        split_layout.addWidget(list_container, 1)
-        split_layout.addWidget(preview_container, 1)
-        main_layout.addLayout(split_layout)
+
+        # Add containers to splitter
+        self.splitter.addWidget(list_container)
+        self.splitter.addWidget(preview_container)
+
+        # Set initial sizes (50/50 split)
+        self.splitter.setSizes([300, 300])
+
+        # Add splitter to main layout
+        main_layout.addWidget(self.splitter)
 
         # Button container
         button_layout = QHBoxLayout()
@@ -160,17 +197,17 @@ class StorySelectionDialog(QDialog):
         self.settings_button.setStyleSheet("""
             QPushButton {
                 padding: 10px 20px;
-                background-color: #757575;
-                color: white;
+                background-color: #E8976B !important;
+                color: white !important;
                 border: none;
                 border-radius: 4px;
                 min-width: 120px;
             }
             QPushButton:hover {
-                background-color: #616161;
+                background-color: #D88559 !important;
             }
             QPushButton:pressed {
-                background-color: #424242;
+                background-color: #C67347 !important;
             }
         """)
         button_layout.addWidget(self.settings_button)
@@ -180,16 +217,38 @@ class StorySelectionDialog(QDialog):
         # Connect signals
         self.story_list.itemSelectionChanged.connect(self.update_preview)
         self.story_list.itemDoubleClicked.connect(self.select_story)
-        
+
         # Initial population
         self.populate_story_list()
 
     def filter_stories(self):
         """Filter stories based on search text."""
         search_text = self.search_box.text().lower()
+
+        # Show/hide items based on search
         for i in range(self.story_list.count()):
             item = self.story_list.item(i)
-            item.setHidden(search_text not in item.text().lower())
+
+            # Check if item is a header
+            is_header = item.flags() == Qt.ItemIsEnabled
+
+            if is_header:
+                # Handle header visibility based on child items
+                show_header = False
+                # Look ahead to check if any child items match
+                j = i + 1
+                while j < self.story_list.count():
+                    next_item = self.story_list.item(j)
+                    if next_item.flags() == Qt.ItemIsEnabled:  # Found next header
+                        break
+                    if search_text in next_item.text().lower():
+                        show_header = True
+                        break
+                    j += 1
+                item.setHidden(not show_header)
+            else:
+                # Normal item filtering
+                item.setHidden(search_text not in item.text().lower())
 
     def update_preview(self):
         """Update the preview panel with selected story details."""
@@ -202,25 +261,56 @@ class StorySelectionDialog(QDialog):
         try:
             with open(story_path, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
-            
-            # Format preview content
-            preview_html = "<h3 style='color: #1976D2;'>{}</h3>".format(
-                story_data.get('title', 'Untitled Story')
-            )
-            
-            # Add first node preview
-            start_node = story_data.get('start', {})
-            if isinstance(start_node, dict):
-                preview_html += "<p><b>Opening:</b></p>"
-                preview_html += "<p>{}</p>".format(start_node.get('text', 'No preview available'))
-            
+
+            # Start building the HTML preview
+            preview_parts = []
+
+            # Story filename
+            filename = os.path.basename(story_path)
+            preview_parts.append(f"<h3 style='color: #1976D2;'>{filename}</h3>")
+
+            # Story structure info
+            node_count = len(story_data.keys())
+            preview_parts.append(f"<p><b>Total Nodes:</b> {node_count}</p>")
+
+            # Preview the start node
+            if 'start' in story_data:
+                start_node = story_data['start']
+                preview_parts.append("<h4>Opening Scene:</h4>")
+
+                # Show text
+                if 'text' in start_node:
+                    preview_text = start_node['text'][:200] + "..." if len(start_node['text']) > 200 else start_node['text']
+                    preview_parts.append(f"<p>{preview_text}</p>")
+
+                # Show event if present
+                if 'event' in start_node:
+                    preview_parts.append(f"<p><b>Event:</b> {start_node['event']}</p>")
+
+                # Show if there's an image prompt
+                if 'image_prompt' in start_node:
+                    preview_parts.append("<p><i>Contains image generation prompt</i></p>")
+
+                # Show NPC if present
+                if 'npc' in start_node:
+                    npc_name = start_node['npc'].get('name', 'Unknown NPC')
+                    preview_parts.append(f"<p><b>Featured NPC:</b> {npc_name}</p>")
+
+                # Show if there's a battle
+                if 'battle' in start_node:
+                    preview_parts.append("<p><b>Contains Battle Scene</b></p>")
+
+            # Join all parts with spacing
+            preview_html = "\n".join(preview_parts)
             self.preview_text.setHtml(preview_html)
-            
+
         except Exception as e:
-            self.preview_text.setPlainText("Error loading preview: {}".format(str(e)))
+            error_msg = f"Error loading preview: {str(e)}"
+            logging.error(error_msg)
+            self.preview_text.setPlainText(error_msg)
 
     def populate_story_list(self):
-        """Loads available stories from the stories directory."""
+        """Loads and groups available stories from the stories directory."""
         try:
             if not os.path.exists(STORIES_DIR):
                 os.makedirs(STORIES_DIR)
@@ -229,42 +319,108 @@ class StorySelectionDialog(QDialog):
             story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
 
             if not story_files:
-                reply = QMessageBox.question(
-                    self, 
-                    "No Stories Found",
-                    f"No story files found in {STORIES_DIR}. Would you like to create a default story?",
-                    QMessageBox.Yes | QMessageBox.No, 
-                    QMessageBox.Yes
-                )
-                if reply == QMessageBox.Yes:
-                    self.create_default_story()
-                    story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-                else:
-                    QMessageBox.warning(
-                        self, 
-                        "No Stories Available", 
-                        "Please add JSON story files to the /stories folder and restart the application."
-                    )
-                    self.close()
-                    return
+                self._handle_no_stories()
+                return
 
-            for story_file in story_files:
-                story_path = os.path.join(STORIES_DIR, story_file)
-                story_title = self.extract_story_title(story_path) or story_file
-                item = QListWidgetItem(story_title)
-                item.setData(Qt.UserRole, story_path)
-                self.story_list.addItem(item)
+            # Group stories
+            story_groups = self._group_stories(story_files)
+
+            # Populate list with grouped stories
+            self._populate_grouped_stories(story_groups)
 
         except Exception as e:
             logging.error(f"Error populating story list: {e}")
-            QMessageBox.critical(
+            QMessageBox.critical(self, "Error", f"Failed to load story files: {str(e)}")
+
+    def _group_stories(self, story_files):
+        """Group stories by their main title."""
+        groups = {}
+        ungrouped = StoryGroup("Other Stories")
+
+        for story_file in story_files:
+            story_path = os.path.join(STORIES_DIR, story_file)
+
+            try:
+                # Try to read the title from the JSON file first
+                with open(story_path, 'r', encoding='utf-8') as f:
+                    story_data = json.load(f)
+                    file_title = story_data.get('title', story_file)
+            except:
+                file_title = story_file.replace('.json', '')
+
+            # Parse the title
+            title_parts = file_title.split(':')
+
+            if len(title_parts) > 1:
+                main_title = title_parts[0].strip()
+                sub_title = ':'.join(title_parts[1:]).strip()
+
+                if not groups.get(main_title):
+                    groups[main_title] = StoryGroup(main_title)
+
+                groups[main_title].stories.append((sub_title, story_path))
+            else:
+                # Handle ungrouped stories
+                display_name = file_title
+                ungrouped.stories.append((display_name, story_path))
+
+        # Add ungrouped stories only if they exist
+        if ungrouped.stories:
+            groups['ungrouped'] = ungrouped
+
+        return groups
+
+    def _populate_grouped_stories(self, story_groups):
+        """Populate the list widget with grouped stories."""
+        self.story_list.clear()
+
+        # Sort groups alphabetically, but ensure 'Other Stories' is last
+        sorted_groups = sorted(
+            story_groups.items(),
+            key=lambda x: ('zz' if x[0] == 'ungrouped' else x[0])
+        )
+
+        for _, group in sorted_groups:
+            if group.main_title != "Other Stories":
+                # Add group header
+                header_item = QListWidgetItem(group.main_title)
+                header_item.setFlags(Qt.ItemIsEnabled)  # Make non-selectable
+                header_item.setBackground(QColor("#E3F2FD"))
+                header_item.setFont(QFont("Arial", 11, QFont.Bold))
+                self.story_list.addItem(header_item)
+
+            # Add stories in group
+            for display_name, story_path in sorted(group.stories):
+                item = QListWidgetItem("    " + display_name if group.main_title != "Other Stories" else display_name)
+                item.setData(Qt.UserRole, story_path)
+                self.story_list.addItem(item)
+
+    def _handle_no_stories(self):
+        """Handle the case when no stories are found."""
+        reply = QMessageBox.question(
+            self, 
+            "No Stories Found",
+            f"No story files found in {STORIES_DIR}. Would you like to create a default story?",
+            QMessageBox.Yes | QMessageBox.No, 
+            QMessageBox.Yes
+        )
+
+        if reply == QMessageBox.Yes:
+            self.create_default_story()
+            self.populate_story_list()  # Retry population
+        else:
+            QMessageBox.warning(
                 self, 
-                "Error", 
-                f"Failed to load story files: {str(e)}"
+                "No Stories Available", 
+                "Please add JSON story files to the /stories folder and restart the application."
             )
+            self.close()
 
     def accept(self):
         """Handle dialog acceptance and story initialization."""
+        # Save settings before proceeding
+        self._save_settings()
+
         if not self.selected_story:
             return
 
@@ -405,6 +561,16 @@ class StorySelectionDialog(QDialog):
                 f"Failed to initialize story: {str(e)}"
             )
 
+    def reject(self):
+        """Handle dialog rejection."""
+        try:
+            self._save_settings()
+            logging.info("Story selection dialog settings saved on reject")
+        except Exception as e:
+            logging.error(f"Error saving dialog settings on reject: {e}")
+        finally:
+            super().reject()
+
     def select_story(self):
         """Handle story selection."""
         selected_items = self.story_list.selectedItems()
@@ -485,3 +651,48 @@ class StorySelectionDialog(QDialog):
             self.parent().task_manager.save_tasks()
             self.parent().story_display.append_text("<p>Settings updated successfully.</p>")
             self.parent().status_bar.showMessage("Settings updated successfully")
+
+    def _load_settings(self):
+        """Load dialog settings from file."""
+        try:
+            settings_path = os.path.join(DATA_DIR, 'dialog_settings.json')
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+                    dialog_settings = settings.get('story_selection_dialog', {})
+
+                    # Load splitter state if it exists
+                    if 'splitter_state' in dialog_settings:
+                        self.splitter.restoreState(QByteArray.fromBase64(
+                            dialog_settings['splitter_state'].encode()
+                        ))
+
+                    return dialog_settings
+        except Exception as e:
+            logging.error(f"Error loading dialog settings: {e}")
+        return {}
+
+    def _save_settings(self):
+        """Save dialog settings to file."""
+        try:
+            settings_path = os.path.join(DATA_DIR, 'dialog_settings.json')
+
+            # Load existing settings if any
+            settings = {}
+            if os.path.exists(settings_path):
+                with open(settings_path, 'r') as f:
+                    settings = json.load(f)
+
+            # Update story selection dialog settings
+            settings['story_selection_dialog'] = {
+                'width': self.width(),
+                'height': self.height(),
+                'splitter_state': self.splitter.saveState().toBase64().decode()
+            }
+
+            # Save updated settings
+            with open(settings_path, 'w') as f:
+                json.dump(settings, f, indent=4)
+
+        except Exception as e:
+            logging.error(f"Error saving dialog settings: {e}")
