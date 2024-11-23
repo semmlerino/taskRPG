@@ -54,5 +54,5 @@ class StoryContent:
         message = battle_data.get("message", "An enemy appears!")
         enemy_name = battle_data.get("enemy", "Unknown Enemy")
         html_parts.append(f"<p><i>{message}</i></p>")
-        html_parts.append(f"<p>A wild <b>{enemy_name}</b> appears!</p>")
+        html_parts.append(f"<p>A <b>{enemy_name}</b> appears!</p>")
         return html_parts

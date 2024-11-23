@@ -18,7 +18,11 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QMessageBox,
     QProgressDialog,
-    QListWidgetItem
+    QListWidgetItem,
+    QLineEdit,
+    QTextBrowser,
+    QLabel,
+    QWidget
 )
 from PyQt5.QtGui import QFont
 from PyQt5.QtCore import Qt, QSize
@@ -36,37 +40,92 @@ class StorySelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Story")
-        self.setFixedSize(500, 400)
+        self.setMinimumSize(600, 500)  # Increased size for better readability
         self.selected_story = None
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the dialog UI with updated styles and functionalities."""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(10)
+        """Initialize the dialog UI with improved layout and styling."""
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+        main_layout.setSpacing(15)
+
+        # Title Label
+        title_label = QLabel("Available Stories")
+        title_label.setFont(QFont("Arial", 14, QFont.Bold))
+        title_label.setStyleSheet("color: #2196F3;")
+        main_layout.addWidget(title_label)
+
+        # Story list with preview panel
+        split_layout = QHBoxLayout()
+        
+        # Left side - Story List
+        list_container = QWidget()
+        list_layout = QVBoxLayout(list_container)
+        
+        # Search box
+        self.search_box = QLineEdit()
+        self.search_box.setPlaceholderText("Search stories...")
+        self.search_box.setStyleSheet("""
+            QLineEdit {
+                padding: 8px;
+                border: 1px solid #CCCCCC;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QLineEdit:focus {
+                border: 1px solid #2196F3;
+            }
+        """)
+        self.search_box.textChanged.connect(self.filter_stories)
+        list_layout.addWidget(self.search_box)
 
         # Story list
         self.story_list = QListWidget()
-        self.story_list.setFont(QFont("Arial", 12))
+        self.story_list.setFont(QFont("Arial", 11))
         self.story_list.setStyleSheet("""
             QListWidget {
                 border: 1px solid #CCCCCC;
                 border-radius: 4px;
+                background-color: white;
             }
             QListWidget::item {
-                padding: 8px;
+                padding: 10px;
+                border-bottom: 1px solid #EEEEEE;
             }
             QListWidget::item:selected {
-                background-color: #2196F3;
-                color: white;
+                background-color: #E3F2FD;
+                color: #1976D2;
             }
             QListWidget::item:hover:!selected {
-                background-color: #E3F2FD;
+                background-color: #F5F5F5;
             }
         """)
-        self.populate_story_list()
-        layout.addWidget(self.story_list)
+        list_layout.addWidget(self.story_list)
+        
+        # Right side - Preview Panel
+        preview_container = QWidget()
+        preview_layout = QVBoxLayout(preview_container)
+        
+        preview_label = QLabel("Story Preview")
+        preview_label.setFont(QFont("Arial", 12, QFont.Bold))
+        preview_layout.addWidget(preview_label)
+        
+        self.preview_text = QTextBrowser()
+        self.preview_text.setStyleSheet("""
+            QTextBrowser {
+                border: 1px solid #CCCCCC;
+                border-radius: 4px;
+                background-color: white;
+                padding: 10px;
+            }
+        """)
+        preview_layout.addWidget(self.preview_text)
+        
+        # Add both containers to split layout
+        split_layout.addWidget(list_container, 1)
+        split_layout.addWidget(preview_container, 1)
+        main_layout.addLayout(split_layout)
 
         # Button container
         button_layout = QHBoxLayout()
@@ -74,11 +133,11 @@ class StorySelectionDialog(QDialog):
 
         # Select button
         select_button = QPushButton("Select Story")
-        select_button.setFont(QFont("Arial", 12))
+        select_button.setFont(QFont("Arial", 11))
         select_button.clicked.connect(self.select_story)
         select_button.setStyleSheet("""
             QPushButton {
-                padding: 8px 16px;
+                padding: 10px 20px;
                 background-color: #2196F3;
                 color: white;
                 border: none;
@@ -88,16 +147,19 @@ class StorySelectionDialog(QDialog):
             QPushButton:hover {
                 background-color: #1976D2;
             }
+            QPushButton:pressed {
+                background-color: #1565C0;
+            }
         """)
         button_layout.addWidget(select_button)
 
         # Settings button
         self.settings_button = QPushButton("Settings")
-        self.settings_button.setFont(QFont("Arial", 12))
+        self.settings_button.setFont(QFont("Arial", 11))
         self.settings_button.clicked.connect(self.open_settings)
         self.settings_button.setStyleSheet("""
             QPushButton {
-                padding: 8px 16px;
+                padding: 10px 20px;
                 background-color: #757575;
                 color: white;
                 border: none;
@@ -107,14 +169,55 @@ class StorySelectionDialog(QDialog):
             QPushButton:hover {
                 background-color: #616161;
             }
+            QPushButton:pressed {
+                background-color: #424242;
+            }
         """)
         button_layout.addWidget(self.settings_button)
 
-        # Add button layout with alignment
-        layout.addLayout(button_layout)
+        main_layout.addLayout(button_layout)
 
-        # Connect double-click signal to select_story
+        # Connect signals
+        self.story_list.itemSelectionChanged.connect(self.update_preview)
         self.story_list.itemDoubleClicked.connect(self.select_story)
+        
+        # Initial population
+        self.populate_story_list()
+
+    def filter_stories(self):
+        """Filter stories based on search text."""
+        search_text = self.search_box.text().lower()
+        for i in range(self.story_list.count()):
+            item = self.story_list.item(i)
+            item.setHidden(search_text not in item.text().lower())
+
+    def update_preview(self):
+        """Update the preview panel with selected story details."""
+        selected_items = self.story_list.selectedItems()
+        if not selected_items:
+            self.preview_text.clear()
+            return
+
+        story_path = selected_items[0].data(Qt.UserRole)
+        try:
+            with open(story_path, 'r', encoding='utf-8') as f:
+                story_data = json.load(f)
+            
+            # Format preview content
+            preview_html = "<h3 style='color: #1976D2;'>{}</h3>".format(
+                story_data.get('title', 'Untitled Story')
+            )
+            
+            # Add first node preview
+            start_node = story_data.get('start', {})
+            if isinstance(start_node, dict):
+                preview_html += "<p><b>Opening:</b></p>"
+                preview_html += "<p>{}</p>".format(start_node.get('text', 'No preview available'))
+            
+            self.preview_text.setHtml(preview_html)
+            
+        except Exception as e:
+            self.preview_text.setPlainText("Error loading preview: {}".format(str(e)))
 
     def populate_story_list(self):
         """Loads available stories from the stories directory."""
