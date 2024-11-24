@@ -66,7 +66,7 @@ from modules.ui.components import (
 from modules.ui.dialogs.settings_dialog import SettingsDialog
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
-from core.battle.battle_manager import BattleManager
+from modules.battle.battle_manager import BattleManager
 
 # Configure logging
 logging.basicConfig(

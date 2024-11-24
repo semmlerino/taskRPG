@@ -1,1 +1,1 @@
-# Empty file - remove all contents
+"""Battle system module."""

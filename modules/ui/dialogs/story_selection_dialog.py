@@ -34,6 +34,9 @@ from modules.ui.dialogs.settings_dialog import SettingsDialog
 from modules.story import StoryManager
 from modules.image_generator import ImageGenerator
 
+# Configure logging
+logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
+
 
 class StoryGroup:
     def __init__(self, main_title):
@@ -47,15 +50,19 @@ class StorySelectionDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Select Story")
-
-        # Load saved dimensions or use defaults
+        
+        # Initialize splitter as instance variable
+        self.splitter = None
+        self.selected_story = None
+        
+        # Initialize UI first
+        self.init_ui()
+        
+        # Load saved dimensions and splitter state after UI is initialized
         settings = self._load_settings()
         width = settings.get('width', 600)
         height = settings.get('height', 500)
         self.resize(width, height)
-
-        self.selected_story = None
-        self.init_ui()
 
     def init_ui(self):
         """Initialize the dialog UI with improved layout and styling."""
@@ -345,7 +352,8 @@ class StorySelectionDialog(QDialog):
                 with open(story_path, 'r', encoding='utf-8') as f:
                     story_data = json.load(f)
                     file_title = story_data.get('title', story_file)
-            except:
+            except Exception as e:
+                logging.error(f"Failed to read {story_path}: {e}")
                 file_title = story_file.replace('.json', '')
 
             # Parse the title
@@ -428,107 +436,91 @@ class StorySelectionDialog(QDialog):
             # Load story data
             with open(self.selected_story, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
+        except Exception as e:
+            logging.error(f"Failed to load story data: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to load story: {str(e)}")
+            return
 
-            # Get story name (used for image folder path)
-            story_name = os.path.splitext(os.path.basename(self.selected_story))[0]
+        # Get story name (used for image folder path)
+        story_name = os.path.splitext(os.path.basename(self.selected_story))[0]
 
-            # Create story-specific image directory using project structure
-            image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
-            os.makedirs(image_folder, exist_ok=True)
+        # Create story-specific image directory using project structure
+        image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
+        os.makedirs(image_folder, exist_ok=True)
 
-            # Get main window reference
-            main_window = self.parent()
-            if not main_window or not hasattr(main_window, 'image_generator'):
-                raise RuntimeError("Image generator not available")
+        # Get main window reference
+        main_window = self.parent()
+        if not main_window or not hasattr(main_window, 'image_generator'):
+            raise RuntimeError("Image generator not available")
 
-            # First check if ComfyUI is available
-            if not main_window.image_generator.validate_server_connection():
-                result = QMessageBox.warning(
-                    self,
-                    "ComfyUI Not Available",
-                    "ComfyUI server is not available. Story will load without generating missing images.\n"
-                    "Would you like to continue?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
-                )
-                if result == QMessageBox.No:
-                    return
-                # If user continues, we'll load without image generation
-                super().accept()
-                return
-
-            # Scan for missing images
-            missing_images = main_window.image_generator.scan_story_for_missing_images(
-                story_data,
-                story_name
+        # First check if ComfyUI is available
+        if not main_window.image_generator.validate_server_connection():
+            result = QMessageBox.warning(
+                self,
+                "ComfyUI Not Available",
+                "ComfyUI server is not available. Story will load without generating missing images.\n"
+                "Would you like to continue?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
             )
+            if result == QMessageBox.No:
+                return
+            # If user continues, we'll load without image generation
+            super().accept()
+            return
 
-            if missing_images:
-                # Create progress dialog
-                progress = QProgressDialog(
-                    "Generating story images...",
-                    "Cancel",
-                    0,
-                    len(missing_images),
-                    self
+        # Scan for missing images
+        missing_images = main_window.image_generator.scan_story_for_missing_images(
+            story_data,
+            story_name
+        )
+
+        if missing_images:
+            # Create progress dialog
+            progress = QProgressDialog(
+                "Generating story images...",
+                "Cancel",
+                0,
+                len(missing_images),
+                self
+            )
+            progress.setWindowModality(Qt.WindowModal)
+            progress.setMinimumDuration(0)
+            progress.setAutoClose(False)
+            progress.setStyleSheet("""
+                QProgressDialog {
+                    background-color: white;
+                    border: 1px solid #BDBDBD;
+                    border-radius: 5px;
+                }
+                QProgressBar {
+                    border: 1px solid #BDBDBD;
+                    border-radius: 5px;
+                    text-align: center;
+                    background-color: #F5F5F5;
+                }
+                QProgressBar::chunk {
+                    background-color: #2196F3;
+                    border-radius: 3px;
+                }
+            """)
+
+            try:
+                # Set image folder in image generator
+                main_window.image_generator.image_folder = image_folder
+
+                # Generate missing images
+                generated_images = main_window.image_generator.generate_missing_story_images(
+                    story_data,
+                    story_name,
+                    progress_dialog=progress
                 )
-                progress.setWindowModality(Qt.WindowModal)
-                progress.setMinimumDuration(0)
-                progress.setAutoClose(False)
-                progress.setStyleSheet("""
-                    QProgressDialog {
-                        background-color: white;
-                        border: 1px solid #BDBDBD;
-                        border-radius: 5px;
-                    }
-                    QProgressBar {
-                        border: 1px solid #BDBDBD;
-                        border-radius: 5px;
-                        text-align: center;
-                        background-color: #F5F5F5;
-                    }
-                    QProgressBar::chunk {
-                        background-color: #2196F3;
-                        border-radius: 3px;
-                    }
-                """)
 
-                try:
-                    # Set image folder in image generator
-                    main_window.image_generator.image_folder = image_folder
-
-                    # Generate missing images
-                    generated_images = main_window.image_generator.generate_missing_story_images(
-                        story_data,
-                        story_name,
-                        progress_dialog=progress
-                    )
-
-                    if progress.wasCanceled():
-                        result = QMessageBox.question(
-                            self,
-                            "Generation Cancelled",
-                            "Image generation was cancelled. Story can be loaded with existing images.\n"
-                            "Would you like to continue?",
-                            QMessageBox.Yes | QMessageBox.No,
-                            QMessageBox.No
-                        )
-                        if result == QMessageBox.No:
-                            progress.close()
-                            return
-                    elif generated_images:
-                        QMessageBox.information(
-                            self,
-                            "Image Generation Complete",
-                            f"Successfully generated {len(generated_images)} new images for the story."
-                        )
-
-                except Exception as e:
-                    logging.error(f"Error during image generation: {e}")
-                    result = QMessageBox.warning(
+                if progress.wasCanceled():
+                    result = QMessageBox.question(
                         self,
-                        "Image Generation Warning",
-                        "Some images could not be generated. Story can be loaded with existing images.\n"
+                        "Generation Cancelled",
+                        "Image generation was cancelled. Story can be loaded with existing images.\n"
                         "Would you like to continue?",
                         QMessageBox.Yes | QMessageBox.No,
                         QMessageBox.No
@@ -536,30 +528,42 @@ class StorySelectionDialog(QDialog):
                     if result == QMessageBox.No:
                         progress.close()
                         return
-                finally:
+                elif generated_images:
+                    QMessageBox.information(
+                        self,
+                        "Image Generation Complete",
+                        f"Successfully generated {len(generated_images)} new images for the story."
+                    )
+
+            except Exception as e:
+                logging.error(f"Error during image generation: {e}")
+                result = QMessageBox.warning(
+                    self,
+                    "Image Generation Warning",
+                    "Some images could not be generated. Story can be loaded with existing images.\n"
+                    "Would you like to continue?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if result == QMessageBox.No:
                     progress.close()
+                    return
+            finally:
+                progress.close()
 
-            # Initialize story manager using project structure
-            main_window.story_manager = StoryManager(
-                filepath=self.selected_story,
-                image_generator=main_window.image_generator,
-                image_folder=image_folder,
-                ui_component=main_window,
-                battle_manager=main_window.battle_manager
-            )
+        # Initialize story manager using project structure
+        main_window.story_manager = StoryManager(
+            filepath=self.selected_story,
+            image_generator=main_window.image_generator,
+            image_folder=image_folder,
+            ui_component=main_window,
+            battle_manager=main_window.battle_manager
+        )
 
-            # Display first story segment
-            main_window.story_manager.display_story_segment()
+        # Display first story segment
+        main_window.story_manager.display_story_segment()
 
-            super().accept()
-
-        except Exception as e:
-            logging.error(f"Error in story initialization: {e}")
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Failed to initialize story: {str(e)}"
-            )
+        super().accept()
 
     def reject(self):
         """Handle dialog rejection."""
@@ -663,9 +667,14 @@ class StorySelectionDialog(QDialog):
 
                     # Load splitter state if it exists
                     if 'splitter_state' in dialog_settings:
-                        self.splitter.restoreState(QByteArray.fromBase64(
-                            dialog_settings['splitter_state'].encode()
-                        ))
+                        splitter_state_b64 = dialog_settings['splitter_state']
+                        splitter_state_bytes = splitter_state_b64.encode('utf-8')  # Convert to bytes
+                        splitter_state_qba = QByteArray.fromBase64(splitter_state_bytes)
+                        if splitter_state_qba:
+                            self.splitter.restoreState(splitter_state_qba)
+                            logging.info("Splitter state restored successfully")
+                        else:
+                            logging.warning("Failed to decode splitter state from settings")
 
                     return dialog_settings
         except Exception as e:
@@ -683,16 +692,27 @@ class StorySelectionDialog(QDialog):
                 with open(settings_path, 'r') as f:
                     settings = json.load(f)
 
-            # Update story selection dialog settings
-            settings['story_selection_dialog'] = {
+            # Create dialog settings dictionary
+            dialog_settings = {
                 'width': self.width(),
                 'height': self.height(),
-                'splitter_state': self.splitter.saveState().toBase64().decode()
             }
+
+            # Only save splitter state if splitter exists
+            if hasattr(self, 'splitter') and self.splitter is not None:
+                splitter_state_qba = self.splitter.saveState()
+                splitter_state_b64 = splitter_state_qba.toBase64().data().decode('utf-8')
+                dialog_settings['splitter_state'] = splitter_state_b64
+
+            # Update story selection dialog settings
+            settings['story_selection_dialog'] = dialog_settings
 
             # Save updated settings
             with open(settings_path, 'w') as f:
                 json.dump(settings, f, indent=4)
 
+            logging.info("Dialog settings saved successfully")
+
         except Exception as e:
             logging.error(f"Error saving dialog settings: {e}")
+

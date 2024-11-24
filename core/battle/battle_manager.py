@@ -1,36 +1,11 @@
 # core/battle/battle_manager.py
+"""
+This is the obsolete battle manager, which is being consolidated into a single file into the modules one.
+"""
 
 from dataclasses import dataclass
 from typing import Optional
 import logging
-
-@dataclass
-class Enemy:
-    """Represents an enemy in battle."""
-    name: str
-    max_hp: int
-    task_name: str
-    task_description: str
-    current_hp: Optional[int] = None
-
-    def __post_init__(self):
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        logging.debug(f"Enemy initialized - Name: {self.name}, Task: {self.task_name}, Max HP: {self.max_hp}, Current HP: {self.current_hp}")
-
-    def take_damage(self, amount: int) -> None:
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        self.current_hp = max(0, self.current_hp - amount)
-        logging.debug(f"{self.name} takes {amount} damage. Current HP: {self.current_hp}")
-
-    def is_defeated(self) -> bool:
-        return self.current_hp <= 0
-
-    def heal(self, amount: int) -> None:
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        self.current_hp = min(self.max_hp, self.current_hp + amount)
 
 import os
 import logging
@@ -47,6 +22,7 @@ from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
 from modules.players.player import Player
 from modules.ui.components.compact_battle_window import CompactBattleWindow
+from modules.battle.battle_manager import Enemy
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QStatusBar, QLabel, QApplication

@@ -7,7 +7,7 @@ from PyQt5.QtGui import QFont
 from typing import Optional
 import logging
 
-from core.battle.battle_manager import Enemy
+from modules.battle.battle_manager import Enemy
 
 class EnemyPanel(QWidget):
     """Displays enemy statistics and task information."""

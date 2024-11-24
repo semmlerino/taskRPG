@@ -1,5 +1,5 @@
 """
-Battle management system for TaskRPG.
+Battle management system for TaskRPG. This is the main battle system which is getting consolidated into a single file from the core one.
 
 Handles the coordination between tasks, combat, and UI components
 while maintaining the game's task-management metaphor.
@@ -20,16 +20,37 @@ from PyQt5.QtCore import Qt, QTimer, QRect
 from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
 from modules.players.player import Player
-from modules.battle.enemy import Enemy
 
 # Project imports: UI components
 from modules.ui.components.compact_battle_window import CompactBattleWindow
-from modules.constants import (
-    BATTLE_DEBOUNCE_INTERVAL,
-    BATTLE_XP_BASE,
-    BATTLE_XP_MULTIPLIER,
-    VICTORY_ANIMATION_DURATION
-)
+
+@dataclass
+class Enemy:
+    """Represents an enemy in battle."""
+    name: str
+    max_hp: int
+    task_name: str
+    task_description: str
+    current_hp: Optional[int] = None
+
+    def __post_init__(self):
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        logging.debug(f"Enemy initialized - Name: {self.name}, Task: {self.task_name}, Max HP: {self.max_hp}, Current HP: {self.current_hp}")
+
+    def take_damage(self, amount: int) -> None:
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        self.current_hp = max(0, self.current_hp - amount)
+        logging.debug(f"{self.name} takes {amount} damage. Current HP: {self.current_hp}")
+
+    def is_defeated(self) -> bool:
+        return self.current_hp <= 0
+
+    def heal(self, amount: int) -> None:
+        if self.current_hp is None:
+            self.current_hp = self.max_hp
+        self.current_hp = min(self.max_hp, self.current_hp + amount)
 
 @dataclass
 class BattleState:
@@ -95,9 +116,23 @@ class BattleManager:
         self.victory_animation = None
         self.victory_sound = None
         
-        # XP calculation settings
-        self.xp_base = BATTLE_XP_BASE
-        self.xp_multiplier = BATTLE_XP_MULTIPLIER
+        # Battle timing and state attributes
+        self.battle_start_time = 0
+        self.last_attack_time = 0
+        self.paused_time: Optional[float] = None
+        self.total_pause_duration: float = 0
+        
+        # Battle statistics
+        self.attacks_performed = 0
+        self.turns_taken = 0
+        self.last_attack_type = ""
+        self.xp_gained = 0
+        
+        # XP Configuration
+        self.xp_base = 100  # Base XP for victories
+        self.xp_multiplier = 1.0  # Multiplier for XP calculations
+        self.xp_bonus_per_turn = 10  # Bonus XP per turn taken
+        self.xp_time_bonus_factor = 0.5  # Factor for time-based XP bonus
         
         logging.info("BattleManager initialized with task manager and player")
 
@@ -413,27 +448,15 @@ class BattleManager:
         return True
 
     def connect_signals(self, hotkey_listener) -> None:
-        """Connect battle-related hotkey signals with debouncing."""
+        """Connect battle-related hotkey signals."""
         try:
-            # Track last attack time for debouncing
-            last_attack_time = 0.0
-
-            def debounced_attack(is_heavy: bool):
-                nonlocal last_attack_time
-                current_time = time.time()
-                if current_time - last_attack_time >= BATTLE_DEBOUNCE_INTERVAL:
-                    self.perform_attack(is_heavy=is_heavy)
-                    last_attack_time = current_time
-
-            # Connect attack signals with debouncing
+            # Connect attack signals directly
             hotkey_listener.normal_attack_signal.connect(
-                lambda: debounced_attack(False)
+                lambda: self.perform_attack(is_heavy=False)
             )
             hotkey_listener.heavy_attack_signal.connect(
-                lambda: debounced_attack(True)
+                lambda: self.perform_attack(is_heavy=True)
             )
-            
-            # Connect pause toggle
             hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
             
             # Mark signals as connected
@@ -691,3 +714,72 @@ class BattleManager:
             
         except Exception as e:
             logging.error(f"Error disconnecting signals: {e}")
+
+    def register_callbacks(self,
+                          on_battle_start: Optional[Callable] = None,
+                          on_battle_end: Optional[Callable] = None,
+                          on_attack: Optional[Callable] = None,
+                          on_state_change: Optional[Callable] = None,
+                          on_victory: Optional[Callable] = None) -> None:
+        """
+        Register callback functions for battle events.
+        
+        Args:
+            on_battle_start: Called when battle starts
+            on_battle_end: Called when battle ends
+            on_attack: Called when attack performed
+            on_state_change: Called when battle state changes
+            on_victory: Called on victory
+        """
+        try:
+            self.callbacks = BattleCallbacks(
+                on_battle_start=on_battle_start,
+                on_battle_end=on_battle_end,
+                on_attack=on_attack,
+                on_state_change=on_state_change,
+                on_victory=on_victory
+            )
+            
+            logging.debug("Battle callbacks registered")
+            
+        except Exception as e:
+            logging.error(f"Error registering battle callbacks: {e}")
+
+    def _validate_attack(self, attack_type: str = "normal") -> bool:
+        """
+        Validate if an attack can be performed.
+        
+        Args:
+            attack_type: Type of attack ("normal" or "heavy")
+            
+        Returns:
+            bool: True if attack is valid, False otherwise
+        """
+        try:
+            # Check if battle is active
+            if not self.battle_state.is_active:
+                logging.debug("Attack invalid: No active battle")
+                return False
+            
+            # Check if battle is paused
+            if self.paused_time is not None:
+                logging.debug("Attack invalid: Battle is paused")
+                return False
+            
+            # Check if enemy exists
+            if not self.current_enemy:
+                logging.debug("Attack invalid: No current enemy")
+                return False
+            
+            # Check cooldown for heavy attacks
+            if attack_type == "heavy":
+                cooldown_time = 2.0  # 2 second cooldown for heavy attacks
+                if time.time() - self.last_attack_time < cooldown_time:
+                    logging.debug("Heavy attack invalid: Still on cooldown")
+                    return False
+                
+            return True
+            
+        except Exception as e:
+            logging.error(f"Error validating attack: {e}")
+            return False

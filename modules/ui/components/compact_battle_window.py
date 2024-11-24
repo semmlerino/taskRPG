@@ -1,10 +1,11 @@
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import logging
 
-from core.battle.battle_manager import Enemy
+if TYPE_CHECKING:
+    from modules.battle.battle_manager import Enemy
 
 class CompactBattleWindow(QWidget):
     """A compact overlay window displaying battle stats when main window loses focus."""
@@ -82,7 +83,7 @@ class CompactBattleWindow(QWidget):
         # Tooltip with hotkeys
         self.setToolTip("D: Normal Attack\nShift+D: Heavy Attack\n#: Pause/Resume")
         
-    def update_display(self, enemy: Optional[Enemy]) -> None:
+    def update_display(self, enemy: Optional['Enemy']) -> None:
         """Update the display with enemy information."""
         try:
             if enemy and hasattr(enemy, 'name') and hasattr(enemy, 'task_name'):

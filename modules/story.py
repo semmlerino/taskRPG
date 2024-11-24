@@ -4,18 +4,17 @@ import os
 import json
 import logging
 import shutil
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
 from enum import Enum, auto
-from typing import TYPE_CHECKING
 
 from modules.common.types import NavigationDirection
-
-if TYPE_CHECKING:
-    from core.battle.battle_manager import BattleManager
-
 from core.story.story_content import StoryContent
 from core.story.story_node import StoryNode
-from .image_generator import ImageGenerator
+
+# Use TYPE_CHECKING for circular imports
+if TYPE_CHECKING:
+    from modules.battle.battle_manager import BattleManager
+    from modules.image_generator import ImageGenerator
 
 class StoryManager:
     """
@@ -25,7 +24,7 @@ class StoryManager:
     def __init__(
         self,
         filepath: str,
-        image_generator: ImageGenerator,
+        image_generator: 'ImageGenerator',
         image_folder: Optional[str] = None,
         ui_component: Optional[Any] = None,
         battle_manager: Optional['BattleManager'] = None
