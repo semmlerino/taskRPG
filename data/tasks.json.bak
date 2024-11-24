@@ -35,6 +35,12 @@
         "active": false,
         "description": null
     },
+    "Gemini": {
+        "min": 2,
+        "max": 5,
+        "active": false,
+        "description": null
+    },
     "SG scripting": {
         "min": 1,
         "max": 1,
@@ -77,16 +83,10 @@
         "active": false,
         "description": null
     },
-    "Gemini": {
-        "min": 2,
-        "max": 5,
-        "active": false,
-        "description": null
-    },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "description": null
     },
     "GPTs": {

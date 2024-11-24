@@ -585,10 +585,14 @@ class BattleManager:
             # Update UI components
             if self.action_buttons:
                 self.action_buttons.setEnabled(not self.paused)
+            
             if self.compact_window:
-                self.compact_window.setEnabled(not self.paused)
+                self.compact_window.update_pause_state(self.paused)
+                # Refresh display when unpausing
+                if not self.paused:
+                    self.compact_window.update_display(self.current_enemy)
 
-            # Update battle state
+            # Update battle state timing
             if self.paused:
                 self.battle_state.paused_time = time.time()
             elif self.battle_state.paused_time:

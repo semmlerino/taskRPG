@@ -79,7 +79,6 @@ class BattleManager:
         self.player = player
         self.battle_state = BattleState()
         self.current_enemy: Optional[Enemy] = None
-        self.paused: bool = False
 
         # UI Components (set by UI layer)
         self.story_display: Optional['StoryDisplay'] = None
@@ -184,7 +183,6 @@ class BattleManager:
             # Reset battle state
             self.battle_state = BattleState()
             self.current_enemy = None
-            self.paused = False
             
             # Release any held keyboard focus
             if self.main_window:
@@ -240,31 +238,11 @@ class BattleManager:
         except Exception as e:
             logging.error(f"Error hiding compact window: {e}")
 
-    def toggle_pause(self) -> None:
-        """Toggle battle pause state."""
-        try:
-            self.paused = not self.paused
-            status = "paused" if self.paused else "resumed"
-
-            if self.action_buttons:
-                self.action_buttons.setEnabled(not self.paused)
-            
-            if self.compact_window:
-                self.compact_window.update_pause_state(self.paused)
-                if not self.paused:
-                    self.compact_window.update_display(self.current_enemy)
-
-            self._update_status(f"Battle {status}")
-            
-        except Exception as e:
-            logging.error(f"Error toggling pause: {e}")
-
     def _validate_attack(self) -> bool:
         """Validate attack conditions."""
         validation_results = {
             "battle_active": self.battle_state.is_active,
             "enemy_exists": self.current_enemy is not None,
-            "not_paused": not self.paused,
             "has_hp_attribute": hasattr(self.current_enemy, 'current_hp') if self.current_enemy else False
         }
         
@@ -282,10 +260,6 @@ class BattleManager:
         if self.battle_state.is_active:
             logging.warning("Battle already in progress")
             self._update_status("Battle already in progress")
-            return False
-        if self.paused:
-            logging.warning("Cannot start battle while paused")
-            self._update_status("Game is paused")
             return False
         return True
 
@@ -427,7 +401,6 @@ class BattleManager:
             hotkey_listener.heavy_attack_signal.connect(
                 lambda: self.perform_attack(is_heavy=True)
             )
-            hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
             
         except Exception as e:
             logging.error(f"Error connecting battle signals: {e}")
