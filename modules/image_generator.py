@@ -77,13 +77,13 @@ class QualityPreset:
                 height=1152
             ),
             ImageQuality.ULTRA: cls(
-                steps=100,
-                cfg=8.0,
+                steps=60,
+                cfg=6.0,
                 denoise=0.98,
-                sampler="dpmpp_2m_sde",
+                sampler="dpmpp_3m_sde",
                 scheduler="karras",
-                width=1280,
-                height=1280
+                width=1216,
+                height=832
             )
         }
         return presets.get(quality, presets[ImageQuality.STANDARD])

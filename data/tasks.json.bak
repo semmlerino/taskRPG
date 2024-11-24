@@ -6,7 +6,7 @@
         "description": null
     },
     "GPTs": {
-        "min": 4,
+        "min": 6,
         "max": 12,
         "active": true,
         "description": null
@@ -56,12 +56,12 @@
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null
     },
     "Claude": {
-        "min": 4,
-        "max": 9,
+        "min": 6,
+        "max": 11,
         "active": true,
         "description": null
     },
@@ -104,7 +104,7 @@
     "TaskRPG": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "description": null
     }
 }
