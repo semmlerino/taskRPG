@@ -749,41 +749,20 @@ class BattleManager:
         except Exception as e:
             logging.error(f"Error registering battle callbacks: {e}")
 
-    def _validate_attack(self, attack_type: str = "normal") -> bool:
-        """
-        Validate if an attack can be performed.
+    def _validate_attack(self) -> bool:
+        """Validate attack conditions."""
+        validation_results = {
+            "battle_active": self.battle_state.is_active,
+            "enemy_exists": self.current_enemy is not None,
+            "not_paused": not self.paused,
+            "has_hp_attribute": hasattr(self.current_enemy, 'current_hp') if self.current_enemy else False
+        }
         
-        Args:
-            attack_type: Type of attack ("normal" or "heavy")
-            
-        Returns:
-            bool: True if attack is valid, False otherwise
-        """
-        try:
-            # Check if battle is active
-            if not self.battle_state.is_active:
-                logging.debug("Attack invalid: No active battle")
+        logging.debug(f"Attack validation results: {validation_results}")
+        
+        for key, value in validation_results.items():
+            if not value:
+                logging.warning(f"Attack validation failed: {key}")
                 return False
-            
-            # Check if battle is paused
-            if self.paused_time is not None:
-                logging.debug("Attack invalid: Battle is paused")
-                return False
-            
-            # Check if enemy exists
-            if not self.current_enemy:
-                logging.debug("Attack invalid: No current enemy")
-                return False
-            
-            # Check cooldown for heavy attacks
-            if attack_type == "heavy":
-                cooldown_time = 2.0  # 2 second cooldown for heavy attacks
-                if time.time() - self.last_attack_time < cooldown_time:
-                    logging.debug("Heavy attack invalid: Still on cooldown")
-                    return False
                 
-            return True
-            
-        except Exception as e:
-            logging.error(f"Error validating attack: {e}")
-            return False
+        return True
