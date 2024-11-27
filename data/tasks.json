@@ -47,37 +47,13 @@
         "active": false,
         "description": null
     },
-    "Perplexity": {
-        "min": 7,
-        "max": 13,
-        "active": false,
-        "description": null
-    },
-    "FitRPG": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "description": null
-    },
-    "Walk/Shopping": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "description": null
-    },
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "description": null
     },
     "Beard": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "description": null
-    },
-    "Hair": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -89,6 +65,30 @@
         "active": true,
         "description": null
     },
+    "Perplexity": {
+        "min": 7,
+        "max": 13,
+        "active": true,
+        "description": null
+    },
+    "Walk/Shopping": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": null
+    },
+    "FitRPG": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": null
+    },
+    "Hair": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": null
+    },
     "GPTs": {
         "min": 6,
         "max": 12,
@@ -98,7 +98,7 @@
     "TaskRPG": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null
     },
     "Claude": {
@@ -106,5 +106,35 @@
         "max": 11,
         "active": true,
         "description": null
+    },
+    "NHS": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": ""
+    },
+    "AWS": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": ""
+    },
+    "Chair?": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": ""
+    },
+    "Medicash Refund": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": ""
+    },
+    "Try Windsurf AI co": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": ""
     }
 }

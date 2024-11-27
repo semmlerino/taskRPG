@@ -4,7 +4,7 @@ import logging
 import base64
 from typing import Dict, Optional, Tuple, List
 
-from PyQt5.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QByteArray
+from PyQt5.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QByteArray, QMimeData
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QTableView, QHeaderView, QWidget, QCheckBox, QMessageBox,
@@ -29,7 +29,9 @@ class TaskTableModel(QAbstractTableModel):
         self._tasks: List[Tuple[str, int, int, bool, Optional[str]]] = []
         self._headers = ['Name', 'Min', 'Max', 'Active']
         self._original_tasks = tasks
-
+        self._drag_source_row = -1
+        self._drag_in_progress = False
+        
         # Convert tasks dictionary to list while preserving all attributes
         for name, task in tasks.items():
             self._tasks.append((
@@ -39,7 +41,6 @@ class TaskTableModel(QAbstractTableModel):
                 task.active,
                 task.description
             ))
-
         logging.debug(f"TaskTableModel initialized with {len(self._tasks)} tasks")
 
     def rowCount(self, parent=QModelIndex()) -> int:
@@ -125,130 +126,155 @@ class TaskTableModel(QAbstractTableModel):
             return self._headers[section]
         return None
 
-    def flags(self, index: QModelIndex) -> Qt.ItemFlags:
-        """Return the item flags for the given index."""
+    def flags(self, index):
+        """Set flags to enable drag and drop."""
         if not index.isValid():
             return Qt.ItemIsDropEnabled
 
-        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-
+        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
+        
         if index.column() == 3:  # Active column
             flags |= Qt.ItemIsUserCheckable
         else:
             flags |= Qt.ItemIsEditable
-
-        # Add drag-drop flags only if not in Active column
-        if index.column() != 3:
-            flags |= Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
-
+            
         return flags
 
-    def supportedDropActions(self) -> Qt.DropActions:
-        """Return the supported drop actions."""
+    def supportedDropActions(self):
+        """Specify supported drop actions."""
         return Qt.MoveAction
 
     def mimeTypes(self):
         """Return supported mime types."""
-        logging.debug("mimeTypes called")
-        types = ['application/x-qabstractitemmodeldatalist']
-        logging.debug(f"Returning mime types: {types}")
-        return types
+        return ['text/plain']
 
     def mimeData(self, indexes):
         """Create mime data for drag operation."""
-        logging.debug(f"mimeData called with indexes: {[f'({idx.row()}, {idx.column()})' for idx in indexes]}")
         try:
-            mime_data = super().mimeData(indexes)
-            if indexes:
-                self.source_row = indexes[0].row()
-                logging.debug(f"Stored source row: {self.source_row}")
-            else:
-                logging.warning("No indexes provided for mimeData")
-            return mime_data
+            if not indexes:
+                return None
+                
+            row = indexes[0].row()
+            if not (0 <= row < len(self._tasks)):
+                return None
+                
+            self._drag_source_row = row
+            self._drag_in_progress = True
+            
+            mime = QMimeData()
+            mime.setText(str(row))
+            logging.debug(f"Starting drag from row {row}")
+            return mime
+            
         except Exception as e:
             logging.error(f"Error in mimeData: {e}")
+            self._resetDragState()
             return None
 
+    def _resetDragState(self):
+        """Reset drag and drop state."""
+        self._drag_source_row = -1
+        self._drag_in_progress = False
+        logging.debug("Reset drag state")
+
     def canDropMimeData(self, data, action, row, column, parent):
-        """Check if the drop operation is valid."""
-        logging.debug(f"canDropMimeData called - row: {row}, column: {column}, "
-                     f"parent row: {parent.row()}, action: {action}")
-        if action == Qt.MoveAction:
-            logging.debug("Drop action is MoveAction - allowing drop")
+        """Check if drop is allowed."""
+        try:
+            if not self._drag_in_progress:
+                return False
+
+            if not data.hasText():
+                return False
+            
+            if action == Qt.IgnoreAction:
+                return True
+
+            # Get target row
+            target_row = row if row != -1 else self.rowCount()
+            if parent.isValid():
+                target_row = parent.row()
+                
+            # Get source row
+            try:
+                source_row = int(data.text())
+            except ValueError:
+                return False
+                
+            # Validate rows
+            if not (0 <= source_row < len(self._tasks)):
+                return False
+                
+            if not (0 <= target_row <= len(self._tasks)):
+                return False
+                
+            # Don't allow dropping onto itself
+            if target_row == source_row or target_row == source_row + 1:
+                return False
+                
+            logging.debug(f"Drop allowed from {source_row} to {target_row}")
             return True
-        logging.debug(f"Drop not allowed for action: {action}")
-        return False
+            
+        except Exception as e:
+            logging.error(f"Error in canDropMimeData: {e}")
+            return False
 
     def dropMimeData(self, data, action, row, column, parent):
         """Handle drop event."""
-        logging.debug(f"dropMimeData called - action: {action}, row: {row}, "
-                     f"column: {column}, parent row: {parent.row()}")
-
-        if action == Qt.IgnoreAction:
-            logging.debug("Ignoring drop action")
-            return True
-
-        if not data:
-            logging.warning("No mime data provided")
-            return False
-
         try:
+            if not self._drag_in_progress or not data.hasText():
+                return False
+
+            # Get source row
+            try:
+                source_row = int(data.text())
+            except ValueError:
+                return False
+
+            if not (0 <= source_row < len(self._tasks)):
+                return False
+
             # Get target row
             target_row = row if row != -1 else self.rowCount()
             if parent.isValid():
                 target_row = parent.row()
 
-            logging.debug(f"Calculated target row: {target_row}")
+            # Validate target row
+            if not (0 <= target_row <= len(self._tasks)):
+                target_row = len(self._tasks)
 
-            # Get source row
-            source_row = getattr(self, 'source_row', -1)
-            if source_row < 0:
-                logging.error("Invalid source row")
+            # Don't move to same position
+            if target_row == source_row or target_row == source_row + 1:
                 return False
 
-            logging.debug(f"Moving row from {source_row} to {target_row}")
-
-            # Adjust target row if needed
+            # Adjust target row if moving down
             if target_row > source_row:
                 target_row -= 1
 
-            logging.debug(f"Adjusted target row: {target_row}")
+            logging.debug(f"Moving row {source_row} to {target_row}")
 
-            if source_row == target_row:
-                logging.debug("Source and target rows are the same - ignoring")
+            try:
+                # Begin move operation
+                self.beginMoveRows(QModelIndex(), source_row, source_row, 
+                                 QModelIndex(), target_row)
+                
+                # Perform the move
+                item = self._tasks.pop(source_row)
+                self._tasks.insert(target_row, item)
+                
+                self.endMoveRows()
+                logging.debug(f"Successfully moved row from {source_row} to {target_row}")
+                return True
+
+            except Exception as e:
+                logging.error(f"Error during move operation: {e}")
                 return False
 
-            # Begin move operation
-            self.beginMoveRows(QModelIndex(), source_row, source_row,
-                             QModelIndex(), target_row)
-
-            # Store the moving task
-            moving_task = self._tasks[source_row]
-            logging.debug(f"Moving task: {moving_task[0]}")  # Log task name
-
-            # Remove from old position
-            self._tasks.pop(source_row)
-
-            # Insert at new position
-            if target_row >= len(self._tasks):
-                logging.debug("Appending to end of list")
-                self._tasks.append(moving_task)
-            else:
-                logging.debug(f"Inserting at position {target_row}")
-                self._tasks.insert(target_row, moving_task)
-
-            # Log new order
-            logging.debug("New task order:")
-            for i, task in enumerate(self._tasks):
-                logging.debug(f"{i}: {task[0]}")
-
-            self.endMoveRows()
-            logging.info(f"Successfully moved row from {source_row} to {target_row}")
-            return True
-
         except Exception as e:
-            logging.error(f"Error in dropMimeData: {e}", exc_info=True)
+            logging.error(f"Error in dropMimeData: {e}")
             return False
+            
+        finally:
+            self._resetDragState()
 
     def get_tasks_dict(self) -> Dict[str, Task]:
         """Convert internal list representation back to task dictionary."""
@@ -357,24 +383,77 @@ class SettingsDialog(QDialog):
     def apply_window_settings(self):
         """Apply window size and column settings."""
         try:
+            # Apply window geometry
             if 'window_geometry' in self.settings:
-                window_geometry = self.settings['window_geometry']
-                geometry_bytes = QByteArray.fromBase64(window_geometry.encode('utf-8'))
-                if geometry_bytes:
-                    self.restoreGeometry(geometry_bytes)
-                    logging.info("Window geometry restored successfully")
-                else:
-                    logging.warning("Failed to decode window geometry from settings")
+                try:
+                    window_geometry = self.settings['window_geometry']
+                    geometry_bytes = QByteArray.fromBase64(window_geometry.encode('utf-8'))
+                    if geometry_bytes:
+                        self.restoreGeometry(geometry_bytes)
+                        logging.info("Window geometry restored successfully")
+                    else:
+                        logging.warning("Failed to decode window geometry from settings")
+                except Exception as e:
+                    logging.error(f"Error restoring window geometry: {e}")
+                    # Fall back to default size
+                    self.resize(800, 600)
 
+            # Apply column widths with validation
             if 'column_widths' in self.settings:
-                col_widths = self.settings['column_widths']
-                for col, width in enumerate(col_widths):
-                    if col < self.task_view.model().columnCount():
-                        self.task_view.setColumnWidth(col, int(width))
-                logging.info(f"Applied column widths: {col_widths}")
+                try:
+                    col_widths = self.settings['column_widths']
+                    total_width = self.width() - 50  # Account for margins and scrollbar
+                    
+                    # Validate total width
+                    current_total = sum(col_widths)
+                    if current_total > total_width:
+                        # Scale down proportionally
+                        scale_factor = total_width / current_total
+                        col_widths = [int(w * scale_factor) for w in col_widths]
+                    
+                    # Ensure minimum widths
+                    min_widths = [100, 60, 60, 50]  # Minimum widths for each column
+                    for i, (width, min_width) in enumerate(zip(col_widths, min_widths)):
+                        if i < self.task_view.model().columnCount():
+                            final_width = max(width, min_width)
+                            self.task_view.setColumnWidth(i, final_width)
+                            
+                    logging.info(f"Applied adjusted column widths: {[self.task_view.columnWidth(i) for i in range(self.task_view.model().columnCount())]}")
+                except Exception as e:
+                    logging.error(f"Error applying column widths: {e}")
+                    # Set default column widths
+                    default_widths = [200, 80, 80, 80]
+                    for i, width in enumerate(default_widths):
+                        if i < self.task_view.model().columnCount():
+                            self.task_view.setColumnWidth(i, width)
 
         except Exception as e:
             logging.error(f"Error applying window settings: {e}", exc_info=True)
+            # Ensure window has a reasonable size
+            self.resize(800, 600)
+
+    def resizeEvent(self, event):
+        """Handle window resize events."""
+        super().resizeEvent(event)
+        try:
+            # Adjust column widths on resize
+            if hasattr(self, 'task_view'):
+                total_width = self.task_view.width() - 50  # Account for margins and scrollbar
+                if total_width > 0:
+                    # Get current widths
+                    col_widths = [self.task_view.columnWidth(i) 
+                                for i in range(self.task_view.model().columnCount())]
+                    current_total = sum(col_widths)
+                    
+                    if current_total > total_width:
+                        # Scale down proportionally
+                        scale_factor = total_width / current_total
+                        for i, width in enumerate(col_widths):
+                            new_width = max(int(width * scale_factor), 
+                                         [100, 60, 60, 50][i])  # Minimum widths
+                            self.task_view.setColumnWidth(i, new_width)
+        except Exception as e:
+            logging.error(f"Error in resizeEvent: {e}")
 
     def init_ui(self):
         """Initialize the UI components."""
@@ -393,82 +472,76 @@ class SettingsDialog(QDialog):
         task_label.setFont(QFont("Arial", 16))
         layout.addWidget(task_label)
 
-        # Table view setup
         self.task_view = QTableView()
-        self.task_view.setModel(self.task_model)
+        self.task_view.setSelectionMode(QTableView.SingleSelection)
+        self.task_view.setSelectionBehavior(QTableView.SelectRows)
         self.task_view.setDragEnabled(True)
         self.task_view.setAcceptDrops(True)
         self.task_view.setDragDropMode(QTableView.InternalMove)
-        self.task_view.setDragDropOverwriteMode(False)
         self.task_view.setDropIndicatorShown(True)
-        self.task_view.setSelectionMode(QTableView.SingleSelection)
-        self.task_view.setSelectionBehavior(QTableView.SelectItems)
+        self.task_view.setShowGrid(True)
         self.task_view.setAlternatingRowColors(True)
-
-        # Set up header and column sizes
-        header = self.task_view.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Interactive)  # Name column
-        header.setSectionResizeMode(1, QHeaderView.Interactive)  # Min column
-        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Max column
-        header.setSectionResizeMode(3, QHeaderView.Interactive)  # Active column
-
-        # Set default column widths
-        self.task_view.setColumnWidth(0, 200)  # Name column
-        self.task_view.setColumnWidth(1, 60)   # Min column
-        self.task_view.setColumnWidth(2, 60)   # Max column
-        self.task_view.setColumnWidth(3, 50)   # Active column
-
-        # Set minimum column widths
-        header.setMinimumSectionSize(40)
-
-        # Enable column stretching
-        header.setStretchLastSection(False)
-
-        # Update table styling
+        
+        # Set the drag drop overlay mode to always show between items
+        self.task_view.setDragDropOverwriteMode(False)
+        
+        # Style the view to make drop indicator more visible
         self.task_view.setStyleSheet("""
             QTableView {
-                background-color: white;
-                alternate-background-color: #F8F9FA;
-                border: 1px solid #DFE3E6;
-                border-radius: 5px;
-                padding: 5px;
-            }
-            QTableView::item {
-                padding: 8px;
+                selection-background-color: #E3F2FD;
+                selection-color: black;
+                alternate-background-color: #F5F5F5;
             }
             QTableView::item:selected {
                 background-color: #E3F2FD;
-                color: #1976D2;
             }
-            /* Style for checkbox column */
-            QTableView::item:!selected:hover {
-                background-color: transparent;
+            QTableView::item:hover {
+                background-color: #F5F5F5;
             }
             QTableView::indicator {
                 width: 20px;
                 height: 20px;
-                subcontrol-position: center;  /* Center the checkbox */
-                subcontrol-origin: padding;   /* Position relative to padding */
+            }
+            QTableView::indicator:checked {
+                background-color: #2196F3;
+                border: 2px solid #2196F3;
+                border-radius: 4px;
             }
             QTableView::indicator:unchecked {
                 background-color: white;
                 border: 2px solid #BDBDBD;
                 border-radius: 4px;
             }
-            QTableView::indicator:checked {
-                background-color: #90CAF9;
-                border: 2px solid #90CAF9;
-                border-radius: 4px;
-            }
+        """)
+        
+        # Set up the model
+        self.task_model = TaskTableModel(self.task_manager.tasks, self)
+        self.task_view.setModel(self.task_model)
+            
+        # Set up the header
+        header = self.task_view.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Interactive)
+        header.setStretchLastSection(True)
+        header.setStyleSheet("""
             QHeaderView::section {
-                background-color: #EDF2F7;
-                color: #2D3748;
-                padding: 8px;
-                border: none;
-                border-right: 1px solid #DFE3E6;
+                background-color: #F5F5F5;
+                padding: 4px;
+                border: 1px solid #E0E0E0;
                 font-weight: bold;
             }
         """)
+            
+        # Set vertical header (row numbers)
+        vertical_header = self.task_view.verticalHeader()
+        vertical_header.setDefaultSectionSize(40)  # Increase row height
+        vertical_header.setStyleSheet("""
+            QHeaderView::section {
+                background-color: #F5F5F5;
+                padding: 4px;
+                border: 1px solid #E0E0E0;
+            }
+        """)
+            
         layout.addWidget(self.task_view)
 
         # Task Management Buttons
@@ -729,4 +802,3 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logging.error(f"Error in closeEvent: {e}")
             event.accept()  # Accept the close event even if there's an error
-
