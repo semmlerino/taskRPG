@@ -41,37 +41,43 @@
         "active": false,
         "description": null
     },
+    "Chair?": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": ""
+    },
+    "Hair": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": null
+    },
     "SG scripting": {
         "min": 1,
         "max": 1,
         "active": false,
         "description": null
     },
-    "Bubble": {
-        "min": 1,
-        "max": 1,
-        "active": true,
-        "description": null
-    },
-    "Beard": {
+    "TaskRPG": {
         "min": 1,
         "max": 1,
         "active": false,
         "description": null
     },
-    "Clean Room (1 Thema des Tages)": {
+    "Medicash Refund": {
         "min": 1,
         "max": 1,
-        "active": true,
-        "description": null
+        "active": false,
+        "description": ""
     },
-    "Perplexity": {
-        "min": 7,
-        "max": 13,
-        "active": true,
-        "description": null
+    "AWS": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": ""
     },
-    "Walk/Shopping": {
+    "Beard": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -83,7 +89,7 @@
         "active": false,
         "description": null
     },
-    "Hair": {
+    "Walk/Shopping": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -95,9 +101,15 @@
         "active": true,
         "description": null
     },
-    "TaskRPG": {
+    "Try Windsurf AI co": {
         "min": 1,
         "max": 1,
+        "active": false,
+        "description": ""
+    },
+    "Perplexity": {
+        "min": 7,
+        "max": 13,
         "active": false,
         "description": null
     },
@@ -110,31 +122,19 @@
     "NHS": {
         "min": 1,
         "max": 1,
-        "active": true,
-        "description": ""
-    },
-    "AWS": {
-        "min": 1,
-        "max": 1,
-        "active": true,
-        "description": ""
-    },
-    "Chair?": {
-        "min": 1,
-        "max": 1,
         "active": false,
         "description": ""
     },
-    "Medicash Refund": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "description": ""
-    },
-    "Try Windsurf AI co": {
+    "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
         "active": true,
-        "description": ""
+        "description": null
+    },
+    "Bubble": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": null
     }
 }

@@ -490,7 +490,8 @@ class SettingsDialog(QDialog):
             QTableView {
                 selection-background-color: #E3F2FD;
                 selection-color: black;
-                alternate-background-color: #F5F5F5;
+                alternate-background-color: #FAFAFA;
+                background-color: white;
             }
             QTableView::item:selected {
                 background-color: #E3F2FD;
