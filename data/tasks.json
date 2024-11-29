@@ -6,7 +6,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "KanaRPG": {
         "min": 1,
@@ -15,7 +16,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "3DE scripting": {
         "min": 1,
@@ -24,7 +26,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "ToDo": {
         "min": 3,
@@ -33,16 +36,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
-    },
-    "Gym": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "description": null,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Mails": {
         "min": 4,
@@ -51,7 +46,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Gemini": {
         "min": 2,
@@ -60,7 +56,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Chair?": {
         "min": 1,
@@ -69,7 +66,8 @@
         "description": "",
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "SG scripting": {
         "min": 1,
@@ -78,7 +76,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "TaskRPG": {
         "min": 1,
@@ -87,7 +86,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Medicash Refund": {
         "min": 1,
@@ -96,7 +96,8 @@
         "description": "",
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "AWS": {
         "min": 1,
@@ -104,8 +105,9 @@
         "active": false,
         "description": "",
         "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null
+        "is_weekly": true,
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Beard": {
         "min": 1,
@@ -114,7 +116,18 @@
         "description": null,
         "is_daily": false,
         "is_weekly": true,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
+    },
+    "Gym": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "description": null,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "FitRPG": {
         "min": 1,
@@ -123,7 +136,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Walk/Shopping": {
         "min": 1,
@@ -132,7 +146,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "GPTs": {
         "min": 6,
@@ -141,7 +156,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Hair": {
         "min": 1,
@@ -150,7 +166,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Perplexity": {
         "min": 7,
@@ -159,7 +176,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Claude": {
         "min": 6,
@@ -168,7 +186,8 @@
         "description": null,
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "NHS": {
         "min": 1,
@@ -177,7 +196,8 @@
         "description": "",
         "is_daily": false,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
@@ -186,7 +206,8 @@
         "description": null,
         "is_daily": true,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
     },
     "Bubble": {
         "min": 1,
@@ -195,6 +216,27 @@
         "description": null,
         "is_daily": true,
         "is_weekly": false,
-        "next_activation_time": null
+        "next_activation_time": null,
+        "manually_deactivated": false
+    },
+    "Showreel": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": "",
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false
+    },
+    "Amazon Shopping, pressure etc": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "description": "",
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false
     }
 }

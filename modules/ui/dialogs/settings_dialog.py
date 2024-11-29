@@ -82,7 +82,7 @@ class TaskTableModel(QAbstractTableModel):
         row = index.row()
         col = index.column()
         
-        if role == Qt.DisplayRole:
+        if role in [Qt.DisplayRole, Qt.EditRole]:
             if col == 0:  # Name
                 return self._tasks[row][0]
             elif col in [1, 2]:  # Min/Max
@@ -104,6 +104,12 @@ class TaskTableModel(QAbstractTableModel):
         try:
             if role == Qt.EditRole:
                 if col == 0:  # Name
+                    # Ensure value is a non-empty string
+                    if not isinstance(value, str):
+                        value = str(value)
+                    value = value.strip()
+                    if not value:  # Reject empty names
+                        return False
                     self._tasks[row] = (value, *self._tasks[row][1:])
                 elif col in [1, 2]:  # Min/Max
                     value = max(1, int(value))
@@ -252,35 +258,45 @@ class TaskTableModel(QAbstractTableModel):
 
 
 class RowHoverDelegate(QStyledItemDelegate):
+    """Delegate for handling row hover effects in task table."""
+    
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._hover_row = -1
         self._view = parent
 
     def paint(self, painter, option, index):
+        """Paint the delegate with proper hover effects."""
         opt = QStyleOptionViewItem(option)
-        
-        # Get the entire row rect
         view = self._view
-        row_rect = view.visualRect(index.sibling(index.row(), 0))
-        for col in range(1, view.model().columnCount()):
-            row_rect = row_rect.united(view.visualRect(index.sibling(index.row(), col)))
+        
+        # Get base background color based on alternate rows
+        if index.row() % 2:
+            base_color = QColor("#EDF5FF")  # Alternate row color
+        else:
+            base_color = QColor("#FFFFFF")  # Regular row color
             
-        # Check if any cell in the row is being hovered
-        is_hovered = False
-        for col in range(view.model().columnCount()):
-            if view.indexAt(view.viewport().mapFromGlobal(QCursor.pos())) == index.sibling(index.row(), col):
-                # Only show hover effect if row is not selected
-                if not (option.state & QStyle.State_Selected):
-                    painter.fillRect(row_rect, QColor("#E8F1FF"))
-                is_hovered = True
-                break
-
-        # Always set text color to our consistent dark blue
+        # Fill with base color first
+        painter.fillRect(option.rect, base_color)
+        
+        # Check if row is being hovered using mouse position
+        mouse_pos = view.viewport().mapFromGlobal(QCursor.pos())
+        row_being_hovered = view.rowAt(mouse_pos.y()) == index.row()
+        
+        # Apply hover effect if row is hovered and not selected
+        if row_being_hovered and not (opt.state & QStyle.State_Selected):
+            hover_color = QColor("#C2E0FF")  # Darker blue for better visibility
+            painter.fillRect(option.rect, hover_color)
+            
+        # Handle selection state
+        if opt.state & QStyle.State_Selected:
+            select_color = QColor("#A7C7E7")
+            painter.fillRect(option.rect, select_color)
+            
+        # Ensure consistent text coloring
         opt.palette.setColor(QPalette.Text, QColor("#2c456b"))
         opt.palette.setColor(QPalette.HighlightedText, QColor("#2c456b"))
         
-        # Draw the item with our custom palette
+        # Draw the actual item content
         QStyledItemDelegate.paint(self, painter, opt, index)
 
 
@@ -292,14 +308,37 @@ class CheckBoxCenterDelegate(QItemDelegate):
         if not index.isValid():
             return
 
-        # Center the checkbox
-        opt = option
-        opt.displayAlignment = Qt.AlignCenter
+        # Get the view and check for hover
+        view = self.parent()
+        mouse_pos = view.viewport().mapFromGlobal(QCursor.pos())
+        row_being_hovered = view.rowAt(mouse_pos.y()) == index.row()
         
-        # Get the checkbox rect
-        style = self.parent().style()
+        # Paint background based on state
+        opt = QStyleOptionViewItem(option)
+        
+        # Get base background color based on alternate rows
+        if index.row() % 2:
+            base_color = QColor("#EDF5FF")  # Alternate row color
+        else:
+            base_color = QColor("#FFFFFF")  # Regular row color
+            
+        # Fill with base color first
+        painter.fillRect(opt.rect, base_color)
+        
+        # Apply hover effect if row is hovered and not selected
+        if row_being_hovered and not (opt.state & QStyle.State_Selected):
+            hover_color = QColor("#C2E0FF")  # Darker blue for better visibility
+            painter.fillRect(opt.rect, hover_color)
+            
+        # Handle selection state
+        if opt.state & QStyle.State_Selected:
+            select_color = QColor("#A7C7E7")
+            painter.fillRect(opt.rect, select_color)
+
+        # Center the checkbox
+        style = view.style()
         checkbox_rect = style.subElementRect(
-            style.SE_CheckBoxIndicator, opt, self.parent()
+            style.SE_CheckBoxIndicator, opt, view
         )
         
         # Calculate center position
@@ -313,9 +352,9 @@ class CheckBoxCenterDelegate(QItemDelegate):
         opt.state |= style.State_On if checked else style.State_Off
             
         # Add hover and focus states
-        if option.state & style.State_MouseOver:
+        if row_being_hovered:
             opt.state |= style.State_MouseOver
-        if option.state & style.State_HasFocus:
+        if opt.state & style.State_HasFocus:
             opt.state |= style.State_HasFocus
         
         # Draw the checkbox
@@ -323,19 +362,28 @@ class CheckBoxCenterDelegate(QItemDelegate):
             style.PE_IndicatorCheckBox,
             opt,
             painter,
-            self.parent()
+            view
         )
 
     def editorEvent(self, event, model, option, index):
         if not index.isValid():
             return False
             
-        # Handle mouse clicks
+        # Get checkbox rect
+        style = self.parent().style()
+        opt = QStyleOptionViewItem(option)
+        checkbox_rect = style.subElementRect(
+            style.SE_CheckBoxIndicator, opt, self.parent()
+        )
+        checkbox_rect.moveCenter(option.rect.center())
+        
+        # Handle mouse events
         if event.type() == event.MouseButtonRelease:
-            current_state = index.data(Qt.CheckStateRole)
-            new_state = Qt.Unchecked if current_state == Qt.Checked else Qt.Checked
-            return model.setData(index, new_state, Qt.CheckStateRole)
-            
+            if checkbox_rect.contains(event.pos()):
+                current = index.data(Qt.CheckStateRole)
+                newValue = Qt.Unchecked if current == Qt.Checked else Qt.Checked
+                return model.setData(index, newValue, Qt.CheckStateRole)
+                
         return False
 
 
@@ -521,12 +569,12 @@ class SettingsDialog(QDialog):
         self.task_view.setDropIndicatorShown(True)
         self.task_view.setShowGrid(True)
         self.task_view.setAlternatingRowColors(True)
-        self.task_view.horizontalHeader().setHighlightSections(False)  # Prevent header highlight on hover
+        self.task_view.horizontalHeader().setHighlightSections(False)
         
         # Set the drag drop overlay mode to always show between items
         self.task_view.setDragDropOverwriteMode(False)
         
-        # Style the view to make drop indicator more visible
+        # Updated stylesheet without competing hover effects
         self.task_view.setStyleSheet("""
             QTableView {
                 selection-background-color: #A7C7E7;
@@ -545,39 +593,47 @@ class SettingsDialog(QDialog):
                 background-color: #A7C7E7;
                 color: #2c456b;
             }
-            QTableView::item:hover {
-                color: #2c456b;
-            }
             QTableView::indicator {
                 width: 20px;
                 height: 20px;
+                border: 2px solid #BDBDBD;
+                border-radius: 4px;
+                background-color: white;
+            }
+            QTableView::indicator:hover {
+                border-color: #2196F3;
+                background-color: #E3F2FD;
             }
             QTableView::indicator:checked {
                 background-color: #2196F3;
                 border: 2px solid #2196F3;
                 border-radius: 4px;
             }
-            QTableView::indicator:unchecked {
-                background-color: white;
-                border: 2px solid #BDBDBD;
-                border-radius: 4px;
+            QTableView::indicator:checked:hover {
+                background-color: #1976D2;
+                border-color: #1976D2;
             }
-            QTableView::indicator:hover {
-                border-color: #64B5F6;
+            QTableView::indicator:unchecked:hover {
+                border-color: #2196F3;
+                background-color: #E3F2FD;
             }
         """)
         
-        # Set up the model
+        # Set up the model and delegate
         self.task_model = TaskTableModel(self.task_manager.tasks, self)
         self.task_view.setModel(self.task_model)
+        
+        # Set custom delegate for row hover effect
+        hover_delegate = RowHoverDelegate(self.task_view)
+        self.task_view.setItemDelegate(hover_delegate)
+        
+        # Enable mouse tracking for hover effects
+        self.task_view.setMouseTracking(True)
         
         # Set up the header
         header = self.task_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
-        
-        # Enable row hover effect
-        self.task_view.setMouseTracking(True)
         
         # Set column widths and alignment
         self.task_view.setColumnWidth(3, 100)  # Set Active column to be narrower
@@ -672,19 +728,26 @@ class SettingsDialog(QDialog):
             QCheckBox::indicator {
                 width: 20px;
                 height: 20px;
-            }
-            QCheckBox::indicator:unchecked {
-                background-color: white;
                 border: 2px solid #BDBDBD;
                 border-radius: 4px;
+                background-color: white;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #2196F3;
+                background-color: #E3F2FD;
             }
             QCheckBox::indicator:checked {
                 background-color: #90CAF9;
                 border: 2px solid #90CAF9;
                 border-radius: 4px;
             }
-            QCheckBox::indicator:hover {
+            QCheckBox::indicator:checked:hover {
+                background-color: #64B5F6;
                 border-color: #64B5F6;
+            }
+            QCheckBox::indicator:unchecked:hover {
+                border-color: #2196F3;
+                background-color: #E3F2FD;
             }
         """)
         self.load_shaking_setting()
@@ -730,10 +793,6 @@ class SettingsDialog(QDialog):
         dialog_buttons.addWidget(cancel_button)
 
         layout.addLayout(dialog_buttons)
-        
-        # Set custom delegate for row hover effect
-        hover_delegate = RowHoverDelegate(self.task_view)
-        self.task_view.setItemDelegate(hover_delegate)
         
         self.setLayout(layout)
 
