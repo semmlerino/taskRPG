@@ -159,6 +159,12 @@ class TaskManager:
         Returns:
             Optional[Task]: Random active task or None if no active tasks.
         """
+        # Check and reactivate any daily tasks that are ready
+        for task in self.tasks.values():
+            if task.is_daily and not task.is_active:
+                if task.check_reactivation():  # This will reactivate if enough time has passed
+                    self.save_tasks()  # Save state if any tasks were reactivated
+        
         active_tasks = self.get_active_tasks()
         if not active_tasks:
             logging.warning("No active tasks available")

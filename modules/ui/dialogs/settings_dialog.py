@@ -4,13 +4,14 @@ import logging
 import base64
 from typing import Dict, Optional, Tuple, List
 
-from PyQt5.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QByteArray, QMimeData
+from PyQt5.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QByteArray, QMimeData, QRect
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QTableView, QHeaderView, QWidget, QCheckBox, QMessageBox,
-    QSizePolicy
+    QSizePolicy, QItemDelegate, QStyledItemDelegate, QStyle,
+    QStyleOptionViewItem
 )
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QCursor, QPalette
 
 from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
@@ -26,11 +27,10 @@ class TaskTableModel(QAbstractTableModel):
     def __init__(self, tasks: Dict[str, Task], parent=None):
         """Initialize the model with tasks dictionary."""
         super().__init__(parent)
-        self._tasks: List[Tuple[str, int, int, bool, Optional[str]]] = []
-        self._headers = ['Name', 'Min', 'Max', 'Active']
+        self._tasks: List[Tuple[str, int, int, bool, bool, bool, Optional[str]]] = []
+        self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly']
         self._original_tasks = tasks
         self._drag_source_row = -1
-        self._drag_in_progress = False
         
         # Convert tasks dictionary to list while preserving all attributes
         for name, task in tasks.items():
@@ -39,6 +39,8 @@ class TaskTableModel(QAbstractTableModel):
                 task.min_count,
                 task.max_count,
                 task.active,
+                task.is_daily,
+                task.is_weekly,
                 task.description
             ))
         logging.debug(f"TaskTableModel initialized with {len(self._tasks)} tasks")
@@ -51,72 +53,98 @@ class TaskTableModel(QAbstractTableModel):
         """Return the number of columns in the model."""
         return len(self._headers)
 
-    def data(self, index: QModelIndex, role=Qt.DisplayRole) -> Optional[str]:
-        """Return the data for the given role at the specified index."""
+    def flags(self, index):
+        """Return item flags."""
+        if not index.isValid():
+            return Qt.ItemIsEnabled
+        
+        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
+        
+        # Make Name column editable
+        if index.column() == 0:
+            flags |= Qt.ItemIsEditable
+            
+        # Make Min/Max columns editable
+        elif index.column() in [1, 2]:
+            flags |= Qt.ItemIsEditable
+            
+        # Make Active, Daily, and Weekly columns checkable
+        elif index.column() in [3, 4, 5]:
+            flags |= Qt.ItemIsUserCheckable
+            
+        return flags
+
+    def data(self, index, role=Qt.DisplayRole):
+        """Return data for the given role."""
         if not index.isValid():
             return None
-
-        row, col = index.row(), index.column()
-
+            
+        row = index.row()
+        col = index.column()
+        
         if role == Qt.DisplayRole:
-            if col < 3:  # Name, Min, Max columns
+            if col == 0:  # Name
+                return self._tasks[row][0]
+            elif col in [1, 2]:  # Min/Max
                 return str(self._tasks[row][col])
-            return None
-
-        elif role == Qt.CheckStateRole and col == 3:  # Active column
-            return Qt.Checked if self._tasks[row][3] else Qt.Unchecked
-
-        elif role == Qt.TextAlignmentRole:
-            if col in [1, 2, 3]:  # Min/Max/Active columns
-                return Qt.AlignCenter
-            return Qt.AlignLeft | Qt.AlignVCenter
-
+                
+        elif role == Qt.CheckStateRole and col in [3, 4, 5]:  # Active/Daily/Weekly
+            return Qt.Checked if self._tasks[row][col] else Qt.Unchecked
+            
         return None
 
-    def setData(self, index: QModelIndex, value, role=Qt.EditRole) -> bool:
-        """Set the data at the specified index."""
+    def setData(self, index, value, role=Qt.EditRole):
+        """Set data for the given role."""
         if not index.isValid():
             return False
-
-        row, col = index.row(), index.column()
-
+            
+        row = index.row()
+        col = index.column()
+        
         try:
-            if col == 3 and role == Qt.CheckStateRole:  # Handle checkbox changes
-                task_data = list(self._tasks[row])
-                task_data[3] = bool(value == Qt.Checked)
-                self._tasks[row] = tuple(task_data)
-                self.dataChanged.emit(index, index)
-                logging.debug(f"Checkbox state changed for task {task_data[0]}: {task_data[3]}")
-                return True
-
-            elif role == Qt.EditRole and col < 3:  # Handle other edits
-                task_data = list(self._tasks[row])
-                if col == 0:  # Name column
-                    new_name = str(value).strip()
-                    if not new_name or (new_name != task_data[0] and 
-                                      any(t[0] == new_name for t in self._tasks)):
-                        return False
-                    task_data[col] = new_name
-                else:  # Min/Max columns
-                    try:
-                        val = int(value)
-                        if val < 1:
-                            return False
-                        if col == 1 and val > task_data[2]:  # Min > Max
-                            return False
-                        if col == 2 and val < task_data[1]:  # Max < Min
-                            return False
-                        task_data[col] = val
-                    except ValueError:
-                        return False
-
-                self._tasks[row] = tuple(task_data)
-                self.dataChanged.emit(index, index)
-                return True
-
-            return False
-
-        except Exception as e:
+            if role == Qt.EditRole:
+                if col == 0:  # Name
+                    self._tasks[row] = (value, *self._tasks[row][1:])
+                elif col in [1, 2]:  # Min/Max
+                    value = max(1, int(value))
+                    new_task = list(self._tasks[row])
+                    new_task[col] = value
+                    self._tasks[row] = tuple(new_task)
+                    
+            elif role == Qt.CheckStateRole:
+                new_task = list(self._tasks[row])
+                is_checked = bool(value == Qt.Checked)
+                
+                if col == 3:  # Active
+                    # Get the original task to handle manual activation/deactivation
+                    task_name = self._tasks[row][0]
+                    original_task = self._original_tasks.get(task_name)
+                    if original_task:
+                        if is_checked:
+                            original_task.activate(manual=True)
+                        else:
+                            original_task.deactivate(manual=True)
+                    new_task[col] = is_checked
+                    
+                elif col in [4, 5]:  # Daily/Weekly
+                    new_task[col] = is_checked
+                    # Ensure task can't be both daily and weekly
+                    if col == 4 and is_checked:  # Daily checked
+                        new_task[5] = False  # Uncheck Weekly
+                    elif col == 5 and is_checked:  # Weekly checked
+                        new_task[4] = False  # Uncheck Daily
+                        
+                self._tasks[row] = tuple(new_task)
+                # Emit dataChanged for both Daily and Weekly columns
+                self.dataChanged.emit(
+                    self.index(row, 4),
+                    self.index(row, 5)
+                )
+                
+            self.dataChanged.emit(index, index)
+            return True
+            
+        except (ValueError, TypeError) as e:
             logging.error(f"Error setting data: {e}")
             return False
 
@@ -126,66 +154,22 @@ class TaskTableModel(QAbstractTableModel):
             return self._headers[section]
         return None
 
-    def flags(self, index):
-        """Set flags to enable drag and drop."""
-        if not index.isValid():
-            return Qt.ItemIsDropEnabled
-
-        flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsDragEnabled | Qt.ItemIsDropEnabled
-        
-        if index.column() == 3:  # Active column
-            flags |= Qt.ItemIsUserCheckable
-        else:
-            flags |= Qt.ItemIsEditable
-            
-        return flags
-
     def supportedDropActions(self):
-        """Specify supported drop actions."""
         return Qt.MoveAction
 
     def mimeTypes(self):
-        """Return supported mime types."""
-        return ['text/plain']
+        return ['application/x-qabstractitemmodeldatalist']
 
     def mimeData(self, indexes):
-        """Create mime data for drag operation."""
-        try:
-            if not indexes:
-                return None
-                
-            row = indexes[0].row()
-            if not (0 <= row < len(self._tasks)):
-                return None
-                
-            self._drag_source_row = row
-            self._drag_in_progress = True
-            
-            mime = QMimeData()
-            mime.setText(str(row))
-            logging.debug(f"Starting drag from row {row}")
-            return mime
-            
-        except Exception as e:
-            logging.error(f"Error in mimeData: {e}")
-            self._resetDragState()
-            return None
-
-    def _resetDragState(self):
-        """Reset drag and drop state."""
-        self._drag_source_row = -1
-        self._drag_in_progress = False
-        logging.debug("Reset drag state")
+        self._drag_source_row = indexes[0].row()
+        return super().mimeData(indexes)
 
     def canDropMimeData(self, data, action, row, column, parent):
         """Check if drop is allowed."""
         try:
-            if not self._drag_in_progress:
+            if not data.hasFormat('application/x-qabstractitemmodeldatalist'):
                 return False
 
-            if not data.hasText():
-                return False
-            
             if action == Qt.IgnoreAction:
                 return True
 
@@ -196,7 +180,7 @@ class TaskTableModel(QAbstractTableModel):
                 
             # Get source row
             try:
-                source_row = int(data.text())
+                source_row = self._drag_source_row
             except ValueError:
                 return False
                 
@@ -219,79 +203,140 @@ class TaskTableModel(QAbstractTableModel):
             return False
 
     def dropMimeData(self, data, action, row, column, parent):
-        """Handle drop event."""
-        try:
-            if not self._drag_in_progress or not data.hasText():
-                return False
-
-            # Get source row
-            try:
-                source_row = int(data.text())
-            except ValueError:
-                return False
-
-            if not (0 <= source_row < len(self._tasks)):
-                return False
-
-            # Get target row
-            target_row = row if row != -1 else self.rowCount()
-            if parent.isValid():
-                target_row = parent.row()
-
-            # Validate target row
-            if not (0 <= target_row <= len(self._tasks)):
-                target_row = len(self._tasks)
-
-            # Don't move to same position
-            if target_row == source_row or target_row == source_row + 1:
-                return False
-
-            # Adjust target row if moving down
-            if target_row > source_row:
-                target_row -= 1
-
-            logging.debug(f"Moving row {source_row} to {target_row}")
-
-            try:
-                # Begin move operation
-                self.beginMoveRows(QModelIndex(), source_row, source_row, 
-                                 QModelIndex(), target_row)
-                
-                # Perform the move
-                item = self._tasks.pop(source_row)
-                self._tasks.insert(target_row, item)
-                
-                self.endMoveRows()
-                logging.debug(f"Successfully moved row from {source_row} to {target_row}")
-                return True
-
-            except Exception as e:
-                logging.error(f"Error during move operation: {e}")
-                return False
-
-        except Exception as e:
-            logging.error(f"Error in dropMimeData: {e}")
+        """Handle dropping of rows."""
+        if not data.hasFormat('application/x-qabstractitemmodeldatalist'):
             return False
-            
-        finally:
-            self._resetDragState()
+
+        if action == Qt.IgnoreAction:
+            return True
+
+        # Get the source row
+        source_row = self._drag_source_row
+        if source_row < 0:
+            return False
+
+        # Calculate target row
+        target_row = parent.row() if parent.isValid() else row
+        if target_row < 0:
+            target_row = self.rowCount()
+
+        # Adjust target row if moving down
+        if target_row > source_row:
+            target_row -= 1
+
+        if source_row == target_row:
+            return False
+
+        # Move the task in the list
+        self.beginMoveRows(QModelIndex(), source_row, source_row, QModelIndex(), target_row + (1 if target_row < source_row else 0))
+        task = self._tasks.pop(source_row)
+        self._tasks.insert(target_row, task)
+        self.endMoveRows()
+
+        return True
 
     def get_tasks_dict(self) -> Dict[str, Task]:
         """Convert internal list representation back to task dictionary."""
-        try:
-            tasks_dict = {}
-            for name, min_count, max_count, active, description in self._tasks:
-                tasks_dict[name] = Task(
-                    name=name,
-                    min_count=min_count,
-                    max_count=max_count,
-                    active=active,
-                    description=description
-                )
-            return tasks_dict
-        except Exception as e:
-            logging.error(f"Error converting to tasks dictionary: {e}")
-            raise
+        return {
+            task[0]: Task(
+                name=task[0],
+                min_count=task[1],
+                max_count=task[2],
+                active=task[3],
+                is_daily=task[4],
+                is_weekly=task[5],
+                description=task[6]
+            )
+            for task in self._tasks
+        }
+
+
+class RowHoverDelegate(QStyledItemDelegate):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._hover_row = -1
+        self._view = parent
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        
+        # Get the entire row rect
+        view = self._view
+        row_rect = view.visualRect(index.sibling(index.row(), 0))
+        for col in range(1, view.model().columnCount()):
+            row_rect = row_rect.united(view.visualRect(index.sibling(index.row(), col)))
+            
+        # Check if any cell in the row is being hovered
+        is_hovered = False
+        for col in range(view.model().columnCount()):
+            if view.indexAt(view.viewport().mapFromGlobal(QCursor.pos())) == index.sibling(index.row(), col):
+                # Only show hover effect if row is not selected
+                if not (option.state & QStyle.State_Selected):
+                    painter.fillRect(row_rect, QColor("#E8F1FF"))
+                is_hovered = True
+                break
+
+        # Always set text color to our consistent dark blue
+        opt.palette.setColor(QPalette.Text, QColor("#2c456b"))
+        opt.palette.setColor(QPalette.HighlightedText, QColor("#2c456b"))
+        
+        # Draw the item with our custom palette
+        QStyledItemDelegate.paint(self, painter, opt, index)
+
+
+class CheckBoxCenterDelegate(QItemDelegate):
+    def createEditor(self, parent, option, index):
+        return None  # Use default editor
+        
+    def paint(self, painter, option, index):
+        if not index.isValid():
+            return
+
+        # Center the checkbox
+        opt = option
+        opt.displayAlignment = Qt.AlignCenter
+        
+        # Get the checkbox rect
+        style = self.parent().style()
+        checkbox_rect = style.subElementRect(
+            style.SE_CheckBoxIndicator, opt, self.parent()
+        )
+        
+        # Calculate center position
+        checkbox_rect.moveCenter(opt.rect.center())
+        
+        # Update the option rect to the centered position
+        opt.rect = checkbox_rect
+        
+        # Set the state based on the checkbox value
+        checked = index.data(Qt.CheckStateRole) == Qt.Checked
+        opt.state |= style.State_On if checked else style.State_Off
+            
+        # Add hover and focus states
+        if option.state & style.State_MouseOver:
+            opt.state |= style.State_MouseOver
+        if option.state & style.State_HasFocus:
+            opt.state |= style.State_HasFocus
+        
+        # Draw the checkbox
+        style.drawPrimitive(
+            style.PE_IndicatorCheckBox,
+            opt,
+            painter,
+            self.parent()
+        )
+
+    def editorEvent(self, event, model, option, index):
+        if not index.isValid():
+            return False
+            
+        # Handle mouse clicks
+        if event.type() == event.MouseButtonRelease:
+            current_state = index.data(Qt.CheckStateRole)
+            new_state = Qt.Unchecked if current_state == Qt.Checked else Qt.Checked
+            return model.setData(index, new_state, Qt.CheckStateRole)
+            
+        return False
 
 
 class SettingsDialog(QDialog):
@@ -412,7 +457,7 @@ class SettingsDialog(QDialog):
                         col_widths = [int(w * scale_factor) for w in col_widths]
                     
                     # Ensure minimum widths
-                    min_widths = [100, 60, 60, 50]  # Minimum widths for each column
+                    min_widths = [100, 60, 60, 50, 50, 50]  # Minimum widths for each column
                     for i, (width, min_width) in enumerate(zip(col_widths, min_widths)):
                         if i < self.task_view.model().columnCount():
                             final_width = max(width, min_width)
@@ -422,7 +467,7 @@ class SettingsDialog(QDialog):
                 except Exception as e:
                     logging.error(f"Error applying column widths: {e}")
                     # Set default column widths
-                    default_widths = [200, 80, 80, 80]
+                    default_widths = [200, 80, 80, 80, 80, 80]
                     for i, width in enumerate(default_widths):
                         if i < self.task_view.model().columnCount():
                             self.task_view.setColumnWidth(i, width)
@@ -450,7 +495,7 @@ class SettingsDialog(QDialog):
                         scale_factor = total_width / current_total
                         for i, width in enumerate(col_widths):
                             new_width = max(int(width * scale_factor), 
-                                         [100, 60, 60, 50][i])  # Minimum widths
+                                         [100, 60, 60, 50, 50, 50][i])  # Minimum widths
                             self.task_view.setColumnWidth(i, new_width)
         except Exception as e:
             logging.error(f"Error in resizeEvent: {e}")
@@ -467,11 +512,6 @@ class SettingsDialog(QDialog):
         title_label.setStyleSheet("color: #2196F3;")
         layout.addWidget(title_label, alignment=Qt.AlignCenter)
 
-        # Task Editing Section - increased from 14 to 16
-        task_label = QLabel("Manage Tasks:")
-        task_label.setFont(QFont("Arial", 16))
-        layout.addWidget(task_label)
-
         self.task_view = QTableView()
         self.task_view.setSelectionMode(QTableView.SingleSelection)
         self.task_view.setSelectionBehavior(QTableView.SelectRows)
@@ -481,6 +521,7 @@ class SettingsDialog(QDialog):
         self.task_view.setDropIndicatorShown(True)
         self.task_view.setShowGrid(True)
         self.task_view.setAlternatingRowColors(True)
+        self.task_view.horizontalHeader().setHighlightSections(False)  # Prevent header highlight on hover
         
         # Set the drag drop overlay mode to always show between items
         self.task_view.setDragDropOverwriteMode(False)
@@ -488,16 +529,24 @@ class SettingsDialog(QDialog):
         # Style the view to make drop indicator more visible
         self.task_view.setStyleSheet("""
             QTableView {
-                selection-background-color: #E3F2FD;
-                selection-color: black;
-                alternate-background-color: #FAFAFA;
+                selection-background-color: #A7C7E7;
+                selection-color: #2c456b;
+                alternate-background-color: #EDF5FF;
                 background-color: white;
+                font-size: 13pt;
+                gridline-color: #D0D0D0;
+            }
+            QTableView::item {
+                border: none;
+                padding: 5px;
+                color: #2c456b;
             }
             QTableView::item:selected {
-                background-color: #E3F2FD;
+                background-color: #A7C7E7;
+                color: #2c456b;
             }
             QTableView::item:hover {
-                background-color: #F5F5F5;
+                color: #2c456b;
             }
             QTableView::indicator {
                 width: 20px;
@@ -513,24 +562,45 @@ class SettingsDialog(QDialog):
                 border: 2px solid #BDBDBD;
                 border-radius: 4px;
             }
+            QTableView::indicator:hover {
+                border-color: #64B5F6;
+            }
         """)
         
         # Set up the model
         self.task_model = TaskTableModel(self.task_manager.tasks, self)
         self.task_view.setModel(self.task_model)
-            
+        
         # Set up the header
         header = self.task_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
         header.setStretchLastSection(True)
+        
+        # Enable row hover effect
+        self.task_view.setMouseTracking(True)
+        
+        # Set column widths and alignment
+        self.task_view.setColumnWidth(3, 100)  # Set Active column to be narrower
+        self.task_view.setColumnWidth(4, 100)  # Set Daily column to be narrower
+        self.task_view.setColumnWidth(5, 100)  # Set Weekly column to be narrower
+        self.task_model.setHeaderData(3, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Active header
+        self.task_model.setHeaderData(4, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Daily header
+        self.task_model.setHeaderData(5, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Weekly header
+        
         header.setStyleSheet("""
             QHeaderView::section {
-                background-color: #F5F5F5;
-                padding: 4px;
-                border: 1px solid #E0E0E0;
+                background-color: #A7C7E7;
+                color: #2c456b;
+                padding: 6px;
+                border: 1px solid #2c456b;
                 font-weight: bold;
             }
         """)
+        
+        # Center the checkboxes in the Active, Daily, and Weekly columns
+        self.task_view.setItemDelegateForColumn(3, CheckBoxCenterDelegate(self.task_view))
+        self.task_view.setItemDelegateForColumn(4, CheckBoxCenterDelegate(self.task_view))
+        self.task_view.setItemDelegateForColumn(5, CheckBoxCenterDelegate(self.task_view))
             
         # Set vertical header (row numbers)
         vertical_header = self.task_view.verticalHeader()
@@ -660,6 +730,11 @@ class SettingsDialog(QDialog):
         dialog_buttons.addWidget(cancel_button)
 
         layout.addLayout(dialog_buttons)
+        
+        # Set custom delegate for row hover effect
+        hover_delegate = RowHoverDelegate(self.task_view)
+        self.task_view.setItemDelegate(hover_delegate)
+        
         self.setLayout(layout)
 
     def add_task(self):
@@ -682,6 +757,8 @@ class SettingsDialog(QDialog):
                 1,              # min_count
                 3,              # max_count
                 True,           # active
+                False,          # is_daily
+                False,          # is_weekly
                 ""              # description
             ))
             self.task_model.endInsertRows()
@@ -749,7 +826,7 @@ class SettingsDialog(QDialog):
         tasks = self.task_model._tasks
         seen_names = set()
 
-        for i, (name, min_count, max_count, active, _) in enumerate(tasks):
+        for i, (name, min_count, max_count, active, is_daily, is_weekly, _) in enumerate(tasks):
             # Check for empty names
             if not name.strip():
                 QMessageBox.warning(self, "Invalid Task",

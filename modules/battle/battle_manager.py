@@ -271,6 +271,13 @@ class BattleManager:
             # Award XP
             self.player.gain_experience(xp_gained)
             
+            # Deactivate task and handle daily task logic
+            if self.current_enemy and self.current_enemy.task_name:
+                task = self.task_manager.get_task(self.current_enemy.task_name)
+                if task:
+                    task.deactivate()  # This will handle daily task reactivation logic
+                    self.task_manager.save_tasks()  # Save task state changes
+            
             # Mark battle as completed in story context
             if hasattr(self, 'story_manager'):
                 self.story_manager.mark_battle_complete(self.current_enemy.name)
