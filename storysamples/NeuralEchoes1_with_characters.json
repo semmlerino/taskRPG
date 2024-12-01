@@ -1,0 +1,74 @@
+{
+    "title": "Neural Echoes:Memory Keeps:The Vintage Repair Shop:File1",
+    "characters": {
+        "Mai": {
+            "description": "A young Asian woman in her late 20s with an intricate diagnostic visor",
+            "traits": {
+                "age": "28",
+                "gender": "female",
+                "occupation": "neural memory repair technician",
+                "style": "cyberpunk technician with custom diagnostic visor",
+                "personality": "precise and professional",
+                "notable_features": "wears a complex diagnostic visor, has dexterous hands from years of crystal work"
+            }
+        },
+        "Mr_Chen": {
+            "description": "An elderly Asian man in his 70s with a gentle demeanor",
+            "traits": {
+                "age": "72",
+                "gender": "male",
+                "occupation": "retired teacher",
+                "style": "traditional casual wear with a cherished coffee cup",
+                "personality": "nervous but kind",
+                "notable_features": "slightly trembling hands, carries a traditional coffee cup"
+            }
+        }
+    },
+    "node1": {
+        "text": "Mai's diagnostic visor throws rainbow artifacts across the workshop's cluttered walls as she works on the ancient NeuroVault terminal. Mr. Chen watches nervously as his first kiss memory keeps dissolving into a bowl of wonton soup on the holographic display. 'Stop fidgeting,' she mutters, adjusting a crystal resonator with practiced precision.",
+        "environment": "Cluttered vintage neural repair shop, early morning light filtering through security shutters",
+        "characters": ["Mai", "Mr_Chen"],
+        "image_prompt": {
+            "scene": "intimate shot of cyberpunk repair shop interior, holographic displays showing glitching memories, morning sun creating rainbow refractions through crystal components, atmospheric lighting emphasizing both high tech and vintage elements",
+            "focus_character": "Mai",
+            "secondary_characters": ["Mr_Chen"],
+            "character_actions": {
+                "Mai": "working on brass-and-chrome neural terminal with intense focus",
+                "Mr_Chen": "clutching traditional coffee cup nervously"
+            }
+        },
+        "next": "node2"
+    },
+    "node2": {
+        "text": "'Sorry,' Mr. Chen clutches his real-bean coffee cup tighter. 'It's just... that's not even good soup. The wontons were chewy.' The memory crystals pulse with an unsettling rhythm as Mai works, their glow reflecting off walls covered in technical diagrams and vintage neural interface schematics.",
+        "characters": ["Mai", "Mr_Chen"],
+        "image_prompt": {
+            "scene": "close-up shot of pulsing memory crystals in vintage neural terminal, diagrams and schematics visible on workshop walls, holographic display showing overlapping images of romantic moment and bowl of soup, mood lighting emphasizing crystal glow",
+            "focus_character": "Mr_Chen",
+            "secondary_characters": ["Mai"],
+            "character_actions": {
+                "Mr_Chen": "holding coffee cup with visible tension",
+                "Mai": "focused on the neural terminal controls"
+            }
+        },
+        "next": "node3"
+    },
+    "node3": {
+        "text": "The quiet whine of a corporate enforcement drone drifts through the open window. They freeze as the terminal chooses that moment to start humming like a vintage motorcycle. Mai's hands hover over the crystals, caught between shutting down and risking data corruption, or continuing and risking detection.",
+        "battle": {
+            "enemy": "Corporate Enforcement Scan",
+            "message": "Avoid detection while stabilizing critical memories!"
+        },
+        "characters": ["Mai", "Mr_Chen"],
+        "image_prompt": {
+            "scene": "tense shot through repair shop window, sleek corporate drone visible through gaps in shutters, contrast between drone's modern design and shop's vintage equipment, dramatic lighting from both drone's scanning beam and terminal's display",
+            "focus_character": "Mai",
+            "secondary_characters": ["Mr_Chen"],
+            "character_actions": {
+                "Mai": "hands frozen over glowing neural terminal",
+                "Mr_Chen": "holding perfectly still in background"
+            }
+        },
+        "next": "node4"
+    }
+}

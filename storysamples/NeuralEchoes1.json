@@ -1,0 +1,33 @@
+{
+    "title": "Neural Echoes:Memory Keeps:The Vintage Repair Shop:File1",
+    "node1": {
+        "text": "Mai's diagnostic visor throws rainbow artifacts across the workshop's cluttered walls as she works on the ancient NeuroVault terminal. Mr. Chen watches nervously as his first kiss memory keeps dissolving into a bowl of wonton soup on the holographic display. 'Stop fidgeting,' she mutters, adjusting a crystal resonator with practiced precision.",
+        "environment": "Cluttered vintage neural repair shop, early morning light filtering through security shutters",
+        "image_prompt": "intimate shot of cyberpunk repair shop interior, holographic displays showing glitching memories, young Asian woman wearing intricate diagnostic visor working on brass-and-chrome neural terminal, morning sun creating rainbow refractions through crystal components, elderly customer clutching traditional coffee cup, photorealistic, atmospheric lighting emphasizing both high tech and vintage elements",
+        "next": "node2"
+    },
+    "node2": {
+        "text": "'Sorry,' Mr. Chen clutches his real-bean coffee cup tighter. 'It's just... that's not even good soup. The wontons were chewy.' The memory crystals pulse with an unsettling rhythm as Mai works, their glow reflecting off walls covered in technical diagrams and vintage neural interface schematics.",
+        "image_prompt": "close-up shot of pulsing memory crystals in vintage neural terminal, diagrams and schematics visible on workshop walls, coffee cup with rising steam in foreground, holographic display showing overlapping images of romantic moment and bowl of soup, mood lighting emphasizing crystal glow, photorealistic, focus on intricate technical details",
+        "next": "node3"
+    },
+    "node3": {
+        "text": "The quiet whine of a corporate enforcement drone drifts through the open window. They freeze as the terminal chooses that moment to start humming like a vintage motorcycle. Mai's hands hover over the crystals, caught between shutting down and risking data corruption, or continuing and risking detection.",
+        "battle": {
+            "enemy": "Corporate Enforcement Scan",
+            "message": "Avoid detection while stabilizing critical memories!"
+        },
+        "image_prompt": "tense shot through repair shop window, sleek corporate drone visible through gaps in shutters, contrast between drone's modern design and shop's vintage equipment, woman's hands frozen over glowing neural terminal, elderly man in background holding perfectly still, dramatic lighting from both drone's scanning beam and terminal's display, photorealistic, emphasis on tension",
+        "next": "node4"
+    },
+    "node4": {
+        "text": "Mai makes a split-second decision, fingers dancing across the crystal interface. The memory feed accelerates, decades of Mr. Chen's life cascading across the holographic display. 'Don't move,' she whispers. 'They're looking for active neural signatures. Old memories read like background noise.'",
+        "image_prompt": "extreme close-up of hands manipulating glowing crystal interface, multiple layers of holographic memories creating ethereal light show, reflections in diagnostic visor showing rapid-fire life moments, corporate drone's shadow passing over work surface, photorealistic, focus on intricate interface and memory displays",
+        "next": "node5"
+    },
+    "node5": {
+        "text": "The drone hovers for an eternal moment. Through her visor, Mai watches Mr. Chen's memories blur together - first kiss, wedding day, birth of his daughter - each moment threatening to destabilize under the drone's scanning field. One wrong move, one power spike, and thirty years of memories could shatter like dropped crystal.",
+        "image_prompt": "split composition showing drone's view through window and interior neural terminal display, memories visible as interweaving streams of light and image, woman's face half-hidden behind diagnostic visor showing technical readouts, elderly man's expression tense but still, photorealistic, emphasis on contrast between cold drone technology and warm personal memories",
+        "next": "node6"
+    }
+}

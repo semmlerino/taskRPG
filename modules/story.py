@@ -10,6 +10,7 @@ from enum import Enum, auto
 from modules.common.types import NavigationDirection
 from core.story.story_content import StoryContent
 from core.story.story_node import StoryNode
+from modules.characters.character_manager import CharacterManager
 
 # Use TYPE_CHECKING for circular imports
 if TYPE_CHECKING:
@@ -52,6 +53,9 @@ class StoryManager:
         self._last_valid_image = None
         self._next_valid_image = None
 
+        # Initialize character manager
+        self.character_manager = CharacterManager(filepath, image_generator)
+        
         logging.info(f"StoryManager initialized with filepath: {filepath}")
 
     def load_story(self) -> Dict[str, Any]:
@@ -463,7 +467,34 @@ class StoryManager:
         self.battle_manager = battle_manager
         logging.info("Battle manager set in StoryManager")
 
-    # Add new method to find next valid image
+    def generate_node_image(self, node_data: Dict[str, Any], node_key: str) -> Optional[str]:
+        """Generate an image for the current story node."""
+        try:
+            if not self.image_generator:
+                return None
+
+            # Determine if this node has character-aware image generation
+            if isinstance(node_data.get("image_prompt"), dict) and "characters" in node_data:
+                # Generate scene with character consistency
+                image_path = os.path.join(self.image_folder, f"{node_key}.png")
+                return self.image_generator.generate_scene_with_characters(
+                    scene_data=node_data,
+                    character_manager=self.character_manager,
+                    save_path=image_path
+                )
+            else:
+                # Fall back to standard image generation
+                prompt = node_data.get("image_prompt", "")
+                if not prompt:
+                    return None
+                    
+                image_path = os.path.join(self.image_folder, f"{node_key}.png")
+                return self.image_generator.generate_image(prompt, save_path=image_path)
+
+        except Exception as e:
+            logging.error(f"Error generating node image: {e}")
+            return None
+
     def _find_next_valid_image(self, current_node_key: str) -> Optional[str]:
         try:
             # Start from next node
@@ -479,6 +510,26 @@ class StoryManager:
         except Exception as e:
             logging.error(f"Error finding next valid image: {e}")
             return None
+
+    def initialize_story_characters(self):
+        """Initialize all characters defined in the story."""
+        try:
+            # Get character definitions from story data
+            characters = self.story_data.get("characters", {})
+            
+            for char_name, char_data in characters.items():
+                if not self.character_manager.get_character(char_name):
+                    # Add character if they don't exist
+                    self.character_manager.add_character(
+                        name=char_name,
+                        description=char_data.get("description", ""),
+                        traits=char_data.get("traits", {})
+                    )
+            
+            logging.info(f"Initialized {len(characters)} story characters")
+            
+        except Exception as e:
+            logging.error(f"Error initializing story characters: {e}")
 
     def move_to_completed(self) -> bool:
         """

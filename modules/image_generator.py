@@ -520,14 +520,14 @@ class ImageGenerator:
             workflow = self.default_workflow_json()
 
             # Update prompts
-            workflow["6"]["inputs"]["text"] = positive_prompt
-            workflow["7"]["inputs"]["text"] = negative_prompt
+            workflow["nodes"][1]["inputs"]["text"] = positive_prompt
+            workflow["nodes"][2]["inputs"]["text"] = negative_prompt
 
             # Update dimensions if needed based on prompt
             if isinstance(prompt_data, dict):
                 width, height = self._get_dimensions_for_prompt(prompt_data.get("main", ""), preset)
-                workflow["5"]["inputs"]["width"] = width
-                workflow["5"]["inputs"]["height"] = height
+                workflow["nodes"][4]["inputs"]["width"] = width
+                workflow["nodes"][4]["inputs"]["height"] = height
 
             logger.info(f"Generated workflow with quality {self.quality.name}")
             return workflow
@@ -555,74 +555,196 @@ class ImageGenerator:
         preset = QualityPreset.get_preset(self.quality)
 
         return {
-            "3": {
-                "class_type": "KSampler",
-                "inputs": {
-                    "cfg": preset.cfg,
-                    "denoise": preset.denoise,
-                    "latent_image": ["5", 0],
-                    "model": ["4", 0],
-                    "negative": ["7", 0],
-                    "positive": ["6", 0],
-                    "sampler_name": preset.sampler,
-                    "scheduler": preset.scheduler,
-                    "seed": random.randint(10**6, 10**7),
-                    "steps": preset.steps
+            "nodes": [
+                {
+                    "id": "base_model",
+                    "type": "CheckpointLoaderSimple",
+                    "inputs": {
+                        "ckpt_name": "sd_xl_base_1.0.safetensors"
+                    }
+                },
+                {
+                    "id": "positive_prompt",
+                    "type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": "",
+                        "clip": "base_model.CLIP"
+                    }
+                },
+                {
+                    "id": "negative_prompt",
+                    "type": "CLIPTextEncode",
+                    "inputs": {
+                        "text": "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry",
+                        "clip": "base_model.CLIP"
+                    }
+                },
+                {
+                    "id": "sampler",
+                    "type": "KSampler",
+                    "inputs": {
+                        "model": "base_model.model",
+                        "positive": "positive_prompt.CONDITIONING",
+                        "negative": "negative_prompt.CONDITIONING",
+                        "latent_image": "empty_latent.LATENT",
+                        "steps": preset.steps,
+                        "cfg": preset.cfg,
+                        "sampler_name": preset.sampler,
+                        "scheduler": preset.scheduler,
+                        "denoise": preset.denoise,
+                        "seed": random.randint(0, 0xffffffffffffffff)
+                    }
+                },
+                {
+                    "id": "empty_latent",
+                    "type": "EmptyLatentImage",
+                    "inputs": {
+                        "width": preset.width,
+                        "height": preset.height,
+                        "batch_size": 1
+                    }
+                },
+                {
+                    "id": "decoder",
+                    "type": "VAEDecode",
+                    "inputs": {
+                        "samples": "sampler.LATENT",
+                        "vae": "base_model.VAE"
+                    }
+                },
+                {
+                    "id": "save_image",
+                    "type": "SaveImage",
+                    "inputs": {
+                        "images": "decoder.IMAGE",
+                        "filename_prefix": "output"
+                    }
                 }
-            },
-            "4": {
-                "class_type": "CheckpointLoaderSimple",
-                "inputs": {
-                    "ckpt_name": "sd_xl_base_1.0.safetensors"
-                }
-            },
-            "5": {
-                "class_type": "EmptyLatentImage",
-                "inputs": {
-                    "batch_size": 1,
-                    "height": preset.height,
-                    "width": preset.width
-                }
-            },
-            "6": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": ["4", 1],
-                    "text": "masterpiece best quality"  # Will be replaced with actual prompt
-                }
-            },
-            "7": {
-                "class_type": "CLIPTextEncode",
-                "inputs": {
-                    "clip": ["4", 1],
-                    "text": ", ".join(self.prompt_enhancer.negative_terms)
-                }
-            },
-            "8": {
-                "class_type": "VAEDecode",
-                "inputs": {
-                    "samples": ["3", 0],
-                    "vae": ["4", 2]
-                }
-            },
-            "9": {
-                "class_type": "SaveImage",
-                "inputs": {
-                    "filename_prefix": "ComfyUI",
-                    "images": ["8", 0]
-                }
-            }
+            ]
         }
 
-    def _validate_image_file(self, path: str) -> bool:
-        """Validate that a file is a valid image."""
-        try:
-            with Image.open(path) as img:
-                img.verify()
-            return True
-        except Exception as e:
-            logger.error(f"Image validation failed for {path}: {e}")
-            return False
+    def generate_image_with_character(
+        self,
+        prompt: str,
+        character_image_path: str,
+        save_path: Optional[str] = None,
+        ip_adapter_weight: float = 0.8
+    ) -> str:
+        """Generate an image while maintaining character consistency using IP-Adapter."""
+        
+        # Start with the default workflow
+        workflow = self.default_workflow_json()
+        
+        # Add IP-Adapter nodes
+        workflow["nodes"].extend([
+            {
+                "id": "ip_adapter_loader",
+                "type": "IPAdapterLoader",
+                "inputs": {
+                    "image": character_image_path,
+                    "model": "ip-adapter_sd15.safetensors"
+                }
+            },
+            {
+                "id": "ip_adapter_apply",
+                "type": "IPAdapterApply",
+                "inputs": {
+                    "model": workflow["nodes"][0]["outputs"]["model"],
+                    "ip_adapter": "ip_adapter_loader.ip_adapter",
+                    "weight": ip_adapter_weight
+                }
+            }
+        ])
+        
+        # Update the KSampler node to use the IP-Adapter output
+        for node in workflow["nodes"]:
+            if node["type"] == "KSampler":
+                node["inputs"]["model"] = "ip_adapter_apply.output"
+        
+        # Generate the image
+        return self.queue_and_generate(workflow, save_path)
+
+    def generate_scene_with_characters(
+        self,
+        scene_data: Dict[str, Any],
+        character_manager: 'CharacterManager',
+        save_path: Optional[str] = None
+    ) -> str:
+        """Generate a scene with multiple characters while maintaining visual consistency."""
+        
+        # Extract scene information
+        image_prompt = scene_data["image_prompt"]
+        focus_character = image_prompt.get("focus_character")
+        secondary_characters = image_prompt.get("secondary_characters", [])
+        
+        # Build the complete scene prompt
+        scene_prompt = image_prompt["scene"]
+        
+        # Add character actions to the prompt
+        character_actions = image_prompt.get("character_actions", {})
+        for char_name, action in character_actions.items():
+            character = character_manager.get_character(char_name)
+            if character:
+                char_desc = f"{character.description} {action}"
+                scene_prompt += f", {char_desc}"
+        
+        # Start with the default workflow
+        workflow = self.default_workflow_json()
+        
+        # Add IP-Adapter nodes for each character
+        ip_adapter_nodes = []
+        for idx, char_name in enumerate([focus_character] + secondary_characters):
+            if not char_name:
+                continue
+                
+            character = character_manager.get_character(char_name)
+            if not character:
+                continue
+            
+            # Adjust weights based on character focus
+            weight = 0.8 if char_name == focus_character else 0.5
+            
+            # Add loader and apply nodes for this character
+            loader_id = f"ip_adapter_loader_{idx}"
+            apply_id = f"ip_adapter_apply_{idx}"
+            
+            ip_adapter_nodes.extend([
+                {
+                    "id": loader_id,
+                    "type": "IPAdapterLoader",
+                    "inputs": {
+                        "image": character.reference_image_path,
+                        "model": "ip-adapter_sd15.safetensors"
+                    }
+                },
+                {
+                    "id": apply_id,
+                    "type": "IPAdapterApply",
+                    "inputs": {
+                        "model": "base_model.model" if idx == 0 else f"ip_adapter_apply_{idx-1}.output",
+                        "ip_adapter": f"{loader_id}.ip_adapter",
+                        "weight": weight
+                    }
+                }
+            ])
+        
+        # Add IP-Adapter nodes to workflow
+        workflow["nodes"].extend(ip_adapter_nodes)
+        
+        # Update the KSampler node to use the final IP-Adapter output
+        if ip_adapter_nodes:
+            last_apply_node = f"ip_adapter_apply_{len(ip_adapter_nodes)//2 - 1}.output"
+            for node in workflow["nodes"]:
+                if node["type"] == "KSampler":
+                    node["inputs"]["model"] = last_apply_node
+        
+        # Update the prompt
+        for node in workflow["nodes"]:
+            if node["type"] == "CLIPTextEncode" and "positive" in node["id"]:
+                node["inputs"]["text"] = scene_prompt
+        
+        # Generate the image
+        return self.queue_and_generate(workflow, save_path)
 
     def load_workflow_json(self) -> Dict[str, Any]:
         """Load and parse the workflow JSON."""

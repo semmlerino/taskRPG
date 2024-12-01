@@ -112,7 +112,7 @@
     "Beard": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": false,
         "is_weekly": true,
@@ -122,7 +122,7 @@
     "Gym": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": false,
         "is_weekly": false,
@@ -132,7 +132,7 @@
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": false,
         "is_weekly": false,
@@ -142,7 +142,7 @@
     "Walk/Shopping": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": false,
         "is_weekly": false,
@@ -202,7 +202,7 @@
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": true,
         "is_weekly": false,
@@ -212,7 +212,7 @@
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "description": null,
         "is_daily": true,
         "is_weekly": false,

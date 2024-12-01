@@ -110,6 +110,21 @@ class TaskTableModel(QAbstractTableModel):
                     value = value.strip()
                     if not value:  # Reject empty names
                         return False
+                        
+                    # Check for invalid characters
+                    invalid_chars = '<>:"/\\|?*'
+                    if any(char in value for char in invalid_chars):
+                        QMessageBox.warning(None, "Invalid Task",
+                            f"Task name cannot contain any of these characters: {invalid_chars}")
+                        return False
+                        
+                    # Check for duplicate names (excluding current row)
+                    for i, task in enumerate(self._tasks):
+                        if i != row and task[0] == value:
+                            QMessageBox.warning(None, "Invalid Task",
+                                f"Task name '{value}' already exists.")
+                            return False
+                            
                     self._tasks[row] = (value, *self._tasks[row][1:])
                 elif col in [1, 2]:  # Min/Max
                     value = max(1, int(value))
