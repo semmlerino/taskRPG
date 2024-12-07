@@ -96,7 +96,7 @@ class Task:
     @classmethod
     def from_dict(cls, name: str, data: dict) -> 'Task':
         """Create a Task instance from a dictionary"""
-        return cls(
+        task = cls(
             name=name,
             min_count=data.get('min', 1),
             max_count=data.get('max', 1),
@@ -107,13 +107,18 @@ class Task:
             next_activation_time=data.get('next_activation_time'),
             manually_deactivated=data.get('manually_deactivated', False)
         )
+        # Check for reactivation immediately after loading
+        task.check_reactivation()
+        return task
 
     def to_dict(self) -> dict:
         """Convert Task to dictionary format"""
+        # Check reactivation before saving
+        self.check_reactivation()
         return {
             'min': self.min_count,
             'max': self.max_count,
-            'active': self.active,
+            'active': self.is_active,  # Use property instead of raw field
             'description': self.description,
             'is_daily': self.is_daily,
             'is_weekly': self.is_weekly,

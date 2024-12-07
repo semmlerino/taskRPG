@@ -16,6 +16,11 @@ class CompactBattleWindow(QWidget):
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.NoFocus)
         self.setFixedSize(250, 120)
+        
+        # Initialize pause state
+        self._is_paused = False
+        self._current_enemy = None
+        
         self.init_ui()
         
         # Enable window dragging
@@ -87,19 +92,25 @@ class CompactBattleWindow(QWidget):
         """Update the display with enemy information."""
         try:
             if enemy and hasattr(enemy, 'name') and hasattr(enemy, 'task_name'):
-                self.enemy_label.setText(enemy.task_name)
+                self._current_enemy = enemy
+                
+                # Update text based on pause state
+                if self._is_paused:
+                    self.enemy_label.setText("PAUSED")
+                else:
+                    self.enemy_label.setText(enemy.task_name)
+                
                 self.hp_bar.setMaximum(enemy.max_hp)
                 self.hp_bar.setValue(enemy.current_hp)
                 self.hp_bar.setFormat(f"{enemy.current_hp}/{enemy.max_hp}")
                 self.tasks_label.setText(f"Tasks remaining: {enemy.current_hp}")
                 self.show()
-                logging.debug(f"Compact window visibility - Enemy: {enemy.name if enemy else 'None'}, HP: {enemy.current_hp if enemy else 'None'}")
+                logging.debug(f"Compact window visibility - Enemy: {enemy.name if enemy else 'None'}, HP: {enemy.current_hp if enemy else 'None'}, Paused: {self._is_paused}")
             else:
                 logging.warning("Invalid enemy object provided to compact window")
                 self.hide()
         except Exception as e:
             logging.error(f"Error updating compact window display: {e}")
-            self.hide()
             
     def update_tasks(self, tasks_left: int):
         """Update the tasks remaining display."""
@@ -108,38 +119,49 @@ class CompactBattleWindow(QWidget):
         
     def update_pause_state(self, is_paused: bool):
         """Update the display to show pause state."""
-        if is_paused:
-            self.enemy_label.setText("PAUSED")
-            self.hp_bar.setStyleSheet("""
-                QProgressBar {
-                    border: 2px solid #BDBDBD;
-                    border-radius: 5px;
-                    text-align: center;
-                    background-color: #f5f5f5;
-                    height: 20px;
-                    font-weight: bold;
-                }
-                QProgressBar::chunk {
-                    background-color: #FF9800;
-                    border-radius: 3px;
-                }
-            """)
-        else:
-            # Restore original style
-            self.hp_bar.setStyleSheet("""
-                QProgressBar {
-                    border: 2px solid #BDBDBD;
-                    border-radius: 5px;
-                    text-align: center;
-                    background-color: #f5f5f5;
-                    height: 20px;
-                    font-weight: bold;
-                }
-                QProgressBar::chunk {
-                    background-color: #76FF03;
-                    border-radius: 3px;
-                }
-            """)
+        try:
+            self._is_paused = is_paused
+            
+            # Update text based on pause state
+            if is_paused:
+                self.enemy_label.setText("PAUSED")
+                self.hp_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: 2px solid #BDBDBD;
+                        border-radius: 5px;
+                        text-align: center;
+                        background-color: #f5f5f5;
+                        height: 20px;
+                        font-weight: bold;
+                    }
+                    QProgressBar::chunk {
+                        background-color: #FF9800;
+                        border-radius: 3px;
+                    }
+                """)
+            else:
+                # Only restore text if we have an enemy
+                if self._current_enemy:
+                    self.enemy_label.setText(self._current_enemy.task_name)
+                    self.hp_bar.setStyleSheet("""
+                        QProgressBar {
+                            border: 2px solid #BDBDBD;
+                            border-radius: 5px;
+                            text-align: center;
+                            background-color: #f5f5f5;
+                            height: 20px;
+                            font-weight: bold;
+                        }
+                        QProgressBar::chunk {
+                            background-color: #76FF03;
+                            border-radius: 3px;
+                        }
+                    """)
+        
+            logging.debug(f"Pause state updated - Paused: {is_paused}, Has Enemy: {self._current_enemy is not None}")
+        
+        except Exception as e:
+            logging.error(f"Error updating compact window pause state: {e}")
         
     def mousePressEvent(self, event):
         """Handle mouse press for window dragging."""

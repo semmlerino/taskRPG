@@ -57,13 +57,16 @@ class TaskManager:
                     try:
                         # Handle both old and new format
                         if isinstance(task_data, Task):
-                            self.tasks[name] = task_data
+                            task = task_data
+                            task.check_reactivation()  # Check reactivation for existing Task objects
+                            self.tasks[name] = task
                         elif isinstance(task_data, dict):
                             # Validate required fields
                             if 'min' not in task_data or 'max' not in task_data:
                                 logging.warning(f"Task '{name}' missing required fields, skipping")
                                 continue
                             
+                            # Task.from_dict now handles reactivation
                             self.tasks[name] = Task.from_dict(name, task_data)
                         else:
                             logging.warning(f"Invalid task data for '{name}', skipping")

@@ -531,20 +531,11 @@ class BattleManager:
             logging.error(f"Error updating tasks left: {e}")
 
     def show_compact_mode(self) -> None:
-        """
-        Show compact battle window when main window loses focus.
-        
-        The compact window provides a minimalist battle interface that:
-        - Stays on top of other windows
-        - Shows essential battle information
-        - Allows basic battle interactions
-        - Can be moved by dragging
-        """
+        """Show compact battle window."""
         try:
             if not self.compact_window and self.is_in_battle():
                 self.compact_window = CompactBattleWindow()
                 
-                # Position window in top-right corner
                 screen = QApplication.primaryScreen()
                 screen_geo = screen.availableGeometry()
                 
@@ -554,20 +545,18 @@ class BattleManager:
                 
                 self.compact_window.move(x, y)
                 
-                # Set always-on-top flag
-                self.compact_window.setWindowFlag(Qt.WindowStaysOnTopHint)
-                
-                # Update display and show
+                # Update display and pause state
                 if self.current_enemy:
                     self.compact_window.update_display(self.current_enemy)
+                    # Ensure pause state is synced
+                    self.compact_window.update_pause_state(self.paused)
                 self.compact_window.show()
                 self.compact_window.raise_()
                 
-                logging.info("Compact battle window shown and configured")
+                logging.info("Compact battle window shown")
                 
         except Exception as e:
             logging.error(f"Error showing compact window: {e}")
-            self._show_error("Failed to show compact battle window")
 
     def hide_compact_mode(self) -> None:
         """Hide and cleanup compact battle window."""
@@ -592,11 +581,15 @@ class BattleManager:
             # Update UI components
             if self.action_buttons:
                 self.action_buttons.setEnabled(not self.paused)
-            
+        
+            if self.enemy_panel:
+                self.enemy_panel.update_pause_state(self.paused)
+
+            # Update compact window if it exists
             if self.compact_window:
                 self.compact_window.update_pause_state(self.paused)
-                # Refresh display when unpausing
-                if not self.paused:
+                # Force a display update to ensure text is correct
+                if self.current_enemy:
                     self.compact_window.update_display(self.current_enemy)
 
             # Update battle state timing
@@ -608,7 +601,7 @@ class BattleManager:
                 self.battle_state.paused_time = None
 
             self._update_status(f"Battle {status}")
-            
+        
         except Exception as e:
             logging.error(f"Error toggling pause: {e}")
             self._show_error("Failed to toggle pause state")

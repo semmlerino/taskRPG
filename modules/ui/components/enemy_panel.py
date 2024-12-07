@@ -72,3 +72,43 @@ class EnemyPanel(QWidget):
             self.hp_bar.setMaximum(100)
             self.hp_bar.setValue(0)
             self.hp_bar.setFormat("%p%")
+
+    def update_pause_state(self, is_paused: bool):
+        """Update the display to show pause state."""
+        try:
+            if is_paused:
+                self.enemy_label.setText("PAUSED")
+                self.hp_bar.setStyleSheet("""
+                    QProgressBar {
+                        border: 2px solid #BDBDBD;
+                        border-radius: 5px;
+                        text-align: center;
+                        background-color: #f5f5f5;
+                        height: 20px;
+                        font-weight: bold;
+                    }
+                    QProgressBar::chunk {
+                        background-color: #FF9800;
+                        border-radius: 3px;
+                    }
+                """)
+            else:
+                # Restore original style and text
+                if hasattr(self, '_current_enemy') and self._current_enemy:
+                    self.enemy_label.setText(self._current_enemy.name)
+                    self.hp_bar.setStyleSheet("""
+                        QProgressBar {
+                            border: 2px solid #BDBDBD;
+                            border-radius: 5px;
+                            text-align: center;
+                            background-color: #f5f5f5;
+                            height: 20px;
+                            font-weight: bold;
+                        }
+                        QProgressBar::chunk {
+                            background-color: #76FF03;
+                            border-radius: 3px;
+                        }
+                    """)
+        except Exception as e:
+            logging.error(f"Error updating enemy panel pause state: {e}")

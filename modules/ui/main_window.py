@@ -586,34 +586,48 @@ class TaskRPG(QMainWindow):
                 status_msg = "Chapter complete!"
                 logging.warning("No story manager available for completion handling")
 
-            # Update UI with completion message
-            self.story_display.append_text(
-                "<br><div style='text-align: center;'>"
-                "<h2>Chapter Complete!</h2>"
-                "<p>You have completed all available tasks for now.</p>"
-                "<p>Press G or click 'Select New Chapter' to continue your adventure!</p>"
-                "</div>"
-            )
+            # Clean up existing UI elements
+            if hasattr(self, 'story_display'):
+                # Remove any existing chapter selection buttons
+                for child in self.story_display.findChildren(QPushButton):
+                    if child.text() == "Select New Chapter":
+                        child.setParent(None)
+                        child.deleteLater()
 
-            # Add chapter selection button if it doesn't exist
-            existing_buttons = [
-                child for child in self.story_display.findChildren(QPushButton)
-                if child.text() == "Select New Chapter"
-            ]
-            
-            if not existing_buttons:
-                logging.info("Adding new chapter selection button")
-                new_chapter_button = QPushButton("Select New Chapter")
-                new_chapter_button.clicked.connect(self._show_story_selection)
-                self.story_display.layout().addWidget(new_chapter_button)
+                # Update UI with completion message
+                self.story_display.clear()  # Clear existing content
+                self.story_display.append_text(
+                    "<br><div style='text-align: center;'>"
+                    "<h2>Chapter Complete!</h2>"
+                    "<p>You have completed all available tasks for now.</p>"
+                    "<p>Press G or click 'Select New Chapter' to continue your adventure!</p>"
+                    "</div>"
+                )
+
+                # Add new chapter selection button
+                try:
+                    layout = self.story_display.layout()
+                    if layout is not None:
+                        new_chapter_button = QPushButton("Select New Chapter")
+                        new_chapter_button.clicked.connect(self._show_story_selection)
+                        layout.addWidget(new_chapter_button)
+                    else:
+                        logging.error("Story display has no layout")
+                except Exception as e:
+                    logging.error(f"Error adding chapter selection button: {e}")
 
             # Update UI state
-            self.action_buttons.hide_attack_buttons()
-            self.action_buttons.next_button.hide()
-            self.settings_button.setEnabled(True)
-            self.status_bar.showMessage(status_msg)
+            if hasattr(self, 'action_buttons'):
+                self.action_buttons.hide_attack_buttons()
+                self.action_buttons.next_button.hide()
             
-            # Clear story manager reference
+            if hasattr(self, 'settings_button'):
+                self.settings_button.setEnabled(True)
+                
+            if hasattr(self, 'status_bar'):
+                self.status_bar.showMessage(status_msg)
+            
+            # Clear story manager and reset state
             self.story_manager = None
             
             logging.info("Chapter end handling complete")
@@ -625,13 +639,25 @@ class TaskRPG(QMainWindow):
     def _show_story_selection(self):
         """Show the story selection dialog."""
         try:
+            # Clean up existing UI state
+            if hasattr(self, 'story_display'):
+                self.story_display.clear()
+                
+            if hasattr(self, 'action_buttons'):
+                self.action_buttons.hide_attack_buttons()
+                self.action_buttons.next_button.hide()
+
             # Show story selection dialog
             dialog = StorySelectionDialog(self)
-            if dialog.exec_() == QDialog.Accepted:
+            if dialog.exec_() == QDialog.Accepted and dialog.selected_story:
                 self._load_selected_story(dialog.selected_story)
+            else:
+                logging.info("Story selection cancelled or no story selected")
+                # Restore chapter end state
+                self.handle_chapter_end()
 
         except Exception as e:
-            logging.error(f"Error showing story selection: {e}")
+            logging.error(f"Error showing story selection: {e}", exc_info=True)
             QMessageBox.critical(self, "Error", "Failed to show story selection")
 
     def _can_proceed(self) -> bool:
@@ -676,10 +702,10 @@ class TaskRPG(QMainWindow):
             if self.isFullScreen():
                 # If in battle, ensure we can exit
                 if self.battle_manager.is_in_battle():
-                    self.battle_manager.hide_compact_mode()
-                    # Release any keyboard grab that might be stuck
-                    self.releaseKeyboard()
-
+                    # Only show compact mode if not already paused
+                    if not self.battle_manager.paused:
+                        self.battle_manager.toggle_pause()
+                    self.battle_manager.show_compact_mode()
             # Set window focus
             self.activateWindow()
             self.raise_()
