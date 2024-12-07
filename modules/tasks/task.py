@@ -5,6 +5,7 @@ import time
 
 @dataclass
 class Task:
+    """Task class representing a task with its properties."""
     name: str
     min_count: int
     max_count: int
@@ -14,6 +15,7 @@ class Task:
     is_weekly: bool = False
     next_activation_time: Optional[float] = None
     manually_deactivated: bool = False
+    count: int = 0  # New field for usage count
 
     def __post_init__(self):
         """Validate and fix task data after initialization"""
@@ -23,6 +25,7 @@ class Task:
         self.is_daily = bool(self.is_daily)
         self.is_weekly = bool(self.is_weekly)
         self.manually_deactivated = bool(self.manually_deactivated)
+        self.count = max(0, int(self.count))  # Ensure count is non-negative integer
         
         # Ensure task can't be both daily and weekly
         if self.is_daily and self.is_weekly:
@@ -105,7 +108,8 @@ class Task:
             is_daily=data.get('is_daily', False),
             is_weekly=data.get('is_weekly', False),
             next_activation_time=data.get('next_activation_time'),
-            manually_deactivated=data.get('manually_deactivated', False)
+            manually_deactivated=data.get('manually_deactivated', False),
+            count=data.get('count', 0)  # Load count from dictionary
         )
         # Check for reactivation immediately after loading
         task.check_reactivation()
@@ -123,7 +127,8 @@ class Task:
             'is_daily': self.is_daily,
             'is_weekly': self.is_weekly,
             'next_activation_time': self.next_activation_time,
-            'manually_deactivated': self.manually_deactivated
+            'manually_deactivated': self.manually_deactivated,
+            'count': self.count  # Add count to dictionary
         }
 
     def get_task_count(self) -> int:

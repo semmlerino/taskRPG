@@ -63,7 +63,7 @@ from modules.ui.components import (
     ChoicesPanel,
     CompactBattleWindow
 )
-from modules.ui.dialogs.settings_dialog import SettingsDialog
+from modules.ui.dialogs.settings import SettingsDialog  # Import from new settings package
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.battle.battle_manager import BattleManager

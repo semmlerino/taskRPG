@@ -27,8 +27,8 @@ class TaskTableModel(QAbstractTableModel):
     def __init__(self, tasks: Dict[str, Task], parent=None):
         """Initialize the model with tasks dictionary."""
         super().__init__(parent)
-        self._tasks: List[Tuple[str, int, int, bool, bool, bool, Optional[str]]] = []
-        self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly']
+        self._tasks: List[Tuple[str, int, int, bool, bool, bool, Optional[str], int]] = []
+        self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly', 'Description', 'Count']
         self._original_tasks = tasks
         self._drag_source_row = -1
         
@@ -41,7 +41,8 @@ class TaskTableModel(QAbstractTableModel):
                 task.active,
                 task.is_daily,
                 task.is_weekly,
-                task.description
+                task.description,
+                task.count
             ))
         logging.debug(f"TaskTableModel initialized with {len(self._tasks)} tasks")
 
@@ -72,102 +73,81 @@ class TaskTableModel(QAbstractTableModel):
         elif index.column() in [3, 4, 5]:
             flags |= Qt.ItemIsUserCheckable
             
+        # Make Description and Count columns editable
+        elif index.column() in [6, 7]:
+            flags |= Qt.ItemIsEditable
+            
         return flags
 
-    def data(self, index, role=Qt.DisplayRole):
-        """Return data for the given role."""
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        """Return data for the given role and section."""
         if not index.isValid():
             return None
-            
+
         row = index.row()
         col = index.column()
-        
-        if role in [Qt.DisplayRole, Qt.EditRole]:
+
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             if col == 0:  # Name
                 return self._tasks[row][0]
-            elif col in [1, 2]:  # Min/Max
-                return str(self._tasks[row][col])
-                
-        elif role == Qt.CheckStateRole and col in [3, 4, 5]:  # Active/Daily/Weekly
-            return Qt.Checked if self._tasks[row][col] else Qt.Unchecked
+            elif col == 1:  # Min
+                return self._tasks[row][1]
+            elif col == 2:  # Max
+                return self._tasks[row][2]
+            elif col == 6:  # Description
+                return self._tasks[row][6] or ""
+            elif col == 7:  # Count
+                return self._tasks[row][7]
             
+        elif role == Qt.CheckStateRole:
+            if col in [3, 4, 5]:  # Active, Daily, Weekly
+                return Qt.Checked if self._tasks[row][col] else Qt.Unchecked
+
         return None
 
-    def setData(self, index, value, role=Qt.EditRole):
-        """Set data for the given role."""
+    def setData(self, index: QModelIndex, value, role=Qt.EditRole) -> bool:
+        """Set data for the given role and section."""
         if not index.isValid():
             return False
-            
+
         row = index.row()
         col = index.column()
-        
-        try:
-            if role == Qt.EditRole:
-                if col == 0:  # Name
-                    # Ensure value is a non-empty string
-                    if not isinstance(value, str):
-                        value = str(value)
-                    value = value.strip()
-                    if not value:  # Reject empty names
+
+        if role == Qt.EditRole:
+            if col == 0:  # Name
+                self._tasks[row] = (value, *self._tasks[row][1:])
+            elif col in [1, 2]:  # Min, Max
+                try:
+                    value = int(value)
+                    if value < 0:
                         return False
-                        
-                    # Check for invalid characters
-                    invalid_chars = '<>:"/\\|?*'
-                    if any(char in value for char in invalid_chars):
-                        QMessageBox.warning(None, "Invalid Task",
-                            f"Task name cannot contain any of these characters: {invalid_chars}")
+                    task_list = list(self._tasks[row])
+                    task_list[col] = value
+                    self._tasks[row] = tuple(task_list)
+                except ValueError:
+                    return False
+            elif col == 6:  # Description
+                task_list = list(self._tasks[row])
+                task_list[6] = value
+                self._tasks[row] = tuple(task_list)
+            elif col == 7:  # Count
+                try:
+                    value = int(value)
+                    if value < 0:
                         return False
-                        
-                    # Check for duplicate names (excluding current row)
-                    for i, task in enumerate(self._tasks):
-                        if i != row and task[0] == value:
-                            QMessageBox.warning(None, "Invalid Task",
-                                f"Task name '{value}' already exists.")
-                            return False
-                            
-                    self._tasks[row] = (value, *self._tasks[row][1:])
-                elif col in [1, 2]:  # Min/Max
-                    value = max(1, int(value))
-                    new_task = list(self._tasks[row])
-                    new_task[col] = value
-                    self._tasks[row] = tuple(new_task)
-                    
-            elif role == Qt.CheckStateRole:
-                new_task = list(self._tasks[row])
-                is_checked = bool(value == Qt.Checked)
-                
-                if col == 3:  # Active
-                    # Get the original task to handle manual activation/deactivation
-                    task_name = self._tasks[row][0]
-                    original_task = self._original_tasks.get(task_name)
-                    if original_task:
-                        if is_checked:
-                            original_task.activate(manual=True)
-                        else:
-                            original_task.deactivate(manual=True)
-                    new_task[col] = is_checked
-                    
-                elif col in [4, 5]:  # Daily/Weekly
-                    new_task[col] = is_checked
-                    # Ensure task can't be both daily and weekly
-                    if col == 4 and is_checked:  # Daily checked
-                        new_task[5] = False  # Uncheck Weekly
-                    elif col == 5 and is_checked:  # Weekly checked
-                        new_task[4] = False  # Uncheck Daily
-                        
-                self._tasks[row] = tuple(new_task)
-                # Emit dataChanged for both Daily and Weekly columns
-                self.dataChanged.emit(
-                    self.index(row, 4),
-                    self.index(row, 5)
-                )
-                
-            self.dataChanged.emit(index, index)
-            return True
-            
-        except (ValueError, TypeError) as e:
-            logging.error(f"Error setting data: {e}")
-            return False
+                    task_list = list(self._tasks[row])
+                    task_list[7] = value
+                    self._tasks[row] = tuple(task_list)
+                except ValueError:
+                    return False
+        elif role == Qt.CheckStateRole:
+            if col in [3, 4, 5]:  # Active, Daily, Weekly
+                task_list = list(self._tasks[row])
+                task_list[col] = value == Qt.Checked
+                self._tasks[row] = tuple(task_list)
+
+        self.dataChanged.emit(index, index, [role])
+        return True
 
     def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole) -> Optional[str]:
         """Return the header data for the given role and section."""
@@ -266,7 +246,8 @@ class TaskTableModel(QAbstractTableModel):
                 active=task[3],
                 is_daily=task[4],
                 is_weekly=task[5],
-                description=task[6]
+                description=task[6],
+                count=task[7]
             )
             for task in self._tasks
         }
@@ -520,7 +501,7 @@ class SettingsDialog(QDialog):
                         col_widths = [int(w * scale_factor) for w in col_widths]
                     
                     # Ensure minimum widths
-                    min_widths = [100, 60, 60, 50, 50, 50]  # Minimum widths for each column
+                    min_widths = [100, 60, 60, 50, 50, 50, 150, 50]  # Minimum widths for each column
                     for i, (width, min_width) in enumerate(zip(col_widths, min_widths)):
                         if i < self.task_view.model().columnCount():
                             final_width = max(width, min_width)
@@ -530,7 +511,7 @@ class SettingsDialog(QDialog):
                 except Exception as e:
                     logging.error(f"Error applying column widths: {e}")
                     # Set default column widths
-                    default_widths = [200, 80, 80, 80, 80, 80]
+                    default_widths = [200, 80, 80, 80, 80, 80, 200, 80]
                     for i, width in enumerate(default_widths):
                         if i < self.task_view.model().columnCount():
                             self.task_view.setColumnWidth(i, width)
@@ -558,7 +539,7 @@ class SettingsDialog(QDialog):
                         scale_factor = total_width / current_total
                         for i, width in enumerate(col_widths):
                             new_width = max(int(width * scale_factor), 
-                                         [100, 60, 60, 50, 50, 50][i])  # Minimum widths
+                                         [100, 60, 60, 50, 50, 50, 150, 50][i])  # Minimum widths
                             self.task_view.setColumnWidth(i, new_width)
         except Exception as e:
             logging.error(f"Error in resizeEvent: {e}")
@@ -569,7 +550,7 @@ class SettingsDialog(QDialog):
         layout.setSpacing(10)
         layout.setContentsMargins(20, 20, 20, 20)
 
-        # Title - increased from 16 to 18
+        # Title
         title_label = QLabel("Task RPG Settings")
         title_label.setFont(QFont("Arial", 18, QFont.Bold))
         title_label.setStyleSheet("color: #2196F3;")
@@ -578,12 +559,12 @@ class SettingsDialog(QDialog):
         self.task_view = QTableView()
         self.task_view.setSelectionMode(QTableView.SingleSelection)
         self.task_view.setSelectionBehavior(QTableView.SelectRows)
+        self.task_view.setAlternatingRowColors(True)
         self.task_view.setDragEnabled(True)
         self.task_view.setAcceptDrops(True)
         self.task_view.setDragDropMode(QTableView.InternalMove)
         self.task_view.setDropIndicatorShown(True)
         self.task_view.setShowGrid(True)
-        self.task_view.setAlternatingRowColors(True)
         self.task_view.horizontalHeader().setHighlightSections(False)
         
         # Set the drag drop overlay mode to always show between items
@@ -648,30 +629,33 @@ class SettingsDialog(QDialog):
         # Set up the header
         header = self.task_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setStretchLastSection(True)
+        header.setStretchLastSection(False)  # Changed to False to show all columns
         
         # Set column widths and alignment
-        self.task_view.setColumnWidth(3, 100)  # Set Active column to be narrower
-        self.task_view.setColumnWidth(4, 100)  # Set Daily column to be narrower
-        self.task_view.setColumnWidth(5, 100)  # Set Weekly column to be narrower
-        self.task_model.setHeaderData(3, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Active header
-        self.task_model.setHeaderData(4, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Daily header
-        self.task_model.setHeaderData(5, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)  # Center the Weekly header
+        self.task_view.setColumnWidth(0, 200)  # Name
+        self.task_view.setColumnWidth(1, 60)   # Min
+        self.task_view.setColumnWidth(2, 60)   # Max
+        self.task_view.setColumnWidth(3, 100)  # Active
+        self.task_view.setColumnWidth(4, 100)  # Daily
+        self.task_view.setColumnWidth(5, 100)  # Weekly
+        self.task_view.setColumnWidth(6, 200)  # Description
+        self.task_view.setColumnWidth(7, 80)   # Count
+
+        # Center align checkboxes and numeric columns
+        for col in [1, 2, 3, 4, 5, 7]:  # Min, Max, Active, Daily, Weekly, Count
+            self.task_model.setHeaderData(col, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
+            if col in [3, 4, 5]:  # Only checkboxes
+                self.task_view.setItemDelegateForColumn(col, CheckBoxCenterDelegate(self.task_view))
         
         header.setStyleSheet("""
             QHeaderView::section {
+                padding: 6px;
                 background-color: #A7C7E7;
                 color: #2c456b;
-                padding: 6px;
                 border: 1px solid #2c456b;
                 font-weight: bold;
             }
         """)
-        
-        # Center the checkboxes in the Active, Daily, and Weekly columns
-        self.task_view.setItemDelegateForColumn(3, CheckBoxCenterDelegate(self.task_view))
-        self.task_view.setItemDelegateForColumn(4, CheckBoxCenterDelegate(self.task_view))
-        self.task_view.setItemDelegateForColumn(5, CheckBoxCenterDelegate(self.task_view))
             
         # Set vertical header (row numbers)
         vertical_header = self.task_view.verticalHeader()
@@ -689,7 +673,7 @@ class SettingsDialog(QDialog):
         # Task Management Buttons
         button_layout = QHBoxLayout()
 
-        # Add Task Button - increased from 12 to 13
+        # Add Task Button
         add_button = QPushButton("Add Task")
         add_button.setFont(QFont("Arial", 13))
         add_button.setStyleSheet("""
@@ -707,7 +691,7 @@ class SettingsDialog(QDialog):
         add_button.clicked.connect(self.add_task)
         button_layout.addWidget(add_button)
 
-        # Remove Task Button - increased from 12 to 13
+        # Remove Task Button
         remove_button = QPushButton("Remove Selected")
         remove_button.setFont(QFont("Arial", 13))
         remove_button.setStyleSheet("""
@@ -727,12 +711,12 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-        # Game Settings Section - increased from 14 to 16
+        # Game Settings Section
         settings_label = QLabel("Game Settings:")
         settings_label.setFont(QFont("Arial", 16))
         layout.addWidget(settings_label)
 
-        # Shake Animation Toggle - increased from 12 to 13
+        # Shake Animation Toggle
         self.shake_checkbox = QCheckBox("Enable Shaking Animation")
         self.shake_checkbox.setFont(QFont("Arial", 13))
         self.shake_checkbox.setStyleSheet("""
@@ -768,10 +752,10 @@ class SettingsDialog(QDialog):
         self.load_shaking_setting()
         layout.addWidget(self.shake_checkbox)
 
-        # Bottom buttons - increased from 12 to 13
+        # Bottom buttons
         dialog_buttons = QHBoxLayout()
 
-        # Save Button - increased from 12 to 13
+        # Save Button
         save_button = QPushButton("Save Changes")
         save_button.setFont(QFont("Arial", 13))
         save_button.setStyleSheet("""
@@ -789,7 +773,7 @@ class SettingsDialog(QDialog):
         save_button.clicked.connect(self.save_settings)
         dialog_buttons.addWidget(save_button)
 
-        # Cancel Button - increased from 12 to 13
+        # Cancel Button
         cancel_button = QPushButton("Cancel")
         cancel_button.setFont(QFont("Arial", 13))
         cancel_button.setStyleSheet("""
@@ -833,7 +817,8 @@ class SettingsDialog(QDialog):
                 True,           # active
                 False,          # is_daily
                 False,          # is_weekly
-                ""              # description
+                "",             # description
+                0               # count
             ))
             self.task_model.endInsertRows()
 
@@ -900,7 +885,7 @@ class SettingsDialog(QDialog):
         tasks = self.task_model._tasks
         seen_names = set()
 
-        for i, (name, min_count, max_count, active, is_daily, is_weekly, _) in enumerate(tasks):
+        for i, (name, min_count, max_count, active, is_daily, is_weekly, _, _) in enumerate(tasks):
             # Check for empty names
             if not name.strip():
                 QMessageBox.warning(self, "Invalid Task",
