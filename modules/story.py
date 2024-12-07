@@ -186,12 +186,7 @@ class StoryManager:
 
             # Update UI if available
             if self.ui:
-                html_content = content.to_html()
-                self.ui.story_display.set_page(
-                    self.current_node_key,
-                    html_content,
-                    content.image_path
-                )
+                self.ui.story_display.set_page(content)
                 logging.info(f"Displayed story segment for node: {self.current_node_key}")
 
             return True
@@ -253,7 +248,8 @@ class StoryManager:
                 event=node.event,
                 npc_info=node.npc_info,
                 battle_info=node.battle_info,
-                choices=node.choices
+                choices=node.choices,
+                image_prompt=node.image_prompt  # Ensure image_prompt is passed
             )
 
         except Exception as e:
@@ -292,12 +288,7 @@ class StoryManager:
             self._current_content = content
 
             if self.ui:
-                html_content = content.to_html()
-                self.ui.story_display.set_page(
-                    self.current_node_key,
-                    html_content,
-                    content.image_path
-                )
+                self.ui.story_display.set_page(content)
                 logging.info(f"Updated display with node: {node_key}")
 
             return True

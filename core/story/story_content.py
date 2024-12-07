@@ -12,6 +12,7 @@ class StoryContent:
     npc_info: Optional[Dict] = None
     battle_info: Optional[Dict] = None
     choices: Optional[List[Dict]] = None
+    image_prompt: Optional[str] = None
 
     def to_html(self) -> str:
         """Convert content to HTML format for display."""

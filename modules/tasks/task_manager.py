@@ -12,8 +12,7 @@ DEFAULT_TASKS = {
     "Example Task": {
         "min": 3,
         "max": 5,
-        "active": True,
-        "description": "An example task"
+        "active": True
     }
 }
 
@@ -197,7 +196,7 @@ class TaskManager:
         return len(self.tasks)
 
     def add_task(self, name: str, min_steps: int, max_steps: int, 
-                 active: bool = True, description: Optional[str] = None) -> bool:
+             active: bool = True) -> bool:
         """
         Add a new task.
         
@@ -206,7 +205,6 @@ class TaskManager:
             min_steps: Minimum steps required
             max_steps: Maximum steps allowed
             active: Whether task is active
-            description: Optional task description
             
         Returns:
             bool: True if task added successfully, False otherwise.
@@ -224,8 +222,7 @@ class TaskManager:
                 name=name,
                 min_count=min_steps,
                 max_count=max_steps,
-                active=active,
-                description=description
+                active=active
             )
             
             logging.info(f"Added new task: {name}")
@@ -235,8 +232,7 @@ class TaskManager:
             return False
 
     def update_task(self, name: str, min_steps: Optional[int] = None, 
-                   max_steps: Optional[int] = None, active: Optional[bool] = None, 
-                   description: Optional[str] = None) -> bool:
+               max_steps: Optional[int] = None, active: Optional[bool] = None) -> bool:
         """
         Update an existing task.
         
@@ -245,7 +241,6 @@ class TaskManager:
             min_steps: New minimum steps (optional)
             max_steps: New maximum steps (optional)
             active: New active state (optional)
-            description: New description (optional)
             
         Returns:
             bool: True if update successful, False otherwise.
@@ -264,9 +259,6 @@ class TaskManager:
             
             if active is not None:
                 task.active = bool(active)
-                
-            if description is not None:
-                task.description = description
             
             logging.info(f"Updated task: {name}")
             return True

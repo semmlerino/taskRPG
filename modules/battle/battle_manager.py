@@ -30,7 +30,6 @@ class Enemy:
     name: str
     max_hp: int
     task_name: str
-    task_description: str
     current_hp: Optional[int] = None
 
     def __post_init__(self):
@@ -175,7 +174,6 @@ class BattleManager:
             self.current_enemy = Enemy(
                 name=enemy_name,
                 task_name=task.name,
-                task_description=task.description or f"Complete {task.name} task",
                 max_hp=initial_hp,
                 current_hp=initial_hp
             )
@@ -545,26 +543,34 @@ class BattleManager:
         """Show compact battle window."""
         try:
             if not self.compact_window and self.is_in_battle():
+                logging.debug("Creating new compact battle window")
                 self.compact_window = CompactBattleWindow()
                 
+                # Position the window
                 screen = QApplication.primaryScreen()
                 screen_geo = screen.availableGeometry()
-                
                 margin = 10
                 x = screen_geo.width() - self.compact_window.width() - margin
                 y = margin
-                
                 self.compact_window.move(x, y)
                 
-                # Update display and pause state
+                # Initialize pause state before showing window
+                self.compact_window.update_pause_state(self.paused)
+                logging.debug(f"Initialized compact window pause state: {self.paused}")
+                
+                # Update display if we have an enemy
                 if self.current_enemy:
                     self.compact_window.update_display(self.current_enemy)
-                    # Ensure pause state is synced
-                    self.compact_window.update_pause_state(self.paused)
+                    logging.debug("Updated compact window with enemy display")
+                
+                # Show and raise window
                 self.compact_window.show()
                 self.compact_window.raise_()
                 
-                logging.info("Compact battle window shown")
+                # Validate state consistency after showing
+                self._validate_pause_state()
+                
+                logging.info(f"Compact battle window shown and initialized with pause state: {self.paused}")
                 
         except Exception as e:
             logging.error(f"Error showing compact window: {e}")
@@ -573,10 +579,21 @@ class BattleManager:
         """Hide and cleanup compact battle window."""
         try:
             if self.compact_window:
+                # Store the current pause state before cleanup
+                was_paused = self.compact_window._is_paused
+                
+                # Cleanup the window
                 self.compact_window.close()
                 self.compact_window.deleteLater()
                 self.compact_window = None
-                logging.info("Compact battle window hidden and cleaned up")
+                
+                # Ensure main window components reflect the correct pause state
+                if self.enemy_panel:
+                    self.enemy_panel.update_pause_state(was_paused)
+                if self.action_buttons:
+                    self.action_buttons.setEnabled(not was_paused)
+                
+                logging.info(f"Compact battle window hidden and cleaned up. Pause state synchronized: {was_paused}")
                 
         except Exception as e:
             logging.error(f"Error hiding compact window: {e}")
@@ -586,24 +603,34 @@ class BattleManager:
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
         try:
+            # Toggle the central pause state
             self.paused = not self.paused
             status = "paused" if self.paused else "resumed"
+            logging.debug(f"Toggling pause state to: {status}")
 
-            # Update UI components
+            # Synchronize UI components in a specific order
+            # 1. First update main window components
             if self.action_buttons:
                 self.action_buttons.setEnabled(not self.paused)
-        
+                logging.debug("Action buttons pause state updated")
+    
             if self.enemy_panel:
                 self.enemy_panel.update_pause_state(self.paused)
+                logging.debug("Enemy panel pause state updated")
 
-            # Update compact window if it exists
+            # 2. Then update compact window if it exists
             if self.compact_window:
-                self.compact_window.update_pause_state(self.paused)
-                # Force a display update to ensure text is correct
+                # Ensure compact window state matches
+                if self.compact_window._is_paused != self.paused:
+                    self.compact_window.update_pause_state(self.paused)
+                    logging.debug("Compact window pause state synchronized")
+                
+                # Always update display to ensure consistency
                 if self.current_enemy:
                     self.compact_window.update_display(self.current_enemy)
+                    logging.debug("Compact window display updated")
 
-            # Update battle state timing
+            # 3. Update battle state timing
             if self.paused:
                 self.battle_state.paused_time = time.time()
             elif self.battle_state.paused_time:
@@ -611,11 +638,35 @@ class BattleManager:
                 self.battle_state.total_pause_duration += pause_duration
                 self.battle_state.paused_time = None
 
-            self._update_status(f"Battle {status}")
+            # Validate pause state consistency
+            self._validate_pause_state()
         
+            self._update_status(f"Battle {status}")
+    
         except Exception as e:
             logging.error(f"Error toggling pause: {e}")
             self._show_error("Failed to toggle pause state")
+
+    def _validate_pause_state(self) -> None:
+        """Validate that pause state is consistent across all components."""
+        try:
+            if self.compact_window and self.compact_window._is_paused != self.paused:
+                logging.warning("Pause state mismatch detected between BattleManager and compact window")
+                self.compact_window.update_pause_state(self.paused)
+        
+            # Check enemy panel state if it exists and has the pause state attribute
+            if self.enemy_panel and hasattr(self.enemy_panel, '_is_paused'):
+                if self.enemy_panel._is_paused != self.paused:
+                    logging.warning("Pause state mismatch detected between BattleManager and enemy panel")
+                    self.enemy_panel.update_pause_state(self.paused)
+                
+            # Validate action buttons enabled state
+            if self.action_buttons and self.action_buttons.isEnabled() == self.paused:
+                logging.warning("Action buttons enabled state inconsistent with pause state")
+                self.action_buttons.setEnabled(not self.paused)
+            
+        except Exception as e:
+            logging.error(f"Error validating pause state: {e}")
 
     def is_in_battle(self) -> bool:
         """Check if currently in battle."""

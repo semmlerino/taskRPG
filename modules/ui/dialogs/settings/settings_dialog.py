@@ -14,7 +14,7 @@ from PyQt5.QtGui import QFont
 from modules.tasks.task_manager import TaskManager
 from modules.constants import DATA_DIR
 from .task_table_model import TaskTableModel
-from .delegates import RowHoverDelegate, CheckBoxCenterDelegate
+from .delegates import CheckBoxHoverDelegate
 from .settings_manager import SettingsManager
 from . import styles
 
@@ -55,41 +55,29 @@ class SettingsDialog(QDialog):
         title_label.setStyleSheet("color: #2196F3;")
         layout.addWidget(title_label, alignment=Qt.AlignCenter)
 
-        # Task table
-        self.setup_task_table()
-        layout.addWidget(self.task_view)
-
-        # Task Management Buttons
-        self.setup_task_buttons(layout)
-
-        # Game Settings Section
-        settings_label = QLabel("Game Settings:")
-        settings_label.setFont(QFont("Arial", 16))
-        layout.addWidget(settings_label)
-
-        # Shake Animation Toggle
-        self.setup_shake_animation(layout)
-
-        # Bottom buttons
-        self.setup_dialog_buttons(layout)
-
-        self.setLayout(layout)
-
-    def setup_task_table(self):
-        """Set up the task table view."""
-        # Create and set up the task view
+        # Task Table
         self.task_view = QTableView()
         self.task_view.setFont(QFont("Arial", 13))
         self.task_view.setStyleSheet(styles.TABLE_STYLE)
-        self.task_view.setSelectionBehavior(QTableView.SelectRows)
         self.task_view.setSelectionMode(QTableView.SingleSelection)
-        self.task_view.setShowGrid(False)
+        self.task_view.setSelectionBehavior(QTableView.SelectRows)
         self.task_view.setAlternatingRowColors(True)
-        self.task_view.setItemDelegate(RowHoverDelegate(self.task_view))
+        self.task_view.setDragEnabled(True)
+        self.task_view.setAcceptDrops(True)
+        self.task_view.setDragDropMode(QTableView.InternalMove)
+        self.task_view.setDropIndicatorShown(True)
+        self.task_view.setShowGrid(True)
+        self.task_view.horizontalHeader().setHighlightSections(False)
         
-        # Create and set the model
-        self.task_model = TaskTableModel(self.task_manager.tasks)
+        # Set the drag drop overlay mode to always show between items
+        self.task_view.setDragDropOverwriteMode(False)
+
+        # Set up the model and delegate
+        self.task_model = TaskTableModel(self.task_manager.tasks, self)
         self.task_view.setModel(self.task_model)
+        
+        # Set custom delegate for hover effects and checkboxes
+        self.task_view.setItemDelegate(CheckBoxHoverDelegate(self.task_view))
         
         # Enable mouse tracking for hover effects
         self.task_view.setMouseTracking(True)
@@ -97,32 +85,30 @@ class SettingsDialog(QDialog):
         # Set up the header
         header = self.task_view.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Interactive)
-        header.setStretchLastSection(False)  # Changed to False to allow explicit sizing
+        header.setStretchLastSection(False)  # Important to show all columns
         header.setStyleSheet(styles.HEADER_STYLE)
         
         # Set column widths and alignment
-        self.task_view.setColumnWidth(0, 200)  # Name column
-        self.task_view.setColumnWidth(1, 60)   # Min column
-        self.task_view.setColumnWidth(2, 60)   # Max column
-        self.task_view.setColumnWidth(3, 80)   # Active column
-        self.task_view.setColumnWidth(4, 80)   # Daily column
-        self.task_view.setColumnWidth(5, 80)   # Weekly column
-        self.task_view.setColumnWidth(6, 200)  # Description column
-        self.task_view.setColumnWidth(7, 80)   # Count column
+        self.task_view.setColumnWidth(0, 200)  # Name
+        self.task_view.setColumnWidth(1, 60)   # Min
+        self.task_view.setColumnWidth(2, 60)   # Max
+        self.task_view.setColumnWidth(3, 100)  # Active
+        self.task_view.setColumnWidth(4, 100)  # Daily
+        self.task_view.setColumnWidth(5, 100)  # Weekly
+        self.task_view.setColumnWidth(6, 80)   # Count
         
-        # Center the checkboxes and numbers
-        for col in [1, 2, 3, 4, 5, 7]:  # Min, Max, Active, Daily, Weekly, Count
+        # Center align checkboxes and numeric columns
+        for col in [1, 2, 3, 4, 5, 6]:  # Min, Max, Active, Daily, Weekly, Count
             self.task_model.setHeaderData(col, Qt.Horizontal, Qt.AlignCenter, Qt.TextAlignmentRole)
-            if col in [3, 4, 5]:  # Only checkboxes
-                self.task_view.setItemDelegateForColumn(col, CheckBoxCenterDelegate(self.task_view))
-            
+        
         # Set vertical header (row numbers)
         vertical_header = self.task_view.verticalHeader()
-        vertical_header.setDefaultSectionSize(40)
+        vertical_header.setDefaultSectionSize(40)  # Increase row height
         vertical_header.setStyleSheet(styles.VERTICAL_HEADER_STYLE)
+            
+        layout.addWidget(self.task_view)
 
-    def setup_task_buttons(self, layout):
-        """Set up task management buttons."""
+        # Task Management Buttons
         button_layout = QHBoxLayout()
 
         # Add Task Button
@@ -141,16 +127,19 @@ class SettingsDialog(QDialog):
 
         layout.addLayout(button_layout)
 
-    def setup_shake_animation(self, layout):
-        """Set up shake animation checkbox."""
+        # Game Settings Section
+        settings_label = QLabel("Game Settings:")
+        settings_label.setFont(QFont("Arial", 16))
+        layout.addWidget(settings_label)
+
+        # Shake Animation Toggle
         self.shake_checkbox = QCheckBox("Enable Shaking Animation")
         self.shake_checkbox.setFont(QFont("Arial", 13))
         self.shake_checkbox.setStyleSheet(styles.CHECKBOX_STYLE)
         self.load_shaking_setting()
         layout.addWidget(self.shake_checkbox)
 
-    def setup_dialog_buttons(self, layout):
-        """Set up dialog buttons."""
+        # Bottom buttons
         dialog_buttons = QHBoxLayout()
 
         # Save Button
@@ -168,6 +157,8 @@ class SettingsDialog(QDialog):
         dialog_buttons.addWidget(cancel_button)
 
         layout.addLayout(dialog_buttons)
+        
+        self.setLayout(layout)
 
     def load_shaking_setting(self):
         """Load shake animation setting from settings file."""
@@ -292,14 +283,6 @@ class SettingsDialog(QDialog):
             weekly_checkbox.setFont(QFont("Arial", 13))
             layout.addWidget(weekly_checkbox)
 
-            # Description
-            desc_label = QLabel("Description:")
-            desc_label.setFont(QFont("Arial", 13))
-            layout.addWidget(desc_label)
-            desc_edit = QTextEdit()
-            desc_edit.setFont(QFont("Arial", 13))
-            layout.addWidget(desc_edit)
-
             # Count
             count_label = QLabel("Count:")
             count_label.setFont(QFont("Arial", 13))
@@ -334,7 +317,6 @@ class SettingsDialog(QDialog):
                     active_checkbox.isChecked(),  # active
                     daily_checkbox.isChecked(),  # is_daily
                     weekly_checkbox.isChecked(),  # is_weekly
-                    desc_edit.toPlainText(),  # description
                     count_spin.value()  # count
                 ))
                 self.task_model.endInsertRows()
@@ -384,7 +366,7 @@ class SettingsDialog(QDialog):
         tasks = self.task_model._tasks
         seen_names = set()
 
-        for i, (name, min_count, max_count, active, is_daily, is_weekly, _, count) in enumerate(tasks):
+        for i, (name, min_count, max_count, active, is_daily, is_weekly, count) in enumerate(tasks):
             # Check for empty names
             if not name.strip():
                 QMessageBox.warning(self, "Invalid Task",

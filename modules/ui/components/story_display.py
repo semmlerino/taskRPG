@@ -40,6 +40,7 @@ class StoryDisplay(QWidget):
         super().__init__(parent)
         self.current_node_key = None
         self.current_image_path = None
+        self.current_image_prompt = None
         self._fullscreen_viewer = None
         
         # Enable keyboard focus for hotkey support
@@ -88,31 +89,31 @@ class StoryDisplay(QWidget):
         layout.addWidget(self.splitter)
         self.setLayout(layout)
 
-    def set_page(self, node_key: str, html_content: str, image_path: str = None):
-        """Set the content for the current story page.
-        
-        Args:
-            node_key: Identifier for the current story node
-            html_content: HTML formatted text content
-            image_path: Path to the image file (optional)
-        """
+    def set_page(self, content: 'StoryContent'):
+        """Set the page content."""
         try:
-            self.current_node_key = node_key
+            self.current_node_key = content.node_key
             self.story_text.clear()
             
+            # Store image prompt
+            logging.info(f"Setting image prompt: {content.image_prompt}")
+            self.current_image_prompt = content.image_prompt
+            
             # Only update image if we have a new one
-            if image_path:
-                self.current_image_path = image_path
+            if content.image_path:
+                self.current_image_path = content.image_path
                 self.load_image()
             # Don't clear the image if no new image is provided
             
-            self.story_text.append(html_content)
+            self.story_text.append(content.to_html())
             
             # Update fullscreen viewer if active
             if self._fullscreen_viewer:
+                logging.info(f"Updating fullscreen viewer with prompt: {self.current_image_prompt}")
                 self._fullscreen_viewer.update_content(
                     self.current_image_path,
-                    self.story_text.toPlainText()
+                    self.story_text.toPlainText(),
+                    self.current_image_prompt
                 )
                 
             self.setFocus()
@@ -190,11 +191,19 @@ class StoryDisplay(QWidget):
 
             self.cleanup_viewer()
             
-            # Create new fullscreen viewer
+            logging.info(f"Current image prompt before creating viewer: {self.current_image_prompt}")
+            
+            # Create new fullscreen viewer with image prompt
             self._fullscreen_viewer = FullscreenImageViewer(
                 self.current_image_path,
-                self.story_text.toPlainText()
+                self.story_text.toPlainText(),
+                self.current_image_prompt
             )
+            
+            # Verify prompt was set
+            if hasattr(self._fullscreen_viewer, 'prompt_label'):
+                logging.info(f"Fullscreen viewer prompt text: {self._fullscreen_viewer.prompt_label.toPlainText()}")
+                logging.info(f"Prompt visible: {self._fullscreen_viewer.prompt_label.isVisible()}")
             
             # Connect signals
             main_window = self.window()

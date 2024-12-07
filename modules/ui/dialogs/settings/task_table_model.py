@@ -13,8 +13,8 @@ class TaskTableModel(QAbstractTableModel):
     def __init__(self, tasks: Dict[str, Task], parent=None):
         """Initialize the model with tasks dictionary."""
         super().__init__(parent)
-        self._tasks: List[Tuple[str, int, int, bool, bool, bool, Optional[str], int]] = []
-        self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly', 'Description', 'Count']
+        self._tasks: List[Tuple[str, int, int, bool, bool, bool, int]] = []
+        self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly', 'Count']
         self._original_tasks = tasks
         self._drag_source_row = -1
         
@@ -27,7 +27,6 @@ class TaskTableModel(QAbstractTableModel):
                 task.active,
                 task.is_daily,
                 task.is_weekly,
-                task.description,
                 task.count
             ))
         logging.debug(f"TaskTableModel initialized with {len(self._tasks)} tasks")
@@ -59,8 +58,8 @@ class TaskTableModel(QAbstractTableModel):
         elif index.column() in [3, 4, 5]:
             flags |= Qt.ItemIsUserCheckable
             
-        # Make Description and Count columns editable
-        elif index.column() in [6, 7]:
+        # Make Count column editable
+        elif index.column() == 6:
             flags |= Qt.ItemIsEditable
             
         return flags
@@ -80,10 +79,8 @@ class TaskTableModel(QAbstractTableModel):
                 return self._tasks[row][1]
             elif col == 2:  # Max
                 return self._tasks[row][2]
-            elif col == 6:  # Description
-                return self._tasks[row][6] or ""
-            elif col == 7:  # Count
-                return self._tasks[row][7]
+            elif col == 6:  # Count
+                return self._tasks[row][6]
         
         elif role == Qt.CheckStateRole:
             if col == 3:  # Active
@@ -113,11 +110,9 @@ class TaskTableModel(QAbstractTableModel):
                 elif col == 2:  # Max
                     value = max(self._tasks[row][1], int(value))
                     self._tasks[row] = (*self._tasks[row][:2], value, *self._tasks[row][3:])
-                elif col == 6:  # Description
-                    self._tasks[row] = (*self._tasks[row][:6], str(value), self._tasks[row][7])
-                elif col == 7:  # Count
+                elif col == 6:  # Count
                     value = max(0, int(value))
-                    self._tasks[row] = (*self._tasks[row][:7], value)
+                    self._tasks[row] = (*self._tasks[row][:6], value)
                     
             elif role == Qt.CheckStateRole:
                 value = bool(value == Qt.Checked)
@@ -220,8 +215,7 @@ class TaskTableModel(QAbstractTableModel):
                 active=task_data[3],
                 is_daily=task_data[4],
                 is_weekly=task_data[5],
-                description=task_data[6],
-                count=task_data[7]
+                count=task_data[6]
             )
             tasks[task.name] = task
         return tasks

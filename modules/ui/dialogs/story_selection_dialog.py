@@ -30,7 +30,7 @@ from PyQt5.QtCore import Qt, QSize, QByteArray
 
 # Project imports
 from modules.constants import STORIES_DIR, ASSETS_DIR, DATA_DIR
-from modules.ui.dialogs.settings_dialog import SettingsDialog
+from modules.ui.dialogs.settings import SettingsDialog
 from modules.story import StoryManager
 from modules.image_generator import ImageGenerator
 
@@ -715,4 +715,3 @@ class StorySelectionDialog(QDialog):
 
         except Exception as e:
             logging.error(f"Error saving dialog settings: {e}")
-

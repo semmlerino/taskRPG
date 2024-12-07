@@ -25,8 +25,7 @@ DEFAULT_TASKS = {
     "Example Task": {
         "min": 3,
         "max": 5,
-        "active": True,
-        "description": "An example task"
+        "active": True
     }
 }
 

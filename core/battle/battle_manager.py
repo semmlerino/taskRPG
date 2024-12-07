@@ -123,7 +123,6 @@ class BattleManager:
             self.current_enemy = Enemy(
                 name=enemy_name,
                 task_name=task.name,
-                task_description=task.description or f"Complete {task.name} task",
                 max_hp=initial_hp,
                 current_hp=initial_hp
             )

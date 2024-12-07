@@ -2,15 +2,16 @@
     "shake_animation": true,
     "window_geometry": "AdnQywADAAAAAAJTAAABCQAAB0wAAAV7AAACVAAAATYAAAdLAAAFegAAAAAAAAAACgAAAAJUAAABNgAAB0sAAAV6",
     "column_widths": [
-        250,
+        537,
         69,
         67,
         91,
         78,
-        641
+        159,
+        80
     ],
     "window": {
-        "width": 900,
-        "height": 736
+        "width": 2560,
+        "height": 1494
     }
 }

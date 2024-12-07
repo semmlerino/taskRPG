@@ -73,9 +73,10 @@ class FullscreenImageViewer(QMainWindow):
     story_advance_signal = pyqtSignal()
     navigate_back_signal = pyqtSignal()
     
-    def __init__(self, image_path, story_text, parent=None):
+    def __init__(self, image_path, story_text, image_prompt=None, parent=None):
         super().__init__(parent)
         logging.info("Initializing FullscreenImageViewer")
+        logging.info(f"Image prompt received: {image_prompt}")
         
         # Set window properties
         self.setStyleSheet("background-color: black;")
@@ -97,6 +98,44 @@ class FullscreenImageViewer(QMainWindow):
         self.text_browser.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.text_browser.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 
+        # Create prompt label
+        self.prompt_label = OutlinedTextBrowser(central_widget)
+        self.prompt_label.setStyleSheet("""
+            QTextBrowser {
+                background-color: rgba(0, 0, 0, 128);
+                border: 2px solid white;
+                border-radius: 5px;
+                color: white;
+                font-size: 18pt;
+                padding: 10px;
+                margin: 10px;
+            }
+        """)
+        self.prompt_label.setReadOnly(True)
+        self.prompt_label.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.prompt_label.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.prompt_label.setVisible(False)  # Set prompt to invisible by default
+        self.prompt_label.setMinimumHeight(100)  # Ensure minimum height
+        if image_prompt:
+            logging.info("Setting initial prompt text")
+            self.prompt_label.setText("Image Prompt:\n" + image_prompt)
+            logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
+            logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
+        
+        # Create layout for central widget
+        layout = QVBoxLayout(central_widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        layout.addWidget(self.image_label)
+        
+        # Add prompt and text browser to central widget
+        self.prompt_label.setParent(central_widget)
+        self.text_browser.setParent(central_widget)
+        
+        # Ensure prompt and text are on top of the image
+        self.prompt_label.raise_()
+        self.text_browser.raise_()
+        
         # Load and display image
         self.original_pixmap = QPixmap(image_path)
         self.scale_image()
@@ -109,7 +148,8 @@ class FullscreenImageViewer(QMainWindow):
         
         # Initialize state
         self.text_visible = True
-
+        self.prompt_visible = False  # Set prompt to invisible by default
+        
         # Set focus policy to accept keyboard input
         self.setFocusPolicy(Qt.StrongFocus)
 
@@ -119,6 +159,7 @@ class FullscreenImageViewer(QMainWindow):
         QShortcut(QKeySequence('Escape'), self, self.close)
         QShortcut(QKeySequence('T'), self, self.toggle_text)
         QShortcut(QKeySequence('G'), self, self.advance_story)
+        QShortcut(QKeySequence('I'), self, self.toggle_prompt)
 
     def position_elements(self):
         """Position the image and text elements."""
@@ -137,6 +178,22 @@ class FullscreenImageViewer(QMainWindow):
             screen_rect.width() - (side_margin * 2),  # Width (with margins on both sides)
             text_height
         )
+
+        # Position prompt at the top with margins
+        prompt_height = max(int(screen_rect.height() * 0.15), 100)  # At least 100px or 15% of screen height
+        prompt_top_margin = 20
+        self.prompt_label.setGeometry(
+            side_margin,
+            prompt_top_margin,
+            screen_rect.width() - (side_margin * 2),
+            prompt_height
+        )
+        
+        # Ensure prompt and text stay on top and are visible
+        self.prompt_label.raise_()
+        self.text_browser.raise_()
+        self.prompt_label.setVisible(False)  # Keep prompt invisible by default
+        logging.info(f"Position updated - Prompt visible: {self.prompt_label.isVisible()}, Text: {self.prompt_label.toPlainText()}")
 
     def resizeEvent(self, event):
         """Handle window resize events."""
@@ -166,6 +223,12 @@ class FullscreenImageViewer(QMainWindow):
         self.text_visible = not self.text_visible
         self.text_browser.setVisible(self.text_visible)
 
+    def toggle_prompt(self):
+        """Toggle prompt visibility."""
+        self.prompt_visible = not self.prompt_visible
+        self.prompt_label.setVisible(self.prompt_visible)
+        logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
+
     def advance_story(self):
         """Handle story progression request."""
         try:
@@ -188,6 +251,8 @@ class FullscreenImageViewer(QMainWindow):
                 self.navigate_back()
             elif event.key() == Qt.Key_T:
                 self.toggle_text()
+            elif event.key() == Qt.Key_I:
+                self.toggle_prompt()
             elif event.key() in (Qt.Key_Escape, Qt.Key_F):
                 self.close()
             else:
@@ -245,13 +310,26 @@ class FullscreenImageViewer(QMainWindow):
             Qt.SmoothTransformation
         )
 
-    def update_content(self, image_path: str, text: str):
+    def update_content(self, image_path: str, text: str, prompt: str = None):
         """Update the viewer content."""
         try:
+            logging.info(f"Updating content with prompt: {prompt}")
             if image_path and os.path.exists(image_path):
                 self.original_pixmap = QPixmap(image_path)
                 self.scale_image()
             self.text_browser.setText(text)
+            if prompt:
+                logging.info("Setting prompt text in update_content")
+                self.prompt_label.setText("Image Prompt:\n" + prompt)
+                self.prompt_label.setVisible(False)  # Keep prompt invisible by default
+                self.prompt_visible = False  # Update state
+                logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
+                logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
+                self.prompt_label.raise_()
+            else:
+                logging.info("No prompt provided, hiding prompt label")
+                self.prompt_label.setVisible(False)
+                self.prompt_visible = False
         except Exception as e:
             logging.error(f"Error updating fullscreen content: {e}")
 

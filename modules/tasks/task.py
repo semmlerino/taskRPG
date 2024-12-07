@@ -10,7 +10,6 @@ class Task:
     min_count: int
     max_count: int
     active: bool = True
-    description: Optional[str] = None
     is_daily: bool = False
     is_weekly: bool = False
     next_activation_time: Optional[float] = None
@@ -104,7 +103,6 @@ class Task:
             min_count=data.get('min', 1),
             max_count=data.get('max', 1),
             active=data.get('active', True),
-            description=data.get('description'),
             is_daily=data.get('is_daily', False),
             is_weekly=data.get('is_weekly', False),
             next_activation_time=data.get('next_activation_time'),
@@ -123,7 +121,6 @@ class Task:
             'min': self.min_count,
             'max': self.max_count,
             'active': self.is_active,  # Use property instead of raw field
-            'description': self.description,
             'is_daily': self.is_daily,
             'is_weekly': self.is_weekly,
             'next_activation_time': self.next_activation_time,
