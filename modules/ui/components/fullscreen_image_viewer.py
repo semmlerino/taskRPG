@@ -118,7 +118,12 @@ class FullscreenImageViewer(QMainWindow):
         self.prompt_label.setMinimumHeight(100)  # Ensure minimum height
         if image_prompt:
             logging.info("Setting initial prompt text")
-            self.prompt_label.setText("Image Prompt:\n" + image_prompt)
+            # Convert image_prompt to string if it's a dictionary
+            if isinstance(image_prompt, dict):
+                prompt_str = str(image_prompt)
+            else:
+                prompt_str = str(image_prompt)
+            self.prompt_label.setText("Image Prompt:\n" + prompt_str)
             logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
             logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
         
@@ -320,7 +325,12 @@ class FullscreenImageViewer(QMainWindow):
             self.text_browser.setText(text)
             if prompt:
                 logging.info("Setting prompt text in update_content")
-                self.prompt_label.setText("Image Prompt:\n" + prompt)
+                # Convert prompt to string if it's a dictionary
+                if isinstance(prompt, dict):
+                    prompt_str = str(prompt)
+                else:
+                    prompt_str = str(prompt)
+                self.prompt_label.setText("Image Prompt:\n" + prompt_str)
                 self.prompt_label.setVisible(False)  # Keep prompt invisible by default
                 self.prompt_visible = False  # Update state
                 logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")

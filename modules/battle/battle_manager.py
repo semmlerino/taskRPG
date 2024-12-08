@@ -273,16 +273,18 @@ class BattleManager:
             if self.current_enemy and self.current_enemy.task_name:
                 task = self.task_manager.get_task(self.current_enemy.task_name)
                 if task:
+                    was_decremented = False
                     # Handle count decrementing
                     if task.count > 0:
                         task.count -= 1
-                        if task.count == 0:
+                        was_decremented = True
+                        if task.count == 0 and was_decremented:
                             task.active = False
                     
-                    # For daily/weekly tasks, handle reactivation logic
-                    if task.is_daily or task.is_weekly:
+                    # For daily/weekly tasks, only deactivate if count was decremented
+                    if was_decremented and (task.is_daily or task.is_weekly):
                         task.deactivate()  # This will handle daily task reactivation logic
-                    elif task.count == 0:
+                    elif task.count == 0 and was_decremented:
                         task.active = False
                     
                     self.task_manager.save_tasks()  # Save task state changes
@@ -390,28 +392,11 @@ class BattleManager:
     def _update_ui_for_victory(self, xp_gained: int) -> None:
         """Update UI elements after victory with enhanced feedback."""
         try:
-            # Prepare victory message with stats
-            stats = []
-            if self.battle_state.turns_taken:
-                stats.append(f"Turns taken: {self.battle_state.turns_taken}")
-            if self.battle_state.battle_start_time:
-                battle_duration = time.time() - self.battle_state.battle_start_time
-                stats.append(f"Battle duration: {battle_duration:.1f}s")
-                
             victory_message = (
                 "<div class='victory-message' style='text-align: center;'>"
-                f"<h3>Victory!</h3>"
-                f"<p>You gained <b>{xp_gained}</b> XP!</p>"
+                "<h3>Victory!</h3>"
+                "</div>"
             )
-            
-            if stats:
-                victory_message += (
-                    "<p class='battle-stats' style='font-size: 0.9em; color: #666;'>"
-                    f"{' | '.join(stats)}"
-                    "</p>"
-                )
-                
-            victory_message += "</div>"
             
             # Update UI components
             updates = {
@@ -430,7 +415,7 @@ class BattleManager:
             # Trigger victory animation if enabled
             if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
                 self.main_window.trigger_victory_animation()
-                
+            
             logging.info("Victory UI updates completed")
                 
         except Exception as e:
@@ -520,7 +505,6 @@ class BattleManager:
             
         except Exception as e:
             logging.error(f"Error setting UI components: {e}")
-            self._show_error("Failed to initialize battle UI")
 
     def update_tasks_left(self) -> None:
         """Update the tasks remaining display."""
@@ -588,10 +572,14 @@ class BattleManager:
                 self.compact_window = None
                 
                 # Ensure main window components reflect the correct pause state
+                self.paused = was_paused
                 if self.enemy_panel:
                     self.enemy_panel.update_pause_state(was_paused)
                 if self.action_buttons:
                     self.action_buttons.setEnabled(not was_paused)
+                
+                # Validate state consistency
+                self._validate_pause_state()
                 
                 logging.info(f"Compact battle window hidden and cleaned up. Pause state synchronized: {was_paused}")
                 
@@ -608,7 +596,7 @@ class BattleManager:
             status = "paused" if self.paused else "resumed"
             logging.debug(f"Toggling pause state to: {status}")
 
-            # Synchronize UI components in a specific order
+            # Synchronize UI components in a specific order to maintain consistency
             # 1. First update main window components
             if self.action_buttons:
                 self.action_buttons.setEnabled(not self.paused)
@@ -620,25 +608,19 @@ class BattleManager:
 
             # 2. Then update compact window if it exists
             if self.compact_window:
-                # Ensure compact window state matches
-                if self.compact_window._is_paused != self.paused:
-                    self.compact_window.update_pause_state(self.paused)
-                    logging.debug("Compact window pause state synchronized")
-                
-                # Always update display to ensure consistency
-                if self.current_enemy:
-                    self.compact_window.update_display(self.current_enemy)
-                    logging.debug("Compact window display updated")
+                self.compact_window.update_pause_state(self.paused)
+                logging.debug("Compact window pause state updated")
 
             # 3. Update battle state timing
+            current_time = time.time()
             if self.paused:
-                self.battle_state.paused_time = time.time()
+                self.battle_state.paused_time = current_time
             elif self.battle_state.paused_time:
-                pause_duration = time.time() - self.battle_state.paused_time
+                pause_duration = current_time - self.battle_state.paused_time
                 self.battle_state.total_pause_duration += pause_duration
                 self.battle_state.paused_time = None
 
-            # Validate pause state consistency
+            # 4. Validate pause state consistency
             self._validate_pause_state()
         
             self._update_status(f"Battle {status}")
@@ -650,20 +632,23 @@ class BattleManager:
     def _validate_pause_state(self) -> None:
         """Validate that pause state is consistent across all components."""
         try:
+            # Check compact window state
             if self.compact_window and self.compact_window._is_paused != self.paused:
-                logging.warning("Pause state mismatch detected between BattleManager and compact window")
+                logging.warning("Pause state mismatch detected in compact window")
                 self.compact_window.update_pause_state(self.paused)
         
-            # Check enemy panel state if it exists and has the pause state attribute
+            # Check enemy panel state
             if self.enemy_panel and hasattr(self.enemy_panel, '_is_paused'):
                 if self.enemy_panel._is_paused != self.paused:
-                    logging.warning("Pause state mismatch detected between BattleManager and enemy panel")
+                    logging.warning("Pause state mismatch detected in enemy panel")
                     self.enemy_panel.update_pause_state(self.paused)
-                
-            # Validate action buttons enabled state
+        
+            # Check action buttons state
             if self.action_buttons and self.action_buttons.isEnabled() == self.paused:
-                logging.warning("Action buttons enabled state inconsistent with pause state")
+                logging.warning("Action buttons state inconsistent with pause state")
                 self.action_buttons.setEnabled(not self.paused)
+            
+            logging.debug(f"Pause state validation complete. Current state: {self.paused}")
             
         except Exception as e:
             logging.error(f"Error validating pause state: {e}")

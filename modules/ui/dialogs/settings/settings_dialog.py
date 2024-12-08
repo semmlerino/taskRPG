@@ -7,7 +7,7 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit
+    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu
 )
 from PyQt5.QtGui import QFont
 
@@ -81,6 +81,10 @@ class SettingsDialog(QDialog):
         
         # Enable mouse tracking for hover effects
         self.task_view.setMouseTracking(True)
+        
+        # Set up context menu
+        self.task_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.task_view.customContextMenuRequested.connect(self.show_context_menu)
         
         # Set up the header
         header = self.task_view.horizontalHeader()
@@ -361,43 +365,64 @@ class SettingsDialog(QDialog):
             logging.error(f"Error removing task: {e}")
             QMessageBox.critical(self, "Error", f"Failed to remove task: {str(e)}")
 
-    def validate_tasks(self):
-        """Validate all tasks before saving."""
-        tasks = self.task_model._tasks
-        seen_names = set()
+    def validate_tasks(self) -> bool:
+        """Validate tasks before saving."""
+        try:
+            tasks = self.task_model._tasks
+            seen_names = set()
+            
+            for i, (name, min_count, max_count, active, is_daily, is_weekly, count) in enumerate(tasks):
+                # Check for empty name
+                if not name:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Task",
+                        f"Task at row {i + 1} has no name."
+                    )
+                    return False
 
-        for i, (name, min_count, max_count, active, is_daily, is_weekly, count) in enumerate(tasks):
-            # Check for empty names
-            if not name.strip():
-                QMessageBox.warning(self, "Invalid Task",
-                    f"Task name in row {i + 1} cannot be empty.")
-                return False
+                # Check for duplicate names
+                if name in seen_names:
+                    QMessageBox.warning(
+                        self,
+                        "Duplicate Task",
+                        f"Task name '{name}' is used multiple times."
+                    )
+                    return False
+                seen_names.add(name)
 
-            # Check for duplicate names
-            if name in seen_names:
-                QMessageBox.warning(self, "Invalid Task",
-                    f"Task name '{name}' is duplicated.")
-                return False
-            seen_names.add(name)
+                # Check min/max values
+                if min_count < 1:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Min Count",
+                        f"Task '{name}' has invalid min count: {min_count}"
+                    )
+                    return False
 
-            # Validate min/max values
-            if min_count < 1:
-                QMessageBox.warning(self, "Invalid Task",
-                    f"Minimum value for task '{name}' must be at least 1.")
-                return False
+                if max_count < min_count:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Max Count",
+                        f"Task '{name}' has max count less than min count."
+                    )
+                    return False
 
-            if max_count < min_count:
-                QMessageBox.warning(self, "Invalid Task",
-                    f"Maximum value for task '{name}' must be greater than or equal to minimum.")
-                return False
+                # Check count value
+                if count < 0:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Count",
+                        f"Task '{name}' has negative count: {count}"
+                    )
+                    return False
 
-            # Validate count value
-            if count < 0:
-                QMessageBox.warning(self, "Invalid Task",
-                    f"Count value for task '{name}' cannot be negative.")
-                return False
+            return True
 
-        return True
+        except Exception as e:
+            logging.error(f"Error validating tasks: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to validate tasks: {str(e)}")
+            return False
 
     def save_settings(self):
         """Save settings and tasks."""
@@ -460,3 +485,123 @@ class SettingsDialog(QDialog):
                 event.ignore()
         else:
             event.accept()
+
+    def show_context_menu(self, position):
+        """Show context menu for task table"""
+        try:
+            index = self.task_view.indexAt(position)
+            if not index.isValid():
+                return
+                
+            row = index.row()
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
+            
+            menu = QMenu(self)
+            
+            # Show current activation time if set
+            if task.activation_time:
+                time_str = f"{task.activation_time.hour:02d}:{task.activation_time.minute:02d}"
+                current_time_action = menu.addAction(f"Current Activation Time: {time_str}")
+                current_time_action.setEnabled(False)  # Make it non-clickable
+                menu.addSeparator()
+            
+            set_time_action = menu.addAction("Set Activation Time")
+            
+            # Only show clear action if there's an activation time set
+            clear_time_action = None
+            if task.activation_time:
+                clear_time_action = menu.addAction("Clear Activation Time")
+            
+            action = menu.exec_(self.task_view.viewport().mapToGlobal(position))
+            
+            if action == set_time_action:
+                self.set_activation_time(row)
+            elif clear_time_action and action == clear_time_action:
+                self.clear_activation_time(row)
+                
+        except Exception as e:
+            logging.error(f"Error showing context menu: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to show context menu: {str(e)}")
+            
+    def set_activation_time(self, row):
+        """Set activation time for task"""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Set Activation Time")
+            layout = QVBoxLayout()
+            
+            # Time input
+            time_label = QLabel("Enter time (HH:MM):")
+            time_label.setFont(QFont("Arial", 13))
+            layout.addWidget(time_label)
+            
+            time_edit = QLineEdit()
+            time_edit.setFont(QFont("Arial", 13))
+            time_edit.setPlaceholderText("14:30")
+            if task.activation_time:
+                time_edit.setText(f"{task.activation_time.hour:02d}:{task.activation_time.minute:02d}")
+            layout.addWidget(time_edit)
+            
+            # Error label (hidden by default)
+            error_label = QLabel()
+            error_label.setStyleSheet("color: red;")
+            error_label.hide()
+            layout.addWidget(error_label)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            ok_button = QPushButton("OK")
+            cancel_button = QPushButton("Cancel")
+            button_layout.addWidget(ok_button)
+            button_layout.addWidget(cancel_button)
+            layout.addLayout(button_layout)
+            
+            dialog.setLayout(layout)
+            
+            def validate_time():
+                """Validate time format and range"""
+                time_str = time_edit.text().strip()
+                try:
+                    hour, minute = map(int, time_str.split(':'))
+                    if 0 <= hour < 24 and 0 <= minute < 60:
+                        error_label.hide()
+                        return True
+                    else:
+                        error_label.setText("Invalid time range")
+                        error_label.show()
+                except ValueError:
+                    error_label.setText("Invalid time format (use HH:MM)")
+                    error_label.show()
+                return False
+            
+            def on_ok():
+                if validate_time():
+                    task.set_activation_time(time_edit.text().strip())
+                    self.saved = False  # Mark settings as changed
+                    dialog.accept()
+            
+            ok_button.clicked.connect(on_ok)
+            cancel_button.clicked.connect(dialog.reject)
+            time_edit.textChanged.connect(lambda: ok_button.setEnabled(validate_time()))
+            
+            dialog.exec_()
+            
+        except Exception as e:
+            logging.error(f"Error setting activation time: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to set activation time: {str(e)}")
+            
+    def clear_activation_time(self, row):
+        """Clear activation time for task"""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
+            task.set_activation_time(None)
+            self.saved = False  # Mark settings as changed
+            
+        except Exception as e:
+            logging.error(f"Error clearing activation time: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to clear activation time: {str(e)}")

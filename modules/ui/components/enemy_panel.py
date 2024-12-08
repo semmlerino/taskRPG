@@ -13,6 +13,8 @@ class EnemyPanel(QWidget):
     """Displays enemy statistics and task information."""
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._is_paused = False
+        self._current_enemy = None
         self.init_ui()
     
     def init_ui(self):
@@ -60,11 +62,8 @@ class EnemyPanel(QWidget):
         """Update panel with enemy information."""
         if enemy:
             logging.debug(f"Updating enemy panel - Name: {enemy.name}, HP: {enemy.current_hp}/{enemy.max_hp}")
-            self.enemy_label.setText(enemy.name)
+            self.update_enemy(enemy)
             self.task_label.setText(enemy.task_name)
-            self.hp_bar.setMaximum(enemy.max_hp)
-            self.hp_bar.setValue(enemy.current_hp)
-            self.hp_bar.setFormat(f"{enemy.current_hp}/{enemy.max_hp}")
         else:
             logging.debug("No enemy provided to update_panel")
             self.enemy_label.setText("No Enemy")
@@ -76,6 +75,7 @@ class EnemyPanel(QWidget):
     def update_pause_state(self, is_paused: bool):
         """Update the display to show pause state."""
         try:
+            self._is_paused = is_paused
             if is_paused:
                 self.enemy_label.setText("PAUSED")
                 self.hp_bar.setStyleSheet("""
@@ -94,7 +94,7 @@ class EnemyPanel(QWidget):
                 """)
             else:
                 # Restore original style and text
-                if hasattr(self, '_current_enemy') and self._current_enemy:
+                if self._current_enemy:
                     self.enemy_label.setText(self._current_enemy.name)
                     self.hp_bar.setStyleSheet("""
                         QProgressBar {
@@ -110,5 +110,18 @@ class EnemyPanel(QWidget):
                             border-radius: 3px;
                         }
                     """)
+            logging.debug(f"Enemy panel pause state updated: {is_paused}")
         except Exception as e:
             logging.error(f"Error updating enemy panel pause state: {e}")
+
+    def update_enemy(self, enemy):
+        """Update the enemy display."""
+        try:
+            self._current_enemy = enemy
+            if not self._is_paused:
+                self.enemy_label.setText(enemy.name)
+            self.hp_bar.setMaximum(enemy.max_hp)
+            self.hp_bar.setValue(enemy.current_hp)
+            self.hp_bar.setFormat(f"{enemy.current_hp}/{enemy.max_hp}")
+        except Exception as e:
+            logging.error(f"Error updating enemy display: {e}")

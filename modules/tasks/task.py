@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from typing import Optional
 from random import randint
 import time
+from datetime import datetime, time as dt_time
+import logging
 
 @dataclass
 class Task:
@@ -15,6 +17,7 @@ class Task:
     next_activation_time: Optional[float] = None
     manually_deactivated: bool = False
     count: int = 0  # New field for usage count
+    activation_time: Optional[dt_time] = None  # New field for daily activation time
 
     def __post_init__(self):
         """Validate and fix task data after initialization"""
@@ -41,12 +44,17 @@ class Task:
         if self.manually_deactivated:
             return False
             
-        # For daily/weekly tasks, check for reactivation
-        if (self.is_daily or self.is_weekly) and not self.active and self.next_activation_time:
-            if time.time() >= self.next_activation_time:
+        # Check activation time if set
+        if self.activation_time and not self.active:
+            current_time = datetime.now().time()
+            if (current_time.hour == self.activation_time.hour and 
+                current_time.minute == self.activation_time.minute):
                 self.active = True
-                self.next_activation_time = None
-                
+                self.activation_time = None  # Clear activation time after activating
+                logging.info(f"Task '{self.name}' activated at scheduled time. Activation time cleared.")
+                return True
+            return False
+            
         return self.active
 
     def deactivate(self, manual: bool = False):
@@ -95,10 +103,38 @@ class Task:
         """Get a random count between min and max values"""
         return randint(self.min_count, self.max_count)
 
+    def set_activation_time(self, time_str: Optional[str] = None):
+        """Set the activation time for this task
+        
+        Args:
+            time_str: Time string in HH:MM format, or None to clear
+        """
+        if time_str is None:
+            self.activation_time = None
+            logging.info(f"Activation time cleared for task '{self.name}'")
+            return
+            
+        try:
+            hour, minute = map(int, time_str.split(':'))
+            self.activation_time = dt_time(hour=hour, minute=minute)
+            self.active = False  # Deactivate until activation time
+            self.manually_deactivated = False  # Clear manual deactivation
+            logging.info(f"Activation time set to {time_str} for task '{self.name}'")
+        except (ValueError, TypeError) as e:
+            logging.error(f"Invalid time format for task '{self.name}': {e}")
+
     @classmethod
     def from_dict(cls, name: str, data: dict) -> 'Task':
         """Create a Task instance from a dictionary"""
-        task = cls(
+        activation_time = None
+        if 'activation_time' in data:
+            try:
+                hour, minute = map(int, data['activation_time'].split(':'))
+                activation_time = dt_time(hour=hour, minute=minute)
+            except (ValueError, TypeError, AttributeError):
+                activation_time = None
+                
+        return cls(
             name=name,
             min_count=data.get('min', 1),
             max_count=data.get('max', 1),
@@ -107,26 +143,25 @@ class Task:
             is_weekly=data.get('is_weekly', False),
             next_activation_time=data.get('next_activation_time'),
             manually_deactivated=data.get('manually_deactivated', False),
-            count=data.get('count', 0)  # Load count from dictionary
+            count=data.get('count', 0),
+            activation_time=activation_time
         )
-        # Check for reactivation immediately after loading
-        task.check_reactivation()
-        return task
 
     def to_dict(self) -> dict:
-        """Convert Task to dictionary format"""
-        # Check reactivation before saving
-        self.check_reactivation()
-        return {
+        """Convert task to dictionary for serialization"""
+        data = {
             'min': self.min_count,
             'max': self.max_count,
-            'active': self.is_active,  # Use property instead of raw field
+            'active': self.active,
             'is_daily': self.is_daily,
             'is_weekly': self.is_weekly,
             'next_activation_time': self.next_activation_time,
             'manually_deactivated': self.manually_deactivated,
-            'count': self.count  # Add count to dictionary
+            'count': self.count
         }
+        if self.activation_time:
+            data['activation_time'] = f"{self.activation_time.hour:02d}:{self.activation_time.minute:02d}"
+        return data
 
     def get_task_count(self) -> int:
         """Get the task count that will be used as HP."""

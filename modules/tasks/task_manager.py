@@ -195,6 +195,40 @@ class TaskManager:
             return len(self.get_active_tasks())
         return len(self.tasks)
 
+    def check_task_activations(self) -> bool:
+        """Check all tasks for activation conditions.
+        
+        Returns:
+            bool: True if any tasks were activated
+        """
+        any_activated = False
+        try:
+            # First check daily/weekly reactivations
+            for task in self.tasks.values():
+                logging.debug(f"Checking task '{task.name}' - Active: {task.is_active}, Activation time: {task.activation_time}")
+                
+                if task.check_reactivation():
+                    any_activated = True
+                    logging.info(f"Task '{task.name}' reactivated by schedule")
+                    
+                # Check activation time
+                if not task.is_active and task.activation_time:
+                    was_active = task.is_active  # Get current state
+                    is_active = task.is_active   # This will trigger the check in the property
+                    if not was_active and is_active:
+                        any_activated = True
+                        logging.info(f"Task '{task.name}' activated by time trigger")
+            
+            if any_activated:
+                self.save_tasks()  # Save state if any tasks were activated
+                logging.info("Tasks saved after activation changes")
+                
+            return any_activated
+                
+        except Exception as e:
+            logging.error(f"Error checking task activations: {e}")
+            return False
+
     def add_task(self, name: str, min_steps: int, max_steps: int, 
              active: bool = True) -> bool:
         """

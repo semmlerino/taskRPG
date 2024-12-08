@@ -65,31 +65,25 @@ class TaskTableModel(QAbstractTableModel):
         return flags
 
     def data(self, index, role=Qt.DisplayRole):
-        """Return data for the given role and section."""
+        """Return data for the specified role."""
         if not index.isValid():
             return None
+
+        if role == Qt.DisplayRole:
+            row = index.row()
+            col = index.column()
+            if row < 0 or row >= len(self._tasks):
+                return None
             
-        row = index.row()
-        col = index.column()
-        
-        if role == Qt.DisplayRole or role == Qt.EditRole:
-            if col == 0:  # Name
-                return self._tasks[row][0]
-            elif col == 1:  # Min
-                return self._tasks[row][1]
-            elif col == 2:  # Max
-                return self._tasks[row][2]
-            elif col == 6:  # Count
-                return self._tasks[row][6]
-        
+            value = self._tasks[row][col]
+            if col in (3, 4, 5):  # Active, Daily, Weekly columns
+                return "Yes" if value else "No"
+            return str(value)
+
         elif role == Qt.CheckStateRole:
-            if col == 3:  # Active
-                return Qt.Checked if self._tasks[row][3] else Qt.Unchecked
-            elif col == 4:  # Daily
-                return Qt.Checked if self._tasks[row][4] else Qt.Unchecked
-            elif col == 5:  # Weekly
-                return Qt.Checked if self._tasks[row][5] else Qt.Unchecked
-            
+            if index.column() in (3, 4, 5):  # Active, Daily, Weekly columns
+                return Qt.Checked if self._tasks[index.row()][index.column()] else Qt.Unchecked
+
         return None
 
     def setData(self, index, value, role=Qt.EditRole):
@@ -205,17 +199,29 @@ class TaskTableModel(QAbstractTableModel):
         return True
 
     def get_tasks(self) -> Dict[str, Task]:
-        """Convert internal list back to tasks dictionary."""
+        """Get tasks as dictionary for saving."""
         tasks = {}
         for task_data in self._tasks:
-            task = Task(
-                name=task_data[0],
-                min_count=task_data[1],
-                max_count=task_data[2],
-                active=task_data[3],
-                is_daily=task_data[4],
-                is_weekly=task_data[5],
-                count=task_data[6]
-            )
-            tasks[task.name] = task
+            name = task_data[0]
+            if name in self._original_tasks:
+                # Update existing task
+                task = self._original_tasks[name]
+                task.min_count = task_data[1]
+                task.max_count = task_data[2]
+                task.active = task_data[3]
+                task.is_daily = task_data[4]
+                task.is_weekly = task_data[5]
+                task.count = task_data[6]
+            else:
+                # Create new task
+                task = Task(
+                    name=name,
+                    min_count=task_data[1],
+                    max_count=task_data[2],
+                    active=task_data[3],
+                    is_daily=task_data[4],
+                    is_weekly=task_data[5],
+                    count=task_data[6]
+                )
+            tasks[name] = task
         return tasks

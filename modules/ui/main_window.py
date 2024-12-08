@@ -121,6 +121,11 @@ class TaskRPG(QMainWindow):
         # Dynamic Font Scaling Timer
         self.init_font_scaling()
 
+        # Create timer for checking task activations
+        self.task_check_timer = QTimer()
+        self.task_check_timer.timeout.connect(self.check_task_activations)
+        self.task_check_timer.start(60000)  # Check every minute
+
         # Install event filter for window state management
         self.installEventFilter(self)
 
@@ -968,6 +973,11 @@ class TaskRPG(QMainWindow):
 
         except Exception as e:
             logging.error(f"Error saving window settings: {e}")
+
+    def check_task_activations(self):
+        """Check for task activations and update UI if needed"""
+        if self.task_manager.check_task_activations():
+            self.update_task_list()  # Refresh the task list if any tasks were activated
 
 
 if __name__ == "__main__":
