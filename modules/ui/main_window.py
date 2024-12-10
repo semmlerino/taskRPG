@@ -119,7 +119,9 @@ class TaskRPG(QMainWindow):
         self.init_animations()
 
         # Dynamic Font Scaling Timer
-        self.init_font_scaling()
+        self.font_scaling_timer = QTimer()
+        self.font_scaling_timer.timeout.connect(self.adjust_fonts)
+        self.font_scaling_timer.start(500)
 
         # Create timer for checking task activations
         self.task_check_timer = QTimer()
@@ -132,41 +134,57 @@ class TaskRPG(QMainWindow):
         # Add focus and keyboard handling
         self.setFocusPolicy(Qt.StrongFocus)
 
-        # Startup Image Generation
-        self._startup_image_generation()
+        # Show the window first
+        self.show()
+
+        # Run image generation and story selection after window is shown
+        QTimer.singleShot(100, self._startup_sequence)
 
         logging.info("TaskRPG main window initialization complete")
 
-    def _startup_image_generation(self):
-        """Handle startup image generation before story selection."""
+    def _startup_sequence(self):
+        """Handle the startup sequence: image generation followed by story selection."""
         try:
+            def show_story_selection():
+                """Show the story selection dialog."""
+                try:
+                    dialog = StorySelectionDialog(self)
+                    if dialog.exec_() == QDialog.Accepted:
+                        self._load_selected_story(dialog.selected_story)
+                        QTimer.singleShot(100, self._ensure_focus)
+                    else:
+                        logging.info("User cancelled story selection")
+                        QMessageBox.information(
+                            self,
+                            "No Story Selected",
+                            "No story selected. Exiting the game."
+                        )
+                        self.close()
+                except Exception as e:
+                    logging.error(f"Error in story selection: {e}")
+                    QMessageBox.critical(
+                        self,
+                        "Critical Error",
+                        "Failed to load story selection."
+                    )
+                    self.close()
+
             def generate_all_story_images():
                 """Generate missing images for all stories at startup."""
                 try:
                     if not os.path.exists(STORIES_DIR):
+                        show_story_selection()
                         return
 
                     story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
                     if not story_files:
+                        show_story_selection()
                         return
 
-                    # Create progress dialog
-                    progress = QProgressDialog(
-                        "Checking stories for missing images...",
-                        "Cancel",
-                        0,
-                        len(story_files),
-                        self
-                    )
-                    progress.setWindowModality(Qt.WindowModal)
-                    progress.setMinimumDuration(0)
-                    progress.setAutoClose(False)
-
-                    total_generated = 0
-                    for idx, story_file in enumerate(story_files):
-                        if progress.wasCanceled():
-                            break
-
+                    # First scan all stories to count total missing images
+                    total_missing = 0
+                    story_data_map = {}  # Store story data to avoid reloading
+                    for story_file in story_files:
                         story_path = os.path.join(STORIES_DIR, story_file)
                         story_name = os.path.splitext(story_file)[0]
 
@@ -174,12 +192,53 @@ class TaskRPG(QMainWindow):
                             # Load story data
                             with open(story_path, 'r', encoding='utf-8') as f:
                                 story_data = json.load(f)
-
-                            # Update progress dialog
-                            progress.setLabelText(f"Checking story: {story_name}")
-                            progress.setValue(idx)
+                                story_data_map[story_name] = story_data
 
                             # Scan for missing images
+                            missing_images = self.image_generator.scan_story_for_missing_images(
+                                story_data,
+                                story_name
+                            )
+                            total_missing += len(missing_images)
+
+                        except Exception as e:
+                            logging.error(f"Error scanning story {story_name}: {e}")
+                            continue
+
+                    if total_missing == 0:
+                        logging.info("No missing images found")
+                        show_story_selection()
+                        return
+
+                    # Create progress dialog for total missing images
+                    progress = QProgressDialog(
+                        f"Found {total_missing} missing images across {len(story_files)} stories",
+                        "Cancel",
+                        0,
+                        total_missing,
+                        self
+                    )
+                    progress.setWindowModality(Qt.WindowModal)
+                    progress.setMinimumDuration(0)
+                    progress.setAutoClose(False)
+
+                    # Now generate all missing images
+                    total_generated = 0
+                    current_progress = 0
+                    for story_file in story_files:
+                        if progress.wasCanceled():
+                            break
+
+                        story_name = os.path.splitext(story_file)[0]
+                        story_data = story_data_map.get(story_name)
+                        if not story_data:
+                            continue
+
+                        try:
+                            # Update progress dialog
+                            progress.setLabelText(f"Checking story: {story_name}")
+
+                            # Generate missing images
                             missing_images = self.image_generator.scan_story_for_missing_images(
                                 story_data,
                                 story_name
@@ -187,7 +246,10 @@ class TaskRPG(QMainWindow):
 
                             if missing_images:
                                 # Update dialog for generation
-                                progress.setLabelText(f"Generating images for: {story_name}")
+                                progress.setLabelText(
+                                    f"Generating images for '{story_name}'\n"
+                                    f"Progress: {current_progress}/{total_missing} images"
+                                )
 
                                 # Generate missing images
                                 generated = self.image_generator.generate_missing_story_images(
@@ -198,6 +260,8 @@ class TaskRPG(QMainWindow):
 
                                 if generated:
                                     total_generated += len(generated)
+                                    current_progress += len(generated)
+                                    progress.setValue(current_progress)
 
                         except Exception as e:
                             logging.error(f"Error processing story {story_name}: {e}")
@@ -209,11 +273,13 @@ class TaskRPG(QMainWindow):
                         QMessageBox.information(
                             self,
                             "Image Generation Complete",
-                            f"Successfully generated {total_generated} images across all stories."
+                            f"Successfully generated {total_generated} images across {len(story_files)} stories."
                         )
 
                 except Exception as e:
                     logging.error(f"Error during startup image generation: {e}")
+
+                show_story_selection()
 
             # Check ComfyUI availability first
             if self.image_generator.validate_server_connection():
@@ -224,13 +290,11 @@ class TaskRPG(QMainWindow):
                     "ComfyUI Not Available",
                     "ComfyUI server is not available. Stories will load without generating missing images."
                 )
+                show_story_selection()
 
         except Exception as e:
-            logging.error(f"Error initializing startup image generation: {e}")
-
-        # Schedule story selection and focus setup
-        QTimer.singleShot(0, self.select_story)
-        QTimer.singleShot(100, self._ensure_focus)
+            logging.error(f"Error in startup sequence: {e}")
+            show_story_selection()
 
     def init_core_components(self):
         """Initialize core game components."""
@@ -241,25 +305,82 @@ class TaskRPG(QMainWindow):
             # Player and Game State
             self.player = Player()
 
-            # Load image quality from settings
+            # Load settings
             settings_file = os.path.join(DATA_DIR, 'settings.json')
-            try:
-                with open(settings_file, 'r', encoding='utf-8') as f:
-                    settings = json.load(f)
-                quality_name = settings.get('image_quality', 'HIGH')
-                image_quality = ImageQuality[quality_name]
-            except Exception as e:
-                logging.error(f"Error loading image quality setting: {e}")
-                image_quality = ImageQuality.HIGH  # Default quality
+            settings = {}
+            workflow_json = None
+            image_quality = ImageQuality.HIGH  # Default quality
 
-            # Image Generator with proper path handling and ULTRA quality
+            # Create DATA_DIR if it doesn't exist
+            os.makedirs(DATA_DIR, exist_ok=True)
+
+            # Try to load existing settings
+            if os.path.exists(settings_file):
+                try:
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        settings = json.load(f)
+                    logging.info("Settings loaded successfully")
+                except Exception as e:
+                    logging.error(f"Error loading settings, using defaults: {e}")
+            else:
+                logging.info("No settings file found, using defaults")
+                # Create default settings
+                settings = {
+                    'image_quality': 'HIGH',
+                    'selected_workflow': 'Default Workflow'
+                }
+                try:
+                    with open(settings_file, 'w', encoding='utf-8') as f:
+                        json.dump(settings, f, indent=4)
+                    logging.info("Created default settings file")
+                except Exception as e:
+                    logging.error(f"Error creating default settings: {e}")
+
+            # Load image quality setting
+            quality_name = settings.get('image_quality', 'HIGH')
+            try:
+                image_quality = ImageQuality[quality_name]
+            except KeyError:
+                logging.error(f"Invalid image quality '{quality_name}', using HIGH")
+                image_quality = ImageQuality.HIGH
+
+            # Load workflow setting
+            selected_workflow = settings.get('selected_workflow', 'Default Workflow')
+            workflow_file = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                'workflows',
+                f"{selected_workflow}.json"
+            )
+
+            # Only load workflow if it exists
+            if os.path.exists(workflow_file):
+                try:
+                    with open(workflow_file, 'r', encoding='utf-8') as f:
+                        workflow_json = json.load(f)
+                    logging.info(f"Loaded workflow from {workflow_file}")
+                except Exception as e:
+                    logging.error(f"Error loading workflow file: {e}")
+                    workflow_json = None
+            else:
+                logging.warning(f"Workflow file not found: {workflow_file}")
+                workflow_json = None
+
+            logging.info(f"Using image quality: {quality_name}")
+
+            # Image Generator with proper path handling and quality settings
             comfyui_path = os.getenv('COMFYUI_PATH', 
                 r"C:\StableDiffusion\ComfyUI_windows_portable_nvidia_cu121_or_cpu\ComfyUI_windows_portable\ComfyUI")
             
+            # Create image generator with loaded workflow
             self.image_generator = ImageGenerator(
+                workflow_json=workflow_json,  # Pass the loaded workflow or None
                 checkpoints_dir=os.path.join(comfyui_path, 'models', 'checkpoints'),
-                quality=ImageQuality.ULTRA  # Set to ULTRA quality
+                quality=image_quality,
             )
+
+            # Validate workflow was loaded
+            if workflow_json and not hasattr(self.image_generator, 'workflow_json'):
+                logging.error("Workflow failed to load in ImageGenerator")
 
             # Battle Manager - initialize before StoryManager
             self.battle_manager = BattleManager(self.task_manager, self.player)
@@ -498,28 +619,58 @@ class TaskRPG(QMainWindow):
     def _load_selected_story(self, story_path: str):
         """Load the selected story file."""
         try:
+            if not os.path.exists(story_path):
+                raise FileNotFoundError(f"Story file not found: {story_path}")
+
             story_name = os.path.splitext(os.path.basename(story_path))[0]
             image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
-            os.makedirs(image_folder, exist_ok=True)
 
-            self.story_manager = StoryManager(
-                filepath=story_path,
-                image_generator=self.image_generator,
-                image_folder=image_folder,
-                ui_component=self,
-                battle_manager=self.battle_manager
-            )
+            # Create image folder if it doesn't exist
+            try:
+                os.makedirs(image_folder, exist_ok=True)
+            except Exception as e:
+                raise RuntimeError(f"Failed to create image folder: {e}")
 
-            self.story_manager.display_story_segment()
-            logging.info(f"Story '{story_name}' loaded successfully")
+            # Validate story file format
+            try:
+                with open(story_path, 'r', encoding='utf-8') as f:
+                    story_data = json.load(f)
+                if not isinstance(story_data, dict):
+                    raise ValueError("Story file must contain a JSON object")
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid story file format: {e}")
+            except Exception as e:
+                raise RuntimeError(f"Error reading story file: {e}")
+
+            # Create new story manager
+            try:
+                self.story_manager = StoryManager(
+                    filepath=story_path,
+                    image_generator=self.image_generator,
+                    image_folder=image_folder,
+                    ui_component=self,
+                    battle_manager=self.battle_manager
+                )
+            except Exception as e:
+                raise RuntimeError(f"Failed to initialize story manager: {e}")
+
+            # Display first story segment
+            try:
+                self.story_manager.display_story_segment()
+                logging.info(f"Story '{story_name}' loaded successfully")
+            except Exception as e:
+                raise RuntimeError(f"Failed to display story segment: {e}")
 
         except Exception as e:
-            logging.error(f"Error loading story: {e}")
+            error_msg = str(e)
+            logging.error(f"Error loading story: {error_msg}")
             QMessageBox.critical(
                 self,
-                "Error",
-                f"Failed to load story: {str(e)}"
+                "Error Loading Story",
+                f"Failed to load story:\n\n{error_msg}\n\nPlease select a different story."
             )
+            # Show story selection again
+            QTimer.singleShot(100, self.select_story)
 
     def next_story_segment(self):
         """Progress to next story segment."""

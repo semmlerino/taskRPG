@@ -131,8 +131,8 @@
         "activation_time": "18:00"
     },
     "GPTs": {
-        "min": 6,
-        "max": 12,
+        "min": 8,
+        "max": 14,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -171,8 +171,8 @@
         "count": 0
     },
     "Claude": {
-        "min": 6,
-        "max": 11,
+        "min": 4,
+        "max": 8,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -183,7 +183,7 @@
     "NHS": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -194,7 +194,7 @@
         "min": 1,
         "max": 1,
         "active": true,
-        "is_daily": false,
+        "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
@@ -203,8 +203,8 @@
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": false,
-        "is_daily": false,
+        "active": true,
+        "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
@@ -215,7 +215,7 @@
         "min": 1,
         "max": 1,
         "active": true,
-        "is_daily": false,
+        "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
@@ -224,7 +224,7 @@
     "Tabs": {
         "min": 2,
         "max": 4,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -240,16 +240,5 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0
-    },
-    "Cook": {
-        "min": 1,
-        "max": 1,
-        "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "activation_time": "21:00"
     }
 }

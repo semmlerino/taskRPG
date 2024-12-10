@@ -1,9 +1,9 @@
 """Custom delegates for the settings dialog."""
-from PyQt5.QtCore import Qt, QRect, QEvent
+from PyQt5.QtCore import Qt, QRect, QEvent, QPoint
 from PyQt5.QtWidgets import (
     QStyledItemDelegate, QStyle, QStyleOptionViewItem
 )
-from PyQt5.QtGui import QColor, QPainter
+from PyQt5.QtGui import QColor, QPainter, QPen, QPolygon
 
 class CheckBoxHoverDelegate(QStyledItemDelegate):
     """Delegate for handling both hover effects and checkboxes in task table."""
@@ -17,10 +17,29 @@ class CheckBoxHoverDelegate(QStyledItemDelegate):
         opt = QStyleOptionViewItem(option)
         self.initStyleOption(opt, index)
         
-        # Draw hover effect
-        if opt.state & QStyle.State_MouseOver:
+        # Draw hover effect for the entire row
+        is_hovering = opt.state & QStyle.State_MouseOver
+        if is_hovering:
+            # Get the view and the row rect
+            view = self._view
+            row_rect = QRect(0, opt.rect.y(), view.viewport().width(), opt.rect.height())
             painter.save()
-            painter.fillRect(opt.rect, QColor("#E3F2FD"))
+            
+            # Create gradient effect for hover
+            if index.row() % 2 == 0:
+                # Normal row
+                hover_color = QColor("#2196F3")  # Material Blue
+            else:
+                # Alternate row
+                hover_color = QColor("#1E88E5")  # Slightly darker blue
+                
+            hover_color.setAlpha(40)  # Very transparent base layer
+            painter.fillRect(row_rect, hover_color)
+            
+            # Add a second layer for more intensity
+            hover_color.setAlpha(20)
+            painter.fillRect(row_rect, hover_color)
+            
             painter.restore()
         
         # Draw checkbox for checkbox columns
@@ -44,8 +63,47 @@ class CheckBoxHoverDelegate(QStyledItemDelegate):
             )
             opt.rect = checkbox_point
             
-            # Draw the checkbox
-            style.drawPrimitive(QStyle.PE_IndicatorCheckBox, opt, painter, opt.widget)
+            # Draw custom checkbox
+            painter.save()
+            if value == Qt.Checked:
+                # Checked state
+                if is_hovering:
+                    bg_color = QColor("#1976D2")  # Darker blue on hover
+                    border_color = QColor("#1565C0")  # Even darker blue for border
+                else:
+                    bg_color = QColor("#2196F3")  # Normal blue
+                    border_color = QColor("#1E88E5")  # Slightly darker blue for border
+            else:
+                # Unchecked state
+                if is_hovering:
+                    bg_color = QColor("#90CAF9")  # Light blue on hover
+                    border_color = QColor("#2196F3")  # Blue border
+                else:
+                    bg_color = QColor("white")
+                    border_color = QColor("#BDBDBD")  # Gray border
+            
+            # Draw checkbox with rounded corners
+            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setPen(border_color)
+            painter.setBrush(bg_color)
+            painter.drawRoundedRect(checkbox_point, 4, 4)
+            
+            # Draw checkmark if checked
+            if value == Qt.Checked:
+                painter.setPen(QPen(QColor("white"), 2))
+                # Calculate checkmark points
+                x1 = checkbox_point.left() + 4
+                y1 = checkbox_point.center().y()
+                x2 = checkbox_point.center().x() - 2
+                y2 = checkbox_point.bottom() - 4
+                x3 = checkbox_point.right() - 4
+                y3 = checkbox_point.top() + 4
+                
+                # Draw checkmark
+                painter.drawLine(x1, y1, x2, y2)
+                painter.drawLine(x2, y2, x3, y3)
+            
+            painter.restore()
         else:
             # For other columns, use default painting
             super().paint(painter, option, index)

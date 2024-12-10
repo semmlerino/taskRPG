@@ -7,7 +7,7 @@ from PyQt5.QtCore import (
 )
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu
+    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu, QComboBox, QApplication
 )
 from PyQt5.QtGui import QFont
 
@@ -135,6 +135,48 @@ class SettingsDialog(QDialog):
         settings_label = QLabel("Game Settings:")
         settings_label.setFont(QFont("Arial", 16))
         layout.addWidget(settings_label)
+
+        # Workflow Selection
+        workflow_layout = QHBoxLayout()
+        workflow_layout.setContentsMargins(0, 5, 0, 5)
+        workflow_layout.setSpacing(10)
+        
+        workflow_label = QLabel("Image Generation Workflow:")
+        workflow_label.setFont(QFont("Arial", 13))
+        workflow_label.setFixedWidth(200)  # Fixed width for label
+        workflow_layout.addWidget(workflow_label)
+
+        self.workflow_combo = QComboBox()
+        self.workflow_combo.setFont(QFont("Arial", 13))
+        self.workflow_combo.setFixedWidth(200)  # Fixed width for combo box
+        self.workflow_combo.setMaxVisibleItems(10)  # Limit dropdown height
+        self.workflow_combo.setStyleSheet("""
+            QComboBox {
+                padding: 5px;
+                border: 1px solid #CCCCCC;
+                border-radius: 3px;
+                background-color: white;
+            }
+            QComboBox::drop-down {
+                border: none;
+                width: 20px;
+            }
+            QComboBox::down-arrow {
+                width: 12px;
+                height: 12px;
+            }
+            QComboBox QAbstractItemView {
+                border: 1px solid #CCCCCC;
+                selection-background-color: #2196F3;
+                selection-color: white;
+                background-color: white;
+            }
+        """)
+        self.workflow_combo.currentTextChanged.connect(lambda text: logging.info(f"Selected workflow: {text}"))
+        self.load_workflow_options()
+        workflow_layout.addWidget(self.workflow_combo)
+        workflow_layout.addStretch()  # Add stretch to prevent widgets from expanding too much
+        layout.addLayout(workflow_layout)
 
         # Shake Animation Toggle
         self.shake_checkbox = QCheckBox("Enable Shaking Animation")
@@ -444,6 +486,7 @@ class SettingsDialog(QDialog):
             settings = {
                 'shake_animation': bool(self.shake_checkbox.isChecked()),
                 'window_geometry': window_geometry,
+                'selected_workflow': self.workflow_combo.currentText(),
                 'column_widths': [
                     int(self.task_view.columnWidth(i))
                     for i in range(self.task_view.model().columnCount())
@@ -605,3 +648,50 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logging.error(f"Error clearing activation time: {e}")
             QMessageBox.critical(self, "Error", f"Failed to clear activation time: {str(e)}")
+
+    def load_workflow_options(self):
+        """Load workflow options from the workflows directory."""
+        try:
+            # Clear existing items
+            self.workflow_combo.clear()
+            
+            # Get the project root directory and workflows path
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+            workflows_dir = os.path.join(project_root, 'workflows')
+            logging.info(f"Project root: {project_root}")
+            logging.info(f"Looking for workflows in directory: {workflows_dir}")
+            
+            # Verify the directory exists
+            if not os.path.exists(workflows_dir):
+                logging.error(f"Workflows directory does not exist: {workflows_dir}")
+                raise FileNotFoundError(f"Workflows directory not found: {workflows_dir}")
+            
+            # Get list of workflow files
+            workflow_files = [f for f in os.listdir(workflows_dir) if f.endswith('.json')]
+            logging.info(f"Found workflow files: {workflow_files}")
+            
+            # Add default workflow option
+            self.workflow_combo.addItem("Default Workflow")
+            
+            # Add workflow files to combo box
+            for workflow_file in workflow_files:
+                workflow_name = os.path.splitext(workflow_file)[0]
+                self.workflow_combo.addItem(workflow_name)
+                logging.info(f"Added workflow option: {workflow_name}")
+            
+            # Force update the combo box
+            self.workflow_combo.update()
+            QApplication.processEvents()  # Force UI update
+            
+            # Set current workflow from settings
+            current_workflow = self.settings.get('selected_workflow', "Default Workflow")
+            index = self.workflow_combo.findText(current_workflow)
+            if index >= 0:
+                self.workflow_combo.setCurrentIndex(index)
+                logging.info(f"Set current workflow to: {current_workflow}")
+            
+        except Exception as e:
+            logging.error(f"Error loading workflow options: {e}")
+            # Clear and add only default workflow if there's an error
+            self.workflow_combo.clear()
+            self.workflow_combo.addItem("Default Workflow")

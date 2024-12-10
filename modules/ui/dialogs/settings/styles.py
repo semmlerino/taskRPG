@@ -144,3 +144,40 @@ CHECKBOX_STYLE = """
         background-color: #E3F2FD;
     }
 """
+
+# Add combobox style
+COMBOBOX_STYLE = """
+    QComboBox {
+        background-color: #FFFFFF;
+        border: 2px solid #BDBDBD;
+        border-radius: 4px;
+        padding: 5px;
+        min-width: 200px;
+    }
+    QComboBox::drop-down {
+        border: none;
+        width: 24px;
+    }
+    QComboBox::down-arrow {
+        image: url(data/icons/dropdown.png);
+        width: 12px;
+        height: 12px;
+    }
+    QComboBox:hover {
+        border-color: #2196F3;
+    }
+    QComboBox:focus {
+        border-color: #2196F3;
+        background-color: #E3F2FD;
+    }
+    QComboBox::item {
+        padding: 5px;
+    }
+    QComboBox::item:selected {
+        background-color: #2196F3;
+        color: white;
+    }
+    QComboBox::item:hover {
+        background-color: #BBDEFB;
+    }
+"""

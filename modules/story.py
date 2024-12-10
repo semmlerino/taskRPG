@@ -157,12 +157,17 @@ class StoryManager:
                 logging.error("Failed to create node content")
                 return False
 
-            # Handle image persistence
+            # Handle image persistence with validation
             current_image = self.get_generated_image(self.current_node_key)
             if current_image:
                 self._last_valid_image = current_image
-            elif not self._last_valid_image:
+            elif not self._last_valid_image or not os.path.isfile(self._last_valid_image):
                 self._next_valid_image = self._find_next_valid_image(self.current_node_key)
+                if not self._next_valid_image:
+                    # Use a default placeholder image if no valid images are found
+                    default_image = os.path.join(os.path.dirname(self.filepath), 'assets', 'images', 'placeholder.png')
+                    if os.path.isfile(default_image):
+                        self._last_valid_image = default_image
 
             # Use the most appropriate image
             content.image_path = current_image or self._last_valid_image or self._next_valid_image
@@ -359,12 +364,12 @@ class StoryManager:
         return self.current_node
 
     def get_generated_image(self, node_key: str) -> Optional[str]:
-        """Gets the path to a generated image for a node."""
-        if not self.image_folder:
+        """Get the path to a generated image for a node, validating its existence."""
+        if not self.image_folder or not node_key:
             return None
-
+            
         image_path = os.path.join(self.image_folder, f"{node_key}.png")
-        return os.path.abspath(image_path) if os.path.exists(image_path) else None
+        return image_path if os.path.isfile(image_path) else None
 
     def get_all_image_prompts(self) -> Dict[str, str]:
         """Get all image prompts from story nodes."""
@@ -486,21 +491,24 @@ class StoryManager:
             logging.error(f"Error generating node image: {e}")
             return None
 
-    def _find_next_valid_image(self, current_node_key: str) -> Optional[str]:
-        try:
-            # Start from next node
-            next_key = self.story_data[current_node_key].get('next')
-            while next_key and next_key in self.story_data:
-                node = self.story_data[next_key]
-                if 'image_prompt' in node:
-                    image_path = self.get_generated_image(next_key)
-                    if image_path:
-                        return image_path
-                next_key = node.get('next')
-            return None
-        except Exception as e:
-            logging.error(f"Error finding next valid image: {e}")
-            return None
+    def _find_next_valid_image(self, start_node_key: str) -> Optional[str]:
+        """Find the next valid image in the story, checking file existence."""
+        current_key = start_node_key
+        visited = set()
+
+        while current_key and current_key not in visited:
+            visited.add(current_key)
+            node = self.story_data.get(current_key, {})
+            next_key = node.get('next')
+            
+            # Check if image exists for this node
+            image = self.get_generated_image(current_key)
+            if image:
+                return image
+                
+            current_key = next_key
+
+        return None
 
     def initialize_story_characters(self):
         """Initialize all characters defined in the story."""

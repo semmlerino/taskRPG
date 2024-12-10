@@ -453,6 +453,15 @@ class StorySelectionDialog(QDialog):
         if not main_window or not hasattr(main_window, 'image_generator'):
             raise RuntimeError("Image generator not available")
 
+        # Initialize story manager first to ensure it's ready
+        main_window.story_manager = StoryManager(
+            filepath=self.selected_story,
+            image_generator=main_window.image_generator,
+            image_folder=image_folder,
+            ui_component=main_window,
+            battle_manager=main_window.battle_manager
+        )
+
         # First check if ComfyUI is available
         if not main_window.image_generator.validate_server_connection():
             result = QMessageBox.warning(
@@ -464,9 +473,11 @@ class StorySelectionDialog(QDialog):
                 QMessageBox.No
             )
             if result == QMessageBox.No:
+                main_window.story_manager = None  # Clean up if user cancels
                 return
             # If user continues, we'll load without image generation
             super().accept()
+            main_window.story_manager.display_story_segment()
             return
 
         # Scan for missing images
@@ -478,7 +489,7 @@ class StorySelectionDialog(QDialog):
         if missing_images:
             # Create progress dialog
             progress = QProgressDialog(
-                "Generating story images...",
+                "Preparing to generate story images...",
                 "Cancel",
                 0,
                 len(missing_images),
@@ -486,12 +497,14 @@ class StorySelectionDialog(QDialog):
             )
             progress.setWindowModality(Qt.WindowModal)
             progress.setMinimumDuration(0)
-            progress.setAutoClose(False)
+            progress.setAutoClose(True)
+            progress.setCancelButton(None)  # Disable cancel button during preparation
             progress.setStyleSheet("""
                 QProgressDialog {
                     background-color: white;
                     border: 1px solid #BDBDBD;
                     border-radius: 5px;
+                    min-width: 300px;
                 }
                 QProgressBar {
                     border: 1px solid #BDBDBD;
@@ -509,6 +522,9 @@ class StorySelectionDialog(QDialog):
                 # Set image folder in image generator
                 main_window.image_generator.image_folder = image_folder
 
+                # Re-enable cancel button for actual generation
+                progress.setCancelButton(QPushButton("Cancel"))
+                
                 # Generate missing images
                 generated_images = main_window.image_generator.generate_missing_story_images(
                     story_data,
@@ -526,7 +542,7 @@ class StorySelectionDialog(QDialog):
                         QMessageBox.No
                     )
                     if result == QMessageBox.No:
-                        progress.close()
+                        main_window.story_manager = None  # Clean up if user cancels
                         return
                 elif generated_images:
                     QMessageBox.information(
@@ -546,23 +562,15 @@ class StorySelectionDialog(QDialog):
                     QMessageBox.No
                 )
                 if result == QMessageBox.No:
-                    progress.close()
+                    main_window.story_manager = None  # Clean up if user cancels
                     return
             finally:
-                progress.close()
+                # Ensure progress dialog is properly closed
+                if progress.isVisible():
+                    progress.close()
 
-        # Initialize story manager using project structure
-        main_window.story_manager = StoryManager(
-            filepath=self.selected_story,
-            image_generator=main_window.image_generator,
-            image_folder=image_folder,
-            ui_component=main_window,
-            battle_manager=main_window.battle_manager
-        )
-
-        # Display first story segment
+        # Display first story segment and accept dialog
         main_window.story_manager.display_story_segment()
-
         super().accept()
 
     def reject(self):
