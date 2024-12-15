@@ -1,0 +1,14 @@
+{
+  "start": {
+    "text": "Avi \"Whistle\" Wren's workshop is on the verge of being repossessed. Amid the chaos of overdue bills and malfunctioning gadgets, Avi discovers a dusty blueprint left by their eccentric grandfather.",
+    "environment": "A cluttered workshop filled with half-finished contraptions, the air thick with the smell of oil and steam.",
+    "battle": {
+      "enemy": "Malfunctioning Clockwork Assistant",
+      "message": "The assistant's gears whir out of control as it charges at you!"
+    },
+    "event": "Avi realizes the blueprint contains cryptic instructions that might lead to a legendary device.",
+    "next": "node1",
+    "image_prompt": "A chaotic workshop with brass gears and steam hissing from broken pipes, illuminated by the warm glow of a single gas lamp. Avi, a young tinkerer, holds a glowing blueprint amidst the mechanical chaos.",
+    "end": false
+  }
+}

@@ -77,8 +77,8 @@ class QualityPreset:
                 denoise=0.97,
                 sampler="dpmpp_2m",
                 scheduler="karras",
-                width=1152,
-                height=1152
+                width=1216,
+                height=832
             ),
             ImageQuality.ULTRA: cls(
                 steps=60,

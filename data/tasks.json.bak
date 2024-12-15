@@ -153,7 +153,7 @@
     "Beard": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -163,7 +163,7 @@
     "Perplexity": {
         "min": 7,
         "max": 13,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -171,8 +171,8 @@
         "count": 0
     },
     "Claude": {
-        "min": 4,
-        "max": 8,
+        "min": 6,
+        "max": 12,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -203,13 +203,12 @@
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0,
-        "activation_time": "21:30"
+        "count": 0
     },
     "Showreel": {
         "min": 1,
@@ -224,7 +223,7 @@
     "Tabs": {
         "min": 2,
         "max": 4,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -234,6 +233,36 @@
     "TXT": {
         "min": 1,
         "max": 2,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0
+    },
+    "Refund Medicash": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0
+    },
+    "Compare Flux Dev/Schnell": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0
+    },
+    "UKP": {
+        "min": 1,
+        "max": 1,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
