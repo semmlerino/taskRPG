@@ -69,7 +69,7 @@ class TaskTableModel(QAbstractTableModel):
         if not index.isValid():
             return None
 
-        if role == Qt.DisplayRole:
+        if role == Qt.DisplayRole or role == Qt.EditRole:
             row = index.row()
             col = index.column()
             if row < 0 or row >= len(self._tasks):
@@ -95,33 +95,79 @@ class TaskTableModel(QAbstractTableModel):
         col = index.column()
         
         try:
+            # Get the current task name before any changes
+            current_task_name = self._tasks[row][0]
+            current_task = self._original_tasks.get(current_task_name)
+            
             if role == Qt.EditRole:
                 if col == 0:  # Name
+                    # Ensure value is a string and not empty
+                    if not isinstance(value, str) or not value.strip():
+                        return False
+                    
+                    # If renaming, update the original tasks reference
+                    if current_task and value != current_task_name:
+                        # Check if new name already exists
+                        if value in self._original_tasks:
+                            return False
+                            
+                        # Create a copy of the original task with the new name
+                        self._original_tasks[value] = Task(
+                            name=value,
+                            min_count=current_task.min_count,
+                            max_count=current_task.max_count,
+                            active=current_task.active,
+                            is_daily=current_task.is_daily,
+                            is_weekly=current_task.is_weekly,
+                            count=current_task.count
+                        )
+                        # Remove the old task reference
+                        del self._original_tasks[current_task_name]
+                    
+                    # Update the task name in the list
                     self._tasks[row] = (value, *self._tasks[row][1:])
                 elif col == 1:  # Min
                     value = max(1, int(value))
                     self._tasks[row] = (*self._tasks[row][:1], value, *self._tasks[row][2:])
+                    if current_task:
+                        current_task.min_count = value
                 elif col == 2:  # Max
                     value = max(self._tasks[row][1], int(value))
                     self._tasks[row] = (*self._tasks[row][:2], value, *self._tasks[row][3:])
+                    if current_task:
+                        current_task.max_count = value
                 elif col == 6:  # Count
                     value = max(0, int(value))
                     self._tasks[row] = (*self._tasks[row][:6], value)
+                    if current_task:
+                        current_task.count = value
                     
             elif role == Qt.CheckStateRole:
                 value = bool(value == Qt.Checked)
                 if col == 3:  # Active
                     self._tasks[row] = (*self._tasks[row][:3], value, *self._tasks[row][4:])
+                    if current_task:
+                        current_task.active = value
                 elif col == 4:  # Daily
                     if value and self._tasks[row][5]:  # If setting daily and weekly is true
                         self._tasks[row] = (*self._tasks[row][:4], value, False, *self._tasks[row][6:])
+                        if current_task:
+                            current_task.is_daily = value
+                            current_task.is_weekly = False
                     else:
                         self._tasks[row] = (*self._tasks[row][:4], value, *self._tasks[row][5:])
+                        if current_task:
+                            current_task.is_daily = value
                 elif col == 5:  # Weekly
                     if value and self._tasks[row][4]:  # If setting weekly and daily is true
                         self._tasks[row] = (*self._tasks[row][:4], False, value, *self._tasks[row][6:])
+                        if current_task:
+                            current_task.is_daily = False
+                            current_task.is_weekly = value
                     else:
                         self._tasks[row] = (*self._tasks[row][:5], value, *self._tasks[row][6:])
+                        if current_task:
+                            current_task.is_weekly = value
                         
             self.dataChanged.emit(index, index)
             return True

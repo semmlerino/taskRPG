@@ -62,17 +62,7 @@
     "TaskRPG": {
         "min": 1,
         "max": 1,
-        "active": false,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0
-    },
-    "Medicash Refund": {
-        "min": 1,
-        "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -127,8 +117,7 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0,
-        "activation_time": "18:00"
+        "count": 0
     },
     "GPTs": {
         "min": 8,
@@ -145,7 +134,7 @@
         "max": 1,
         "active": false,
         "is_daily": false,
-        "is_weekly": false,
+        "is_weekly": true,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0
@@ -153,7 +142,7 @@
     "Beard": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -163,7 +152,7 @@
     "Perplexity": {
         "min": 7,
         "max": 13,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -183,7 +172,7 @@
     "NHS": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -210,10 +199,10 @@
         "manually_deactivated": false,
         "count": 0
     },
-    "Showreel": {
+    "Showreel (add JOY/Killer. others...?)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
@@ -243,7 +232,7 @@
     "Refund Medicash": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -253,17 +242,7 @@
     "Compare Flux Dev/Schnell": {
         "min": 1,
         "max": 1,
-        "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0
-    },
-    "UKP": {
-        "min": 1,
-        "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,

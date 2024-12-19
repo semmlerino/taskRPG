@@ -285,22 +285,48 @@ class FullscreenImageViewer(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event."""
         try:
-            # Release keyboard grab before cleanup
+            # Always release keyboard first
             self.releaseKeyboard()
-            self.cleanup_resources()
+            
+            # Then attempt cleanup
+            try:
+                self.cleanup_resources()
+            except Exception as e:
+                logging.error(f"Error during FullscreenImageViewer cleanup: {e}")
+                # Continue with close even if cleanup fails
+            
             super().closeEvent(event)
             logging.info("FullscreenImageViewer closed successfully")
         except Exception as e:
-            logging.error(f"Error during FullscreenImageViewer cleanup: {e}")
-            # Force release keyboard and accept event
-            self.releaseKeyboard()
+            logging.error(f"Error during FullscreenImageViewer close: {e}")
+        finally:
+            # Ensure keyboard is released even if there's an error
+            try:
+                self.releaseKeyboard()
+            except:
+                pass
             event.accept()
 
     def cleanup_resources(self):
         """Clean up resources before closing."""
         try:
+            # Clear keyboard focus and window flags
+            self.releaseKeyboard()
+            self.setWindowFlags(Qt.Widget)
+            
+            # Clear image resources
             self.original_pixmap = None
             self.get_scaled_pixmap.cache_clear()
+            
+            # Clear text resources
+            if hasattr(self, 'text_browser'):
+                self.text_browser.clear()
+            if hasattr(self, 'prompt_label'):
+                self.prompt_label.clear()
+                
+            # Force process events to ensure cleanup
+            QApplication.processEvents()
+            
         except Exception as e:
             logging.error(f"Error cleaning up resources: {e}")
 
@@ -319,6 +345,10 @@ class FullscreenImageViewer(QMainWindow):
         """Update the viewer content."""
         try:
             logging.info(f"Updating content with prompt: {prompt}")
+            if not self.isVisible():
+                logging.warning("Attempted to update content of hidden viewer")
+                return
+                
             if image_path and os.path.exists(image_path):
                 self.original_pixmap = QPixmap(image_path)
                 self.scale_image()
@@ -342,6 +372,9 @@ class FullscreenImageViewer(QMainWindow):
                 self.prompt_visible = False
         except Exception as e:
             logging.error(f"Error updating fullscreen content: {e}")
+            # Force cleanup if update fails
+            self.cleanup_resources()
+            self.close()
 
     def format_story_text(self, text: str) -> str:
         """Format the story text into multiple lines with proper wrapping."""

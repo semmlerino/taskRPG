@@ -14,6 +14,16 @@ class StoryContent:
     choices: Optional[List[Dict]] = None
     image_prompt: Optional[str] = None
 
+    @property
+    def battle(self) -> bool:
+        """Return True if this node contains battle content."""
+        if isinstance(self.battle_info, dict):
+            # Check if the dictionary has battle-related keys
+            return bool(self.battle_info.get("battle") or 
+                       self.battle_info.get("enemy") or 
+                       self.battle_info.get("message"))
+        return bool(self.battle_info)  # Handle True/False/None cases
+
     def to_html(self) -> str:
         """Convert content to HTML format for display."""
         html_parts = [f"<p>{self.text}</p>"]
@@ -51,6 +61,11 @@ class StoryContent:
     def _generate_battle_html(self) -> List[str]:
         """Generate HTML for battle information."""
         html_parts = []
+        
+        # Handle case where battle_info might be True/False
+        if not isinstance(self.battle_info, dict):
+            return html_parts
+            
         battle_data = self.battle_info.get("battle", self.battle_info)
         message = battle_data.get("message", "An enemy appears!")
         enemy_name = battle_data.get("enemy", "Unknown Enemy")

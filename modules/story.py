@@ -25,7 +25,7 @@ class StoryManager:
     def __init__(
         self,
         filepath: str,
-        image_generator: 'ImageGenerator',
+        image_generator: Optional['ImageGenerator'] = None,
         image_folder: Optional[str] = None,
         ui_component: Optional[Any] = None,
         battle_manager: Optional['BattleManager'] = None
@@ -42,19 +42,11 @@ class StoryManager:
         self.current_node = self.story_data.get(self.current_node_key, {})
         self._current_content: Optional[StoryContent] = None
 
-        # Navigation history
-        self._history: List[tuple] = []
-        self._history_index: int = -1
+        # Reset all history and state
+        self.reset_state()
 
-        # Track completed battles
-        self.completed_battle_nodes = set()
-
-        # Add after the __init__ method initialization
-        self._last_valid_image = None
-        self._next_valid_image = None
-
-        # Initialize character manager
-        self.character_manager = CharacterManager(filepath, image_generator)
+        # Initialize character manager only if image generator is available
+        self.character_manager = CharacterManager(filepath, image_generator) if image_generator else None
         
         logging.info(f"StoryManager initialized with filepath: {filepath}")
 
@@ -158,19 +150,21 @@ class StoryManager:
                 return False
 
             # Handle image persistence with validation
-            current_image = self.get_generated_image(self.current_node_key)
-            if current_image:
-                self._last_valid_image = current_image
-            elif not self._last_valid_image or not os.path.isfile(self._last_valid_image):
-                self._next_valid_image = self._find_next_valid_image(self.current_node_key)
-                if not self._next_valid_image:
-                    # Use a default placeholder image if no valid images are found
-                    default_image = os.path.join(os.path.dirname(self.filepath), 'assets', 'images', 'placeholder.png')
-                    if os.path.isfile(default_image):
-                        self._last_valid_image = default_image
+            # Only attempt image handling if image generator is available
+            if self.image_generator:
+                current_image = self.get_generated_image(self.current_node_key)
+                if current_image:
+                    self._last_valid_image = current_image
+                elif not self._last_valid_image or not os.path.isfile(self._last_valid_image):
+                    self._next_valid_image = self._find_next_valid_image(self.current_node_key)
+                    if not self._next_valid_image:
+                        # Use a default placeholder image if no valid images are found
+                        default_image = os.path.join(os.path.dirname(self.filepath), 'assets', 'images', 'placeholder.png')
+                        if os.path.isfile(default_image):
+                            self._last_valid_image = default_image
 
-            # Use the most appropriate image
-            content.image_path = current_image or self._last_valid_image or self._next_valid_image
+                # Use the most appropriate image
+                content.image_path = current_image or self._last_valid_image or self._next_valid_image
 
             self._current_content = content
 
@@ -428,10 +422,10 @@ class StoryManager:
         try:
             current_node = self.get_current_node()
 
-            # Handle battle nodes
-            if "battle" in current_node and not current_node.get("battle_completed", False):
+            # Handle battle nodes only if battle manager is available
+            if self.battle_manager and "battle" in current_node and not current_node.get("battle_completed", False):
                 battle_info = current_node["battle"]
-                if self.battle_manager and self.battle_manager.start_battle(battle_info):
+                if self.battle_manager.start_battle(battle_info):
                     # Mark this battle as completed
                     current_node["battle_completed"] = True
                     self.mark_battle_complete(self.current_node_key)
@@ -439,6 +433,13 @@ class StoryManager:
                     if not current_node.get('next'):
                         return True
                 return False  # Battle in progress or couldn't start
+            elif "battle" in current_node and not self.battle_manager:
+                # Skip battle if battle manager is not available
+                logging.warning("Battle system not available, skipping battle node")
+                if current_node.get('next'):
+                    self.set_current_node(current_node['next'])
+                    return self.display_story_segment()
+                return True
 
             # Normal story progression
             next_node = current_node.get('next')
@@ -585,3 +586,19 @@ class StoryManager:
         except Exception as e:
             logging.error(f"Error moving story to completed: {e}", exc_info=True)
             return False
+
+    def reset_state(self):
+        """Reset all story state and history."""
+        # Navigation history
+        self._history: List[tuple] = []
+        self._history_index: int = -1
+
+        # Track completed battles
+        self.completed_battle_nodes = set()
+
+        # Reset image tracking
+        self._last_valid_image = None
+        self._next_valid_image = None
+
+        # Reset current content
+        self._current_content = None

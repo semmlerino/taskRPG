@@ -76,12 +76,17 @@ class StoryDisplay(QWidget):
         # Setup text display area
         self.story_text = StoryTextBrowser()
         
+        # Add change story button
+        self.change_story_button = QPushButton("Change Story")
+        self.change_story_button.clicked.connect(self._change_story)
+        
         # Add both components to splitter
         self.splitter.addWidget(self.image_scroll)
         self.splitter.addWidget(self.story_text)
+        self.splitter.addWidget(self.change_story_button)
         
         # Set default split positions
-        self.splitter.setSizes([300, 400])
+        self.splitter.setSizes([300, 400, 50])
         
         # Connect splitter movement to image resize
         self.splitter.splitterMoved.connect(self.load_image)
@@ -92,6 +97,11 @@ class StoryDisplay(QWidget):
     def set_page(self, content: 'StoryContent'):
         """Set the page content."""
         try:
+            # Clean up any existing fullscreen viewer before changing content
+            if content.battle and self._fullscreen_viewer:
+                logging.info("Battle node detected, cleaning up fullscreen viewer")
+                self.cleanup_viewer()
+            
             self.current_node_key = content.node_key
             self.story_text.clear()
             
@@ -107,8 +117,8 @@ class StoryDisplay(QWidget):
             
             self.story_text.append(content.to_html())
             
-            # Update fullscreen viewer if active
-            if self._fullscreen_viewer:
+            # Update fullscreen viewer if active and not a battle node
+            if self._fullscreen_viewer and not content.battle:
                 logging.info(f"Updating fullscreen viewer with prompt: {self.current_image_prompt}")
                 self._fullscreen_viewer.update_content(
                     self.current_image_path,
@@ -266,12 +276,24 @@ class StoryDisplay(QWidget):
         """Clean up any existing fullscreen viewer instance."""
         if self._fullscreen_viewer:
             try:
+                # First release keyboard and disable window flags
+                self._fullscreen_viewer.releaseKeyboard()
+                self._fullscreen_viewer.setWindowFlags(Qt.Widget)
                 self._fullscreen_viewer.close()
+                
+                # Re-enable global hotkey
+                main_window = self.window()
+                if hasattr(main_window, 'hotkey_listener'):
+                    main_window.hotkey_listener.set_next_story_enabled(True)
+                    logging.info("Re-enabled global G hotkey during cleanup")
+                
+                # Schedule deletion for next event loop
                 self._fullscreen_viewer.deleteLater()
             except Exception as e:
                 logging.error(f"Error cleaning up viewer: {e}")
             finally:
                 self._fullscreen_viewer = None
+                logging.info("Fullscreen viewer cleanup complete")
 
     def show_error(self, message: str):
         """Display an error message dialog.
@@ -322,4 +344,33 @@ class StoryDisplay(QWidget):
         # Remove any existing chapter selection button
         for child in self.findChildren(QPushButton):
             if child.text() == "Select New Chapter":
+                child.deleteLater()
+
+    def _change_story(self):
+        """Open story selection dialog to switch stories."""
+        from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
+        
+        # Find the main window by traversing up the widget hierarchy
+        main_window = self
+        while main_window and not hasattr(main_window, 'story_manager'):
+            main_window = main_window.parent()
+            
+        if not main_window:
+            logging.error("Could not find main window")
+            return
+            
+        # Clear any existing choices or state
+        self.clear_choices()
+        self.story_text.clear()
+            
+        dialog = StorySelectionDialog(main_window)
+        if dialog.exec_():
+            # The dialog will handle story initialization if accepted
+            pass
+
+    def clear_choices(self):
+        """Clear any existing choice buttons."""
+        # Find and remove all choice buttons
+        for child in self.findChildren(QPushButton):
+            if hasattr(child, 'choice_data'):  # Identify choice buttons by their choice_data attribute
                 child.deleteLater()

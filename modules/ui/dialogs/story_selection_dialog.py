@@ -436,9 +436,19 @@ class StorySelectionDialog(QDialog):
             # Load story data
             with open(self.selected_story, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
+        except json.JSONDecodeError as e:
+            logging.error(f"Invalid JSON in story file: {e}")
+            QMessageBox.critical(self, "Error", f"The story file contains invalid JSON: {str(e)}")
+            return
         except Exception as e:
             logging.error(f"Failed to load story data: {e}")
             QMessageBox.critical(self, "Error", f"Failed to load story: {str(e)}")
+            return
+
+        # Validate story data structure
+        if not isinstance(story_data, dict):
+            logging.error("Story data must be a dictionary")
+            QMessageBox.critical(self, "Error", "Invalid story format: Story data must be a dictionary")
             return
 
         # Get story name (used for image folder path)
@@ -446,28 +456,44 @@ class StorySelectionDialog(QDialog):
 
         # Create story-specific image directory using project structure
         image_folder = os.path.join(ASSETS_DIR, 'images', story_name)
-        os.makedirs(image_folder, exist_ok=True)
+        try:
+            os.makedirs(image_folder, exist_ok=True)
+        except Exception as e:
+            logging.error(f"Failed to create image folder: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to create image folder: {str(e)}")
+            return
 
         # Get main window reference
         main_window = self.parent()
-        if not main_window or not hasattr(main_window, 'image_generator'):
-            raise RuntimeError("Image generator not available")
+        if not main_window:
+            logging.error("Parent window not available")
+            QMessageBox.critical(self, "Error", "Could not find main window")
+            return
 
-        # Initialize story manager first to ensure it's ready
-        main_window.story_manager = StoryManager(
-            filepath=self.selected_story,
-            image_generator=main_window.image_generator,
-            image_folder=image_folder,
-            ui_component=main_window,
-            battle_manager=main_window.battle_manager
-        )
+        try:
+            # Initialize story manager without requiring image generator or battle manager
+            main_window.story_manager = StoryManager(
+                filepath=self.selected_story,
+                image_generator=getattr(main_window, 'image_generator', None),
+                image_folder=image_folder,
+                ui_component=main_window,
+                battle_manager=getattr(main_window, 'battle_manager', None)
+            )
+        except Exception as e:
+            logging.error(f"Failed to initialize story manager: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to initialize story: {str(e)}")
+            return
 
-        # First check if ComfyUI is available
-        if not main_window.image_generator.validate_server_connection():
+        # Check if image generation is possible
+        can_generate_images = (hasattr(main_window, 'image_generator') and 
+                             main_window.image_generator and 
+                             main_window.image_generator.validate_server_connection())
+
+        if not can_generate_images:
             result = QMessageBox.warning(
                 self,
-                "ComfyUI Not Available",
-                "ComfyUI server is not available. Story will load without generating missing images.\n"
+                "Image Generation Not Available",
+                "Image generation is not available. Story will load without generating missing images.\n"
                 "Would you like to continue?",
                 QMessageBox.Yes | QMessageBox.No,
                 QMessageBox.No
@@ -475,9 +501,14 @@ class StorySelectionDialog(QDialog):
             if result == QMessageBox.No:
                 main_window.story_manager = None  # Clean up if user cancels
                 return
-            # If user continues, we'll load without image generation
+            # If user continues, load without image generation
             super().accept()
-            main_window.story_manager.display_story_segment()
+            try:
+                main_window.story_manager.display_story_segment()
+            except Exception as e:
+                logging.error(f"Failed to display initial story segment: {e}")
+                QMessageBox.critical(self, "Error", f"Failed to display story: {str(e)}")
+                main_window.story_manager = None
             return
 
         # Scan for missing images
