@@ -228,12 +228,12 @@ class ImageGenerator:
 
         # Load settings to get selected workflow
         settings_file = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data', 'settings.json')
-        selected_workflow = "Default Workflow"
+        selected_workflow = "newFluxWorkflow"  # Default to newFluxWorkflow
         try:
             if os.path.exists(settings_file):
                 with open(settings_file, 'r', encoding='utf-8') as f:
                     settings = json.load(f)
-                    selected_workflow = settings.get('selected_workflow', "Default Workflow")
+                    selected_workflow = settings.get('selected_workflow', "newFluxWorkflow")
                     logger.info(f"Found workflow in settings: {selected_workflow}")
         except Exception as e:
             logger.error(f"Error loading settings: {e}")
@@ -243,7 +243,7 @@ class ImageGenerator:
             logger.info("Using provided workflow_json")
             self.original_workflow_json = workflow_json
             self.workflow_json = self._validate_and_prepare_workflow(workflow_json)
-        elif selected_workflow != "Default Workflow":
+        else:
             # Try to load selected workflow file
             workflow_file = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -266,15 +266,23 @@ class ImageGenerator:
                                 logger.info(f"Model node {node_id}: {node['class_type']} - {node['inputs']}")
                 else:
                     logger.warning(f"Selected workflow file not found: {workflow_file}")
-                    self.workflow_json = self.default_workflow_json()
-                    logger.info("Falling back to default workflow")
+                    # Try to load newFluxWorkflow as fallback
+                    fallback_file = os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                        'workflows',
+                        "newFluxWorkflow.json"
+                    )
+                    if os.path.exists(fallback_file):
+                        with open(fallback_file, 'r', encoding='utf-8') as f:
+                            self.workflow_json = json.load(f)
+                        logger.info("Falling back to newFluxWorkflow")
+                    else:
+                        self.workflow_json = self.default_workflow_json()
+                        logger.info("Falling back to default workflow")
             except Exception as e:
                 logger.error(f"Error loading workflow file: {e}")
                 self.workflow_json = self.default_workflow_json()
                 logger.info("Falling back to default workflow due to error")
-        else:
-            logger.info("Using default workflow")
-            self.workflow_json = self.default_workflow_json()
 
         logger.info(f"ImageGenerator initialized with quality: {quality.name} and workflow: {selected_workflow}")
 
@@ -524,21 +532,58 @@ class ImageGenerator:
                 logger.error("No workflow available")
                 return None
                 
+            # Validate prompt
+            if not prompt or not isinstance(prompt, str):
+                logger.error(f"Invalid prompt: {prompt}")
+                return None
+                
             # Make a copy of the workflow to avoid modifying the original
             workflow = copy.deepcopy(self.workflow_json)
             
+            # Find the SaveImage node and ensure it has proper metadata
+            for node_id, node in workflow.items():
+                if node["class_type"] == "SaveImage":
+                    if "inputs" not in node:
+                        node["inputs"] = {}
+                    # Add metadata to include workflow information
+                    node["inputs"]["metadata"] = {
+                        "workflow": self.original_workflow_json,
+                        "prompt": prompt,
+                        "timestamp": datetime.datetime.now().isoformat()
+                    }
+                    logger.info(f"Added metadata to SaveImage node {node_id}")
+                    
             # Find the CLIP Text Encode node and update its prompt
+            prompt_updated = False
             for node_id, node in workflow.items():
                 if node["class_type"] == "CLIPTextEncode":
+                    # Update the prompt text
                     node["inputs"]["text"] = prompt
-                    logger.info(f"Updated prompt in node {node_id}")
+                    logger.info(f"Updated prompt in node {node_id}: {prompt}")
+                    prompt_updated = True
                     break
-            
+                    
+            if not prompt_updated:
+                logger.error("No CLIPTextEncode node found in workflow")
+                return None
+                
+            # Ensure UNETLoader is using fp8_e4m3fn weight type
+            for node_id, node in workflow.items():
+                if node["class_type"] == "UNETLoader":
+                    node["inputs"]["weight_dtype"] = "fp8_e4m3fn"
+                    logger.info(f"Set UNETLoader weight_dtype to fp8_e4m3fn in node {node_id}")
+                    
+            # Validate CLIP models
+            for node_id, node in workflow.items():
+                if node["class_type"] == "DualCLIPLoader":
+                    if node["inputs"]["clip_name1"] != "t5xxl_fp8_e4m3fn.safetensors" or node["inputs"]["clip_name2"] != "clip_l.safetensors":
+                        logger.warning(f"CLIP models in workflow may not match optimal configuration")
+                        
             return workflow
             
         except Exception as e:
             logger.error(f"Error preparing workflow: {e}")
-            raise
+            return None
 
     def get_image_from_history(self, client_id: str):
         """Get the generated image from the history."""

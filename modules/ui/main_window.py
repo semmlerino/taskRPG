@@ -172,6 +172,18 @@ class TaskRPG(QMainWindow):
             def generate_all_story_images():
                 """Generate missing images for all stories at startup."""
                 try:
+                    # First check if image generation is available
+                    if not hasattr(self, 'image_generator') or not self.image_generator:
+                        logging.warning("Image generator not available")
+                        show_story_selection()
+                        return
+
+                    # Verify server connection
+                    if not self.image_generator.validate_server_connection():
+                        logging.error("ComfyUI server not available")
+                        show_story_selection()
+                        return
+
                     if not os.path.exists(STORIES_DIR):
                         show_story_selection()
                         return
@@ -199,7 +211,8 @@ class TaskRPG(QMainWindow):
                                 story_data,
                                 story_name
                             )
-                            total_missing += len(missing_images)
+                            if missing_images:  # Only count if we got a valid list back
+                                total_missing += len(missing_images)
 
                         except Exception as e:
                             logging.error(f"Error scanning story {story_name}: {e}")
@@ -281,16 +294,8 @@ class TaskRPG(QMainWindow):
 
                 show_story_selection()
 
-            # Check ComfyUI availability first
-            if self.image_generator.validate_server_connection():
-                generate_all_story_images()
-            else:
-                QMessageBox.warning(
-                    self,
-                    "ComfyUI Not Available",
-                    "ComfyUI server is not available. Stories will load without generating missing images."
-                )
-                show_story_selection()
+            # Start the sequence
+            QTimer.singleShot(100, generate_all_story_images)
 
         except Exception as e:
             logging.error(f"Error in startup sequence: {e}")

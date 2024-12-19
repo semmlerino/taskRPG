@@ -658,7 +658,6 @@ class SettingsDialog(QDialog):
             # Get the project root directory and workflows path
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
             workflows_dir = os.path.join(project_root, 'workflows')
-            logging.info(f"Project root: {project_root}")
             logging.info(f"Looking for workflows in directory: {workflows_dir}")
             
             # Verify the directory exists
@@ -670,28 +669,27 @@ class SettingsDialog(QDialog):
             workflow_files = [f for f in os.listdir(workflows_dir) if f.endswith('.json')]
             logging.info(f"Found workflow files: {workflow_files}")
             
-            # Add default workflow option
-            self.workflow_combo.addItem("Default Workflow")
-            
             # Add workflow files to combo box
             for workflow_file in workflow_files:
                 workflow_name = os.path.splitext(workflow_file)[0]
                 self.workflow_combo.addItem(workflow_name)
                 logging.info(f"Added workflow option: {workflow_name}")
             
-            # Force update the combo box
-            self.workflow_combo.update()
-            QApplication.processEvents()  # Force UI update
-            
             # Set current workflow from settings
-            current_workflow = self.settings.get('selected_workflow', "Default Workflow")
+            current_workflow = self.settings.get('selected_workflow', "newFluxWorkflow")
             index = self.workflow_combo.findText(current_workflow)
             if index >= 0:
                 self.workflow_combo.setCurrentIndex(index)
                 logging.info(f"Set current workflow to: {current_workflow}")
+            else:
+                # If current workflow not found, default to newFluxWorkflow
+                index = self.workflow_combo.findText("newFluxWorkflow")
+                if index >= 0:
+                    self.workflow_combo.setCurrentIndex(index)
+                    logging.info("Defaulting to newFluxWorkflow workflow")
             
         except Exception as e:
             logging.error(f"Error loading workflow options: {e}")
             # Clear and add only default workflow if there's an error
             self.workflow_combo.clear()
-            self.workflow_combo.addItem("Default Workflow")
+            self.workflow_combo.addItem("newFluxWorkflow")

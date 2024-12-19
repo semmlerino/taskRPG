@@ -1,7 +1,7 @@
 {
     "shake_animation": true,
     "window_geometry": "AdnQywADAAAAAAJTAAABCQAAB0wAAAV7AAACVAAAATYAAAdLAAAFegAAAAAAAAAACgAAAAJUAAABNgAAB0sAAAV6",
-    "selected_workflow": "Flux",
+    "selected_workflow": "newFluxWorkflow",
     "column_widths": [
         537,
         69,
@@ -12,7 +12,7 @@
         80
     ],
     "window": {
-        "width": 900,
-        "height": 736
+        "width": 2560,
+        "height": 1494
     }
 }

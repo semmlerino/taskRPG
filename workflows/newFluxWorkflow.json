@@ -1,7 +1,7 @@
 {
   "6": {
     "inputs": {
-      "text": "INSERTTEXT",
+      "text": "A funny elf dancing",
       "speak_and_recognation": true,
       "clip": [
         "34",
@@ -52,7 +52,7 @@
   "12": {
     "inputs": {
       "unet_name": "flux-dev.safetensors",
-      "weight_dtype": "default"
+      "weight_dtype": "fp8_e4m3fn"
     },
     "class_type": "UNETLoader",
     "_meta": {
@@ -78,7 +78,7 @@
         0
       ],
       "latent_image": [
-        "28",
+        "26",
         0
       ]
     },
@@ -99,7 +99,7 @@
   "17": {
     "inputs": {
       "scheduler": "sgm_uniform",
-      "steps": 20,
+      "steps": 50,
       "denoise": 1,
       "model": [
         "12",
@@ -129,7 +129,7 @@
   },
   "25": {
     "inputs": {
-      "noise_seed": 958940824687493
+      "noise_seed": 363405777407543
     },
     "class_type": "RandomNoise",
     "_meta": {
@@ -138,7 +138,7 @@
   },
   "26": {
     "inputs": {
-      "ratio_selected": "3:4 [896x1152 portrait]",
+      "ratio_selected": "16:9 [1344x768 landscape]",
       "batch_size": 1
     },
     "class_type": "Empty Latent Ratio Select SDXL",
@@ -157,48 +157,6 @@
     "class_type": "FluxGuidance",
     "_meta": {
       "title": "FluxGuidance"
-    }
-  },
-  "28": {
-    "inputs": {
-      "width": 1440,
-      "height": 960,
-      "batch_size": 1
-    },
-    "class_type": "EmptyLatentImage",
-    "_meta": {
-      "title": "Empty Latent Image"
-    }
-  },
-  "33": {
-    "inputs": {
-      "filename_prefix": "Flux/image",
-      "filename_keys": "PNG",
-      "foldername_prefix": "",
-      "foldername_keys": "ckpt_name",
-      "delimiter": "-",
-      "save_job_data": "disabled",
-      "job_data_per_image": false,
-      "job_custom_text": "",
-      "save_metadata": true,
-      "counter_digits": 4,
-      "counter_position": "last",
-      "one_counter_per_folder": true,
-      "image_preview": true,
-      "output_ext": ".webp",
-      "quality": 90,
-      "named_keys": false,
-      "positive_text_opt": "",
-      "negative_text_opt": "",
-      "speak_and_recognation": true,
-      "images": [
-        "8",
-        0
-      ]
-    },
-    "class_type": "SaveImageExtended",
-    "_meta": {
-      "title": " Save Image Extended"
     }
   },
   "34": {
@@ -223,6 +181,19 @@
     "class_type": "Lora Loader Stack (rgthree)",
     "_meta": {
       "title": "Lora Loader Stack (rgthree)"
+    }
+  },
+  "37": {
+    "inputs": {
+      "filename_prefix": "Flux",
+      "images": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
     }
   }
 }
