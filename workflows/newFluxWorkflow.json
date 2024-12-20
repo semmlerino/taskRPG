@@ -99,7 +99,7 @@
   "17": {
     "inputs": {
       "scheduler": "sgm_uniform",
-      "steps": 50,
+      "steps": 40,
       "denoise": 1,
       "model": [
         "12",

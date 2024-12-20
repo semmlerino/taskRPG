@@ -23,6 +23,9 @@ import websocket
 import requests
 from requests.exceptions import RequestException
 
+# Local imports
+from core.story.character_descriptions import description_manager
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -159,13 +162,17 @@ class PromptEnhancer:
     def enhance_legacy_prompt(self, prompt: str) -> Tuple[str, str]:
         """Enhance a legacy string prompt."""
         try:
+            # First expand character descriptions
+            expanded_prompt = description_manager.expand_character_descriptions(prompt)
+            logger.info(f"Prompt with expanded character descriptions: {expanded_prompt}")
+
             # Extract any style information in parentheses
             style_info = ""
-            if "(" in prompt and ")" in prompt:
-                main_part = prompt[:prompt.find("(")].strip()
-                style_info = prompt[prompt.find("(")+1:prompt.find(")")].strip()
+            if "(" in expanded_prompt and ")" in expanded_prompt:
+                main_part = expanded_prompt[:expanded_prompt.find("(")].strip()
+                style_info = expanded_prompt[expanded_prompt.find("(")+1:expanded_prompt.find(")")].strip()
             else:
-                main_part = prompt
+                main_part = expanded_prompt
 
             structured_prompt = {
                 "main": main_part,
@@ -198,10 +205,16 @@ class ImageGenerator:
             # Update the prompt text
             workflow[prompt_node]["inputs"]["text"] = prompt
 
+            # Update the negative prompt text if it exists
+            for node_id, node in workflow.items():
+                if node["class_type"] == "CLIPTextEncode" and "negative_prompt" in node["inputs"]:
+                    node["inputs"]["negative_prompt"] = negative_prompt
+                    break
+
             return workflow
 
         except Exception as e:
-            logger.error(f"Error in _validate_and_prepare_workflow: {e}")
+            logger.error(f"Error validating workflow: {e}")
             return workflow
 
     def __init__(
@@ -289,30 +302,35 @@ class ImageGenerator:
     def scan_story_for_missing_images(self, story_data: Dict[str, Any], story_name: str) -> List[Tuple[str, str]]:
         """Scan story for missing images using project structure."""
         missing_images = []
-        logging.info(f"Scanning story '{story_name}' for missing images")
 
         try:
-            # Create the story's image directory if it doesn't exist
+            # First load character descriptions from this story
+            description_manager.load_descriptions_from_story(story_data)
+            logging.info("Loaded character descriptions from story")
+
+            # Create image directory for story if it doesn't exist
             image_dir = os.path.join(ASSETS_DIR, 'images', story_name)
             os.makedirs(image_dir, exist_ok=True)
-            logging.info(f"Using image directory: {image_dir}")
 
-            # Scan story nodes
             total_nodes = 0
             missing_count = 0
             for node_key, node_data in story_data.items():
                 if isinstance(node_data, dict) and 'image_prompt' in node_data:
                     total_nodes += 1
                     image_path = os.path.join(image_dir, f"{node_key}.png")
-                    prompt = node_data['image_prompt']
+                    # Expand character descriptions in the prompt
+                    raw_prompt = node_data['image_prompt']
+                    expanded_prompt = description_manager.expand_character_descriptions(raw_prompt)
+                    logger.info(f"Original prompt: {raw_prompt}")
+                    logger.info(f"Expanded prompt: {expanded_prompt}")
 
                     # Check existence and validity
                     if not os.path.exists(image_path) or not self._validate_image_file(image_path):
                         missing_count += 1
                         logging.info(f"Found missing image - ID: {node_key}")
-                        logging.debug(f"Prompt: {prompt}")
+                        logging.debug(f"Prompt: {expanded_prompt}")
                         logging.debug(f"Target path: {image_path}")
-                        missing_images.append((prompt, image_path))
+                        missing_images.append((expanded_prompt, image_path))
 
             logging.info(f"Found {missing_count} missing images out of {total_nodes} total in '{story_name}'")
             return missing_images
@@ -406,12 +424,17 @@ class ImageGenerator:
         logging.info(f"Using prompt: {prompt}")
         
         try:
+            # Enhance the prompt with quality terms and character descriptions
+            positive_prompt, negative_prompt = self.prompt_enhancer.enhance_legacy_prompt(prompt)
+            logging.info(f"Enhanced positive prompt: {positive_prompt}")
+            logging.info(f"Enhanced negative prompt: {negative_prompt}")
+            
             logging.info("Initializing WebSocket")
             if not self.init_websocket():
                 raise RuntimeError("Failed to initialize WebSocket")
             
             logging.info("Preparing workflow")
-            workflow = self.prepare_workflow(prompt)
+            workflow = self.prepare_workflow(positive_prompt, negative_prompt)
             if not workflow:
                 logging.error("Failed to prepare workflow")
                 return None
@@ -524,7 +547,7 @@ class ImageGenerator:
             self.ws = None
             return False
 
-    def prepare_workflow(self, prompt):
+    def prepare_workflow(self, positive_prompt, negative_prompt):
         """Prepare the workflow for image generation."""
         try:
             # Use the stored workflow_json instead of loading it again
@@ -533,8 +556,12 @@ class ImageGenerator:
                 return None
                 
             # Validate prompt
-            if not prompt or not isinstance(prompt, str):
-                logger.error(f"Invalid prompt: {prompt}")
+            if not positive_prompt or not isinstance(positive_prompt, str):
+                logger.error(f"Invalid positive prompt: {positive_prompt}")
+                return None
+                
+            if not negative_prompt or not isinstance(negative_prompt, str):
+                logger.error(f"Invalid negative prompt: {negative_prompt}")
                 return None
                 
             # Make a copy of the workflow to avoid modifying the original
@@ -548,7 +575,8 @@ class ImageGenerator:
                     # Add metadata to include workflow information
                     node["inputs"]["metadata"] = {
                         "workflow": self.original_workflow_json,
-                        "prompt": prompt,
+                        "prompt": positive_prompt,
+                        "negative_prompt": negative_prompt,
                         "timestamp": datetime.datetime.now().isoformat()
                     }
                     logger.info(f"Added metadata to SaveImage node {node_id}")
@@ -558,8 +586,10 @@ class ImageGenerator:
             for node_id, node in workflow.items():
                 if node["class_type"] == "CLIPTextEncode":
                     # Update the prompt text
-                    node["inputs"]["text"] = prompt
-                    logger.info(f"Updated prompt in node {node_id}: {prompt}")
+                    node["inputs"]["text"] = positive_prompt
+                    node["inputs"]["negative_prompt"] = negative_prompt
+                    logger.info(f"Updated prompt in node {node_id}: {positive_prompt}")
+                    logger.info(f"Updated negative prompt in node {node_id}: {negative_prompt}")
                     prompt_updated = True
                     break
                     
@@ -741,6 +771,7 @@ class ImageGenerator:
                 raise ValueError("No CLIPTextEncode node found in workflow")
 
             workflow[clip_node]["inputs"]["text"] = positive_prompt
+            workflow[clip_node]["inputs"]["negative_prompt"] = negative_prompt
 
             # Update dimensions if needed based on prompt
             if isinstance(prompt_data, dict) and latent_node:

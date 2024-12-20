@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, Dict, List
+from .character_descriptions import description_manager
 
 @dataclass
 class StoryContent:
@@ -13,6 +14,11 @@ class StoryContent:
     battle_info: Optional[Dict] = None
     choices: Optional[List[Dict]] = None
     image_prompt: Optional[str] = None
+
+    def __post_init__(self):
+        """Process image prompt after initialization to expand character descriptions"""
+        if self.image_prompt:
+            self.image_prompt = description_manager.expand_character_descriptions(self.image_prompt)
 
     @property
     def battle(self) -> bool:

@@ -8,6 +8,7 @@ import os
 import json
 import logging
 from typing import Optional, Dict, Any
+from datetime import datetime
 
 from PyQt5.QtWidgets import (
     QDialog,
@@ -41,7 +42,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
 class StoryGroup:
     def __init__(self, main_title):
         self.main_title = main_title
-        self.stories = []  # List of (display_name, full_path) tuples
+        self.stories = []  # List of (display_name, full_path, created_date) tuples
 
 
 class StorySelectionDialog(QDialog):
@@ -276,6 +277,11 @@ class StorySelectionDialog(QDialog):
             filename = os.path.basename(story_path)
             preview_parts.append(f"<h3 style='color: #1976D2;'>{filename}</h3>")
 
+            # Creation date
+            created_date = os.path.getctime(story_path)
+            created_str = datetime.fromtimestamp(created_date).strftime("%Y-%m-%d %H:%M:%S")
+            preview_parts.append(f"<p><b>Created:</b> {created_str}</p>")
+
             # Story structure info
             node_count = len(story_data.keys())
             preview_parts.append(f"<p><b>Total Nodes:</b> {node_count}</p>")
@@ -340,7 +346,7 @@ class StorySelectionDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to load story files: {str(e)}")
 
     def _group_stories(self, story_files):
-        """Group stories by their main title."""
+        """Group stories by their main title and sort by creation date."""
         groups = {}
         ungrouped = StoryGroup("Other Stories")
 
@@ -348,6 +354,9 @@ class StorySelectionDialog(QDialog):
             story_path = os.path.join(STORIES_DIR, story_file)
 
             try:
+                # Get file creation time
+                created_date = os.path.getctime(story_path)
+                
                 # Try to read the title from the JSON file first
                 with open(story_path, 'r', encoding='utf-8') as f:
                     story_data = json.load(f)
@@ -366,11 +375,15 @@ class StorySelectionDialog(QDialog):
                 if not groups.get(main_title):
                     groups[main_title] = StoryGroup(main_title)
 
-                groups[main_title].stories.append((sub_title, story_path))
+                groups[main_title].stories.append((sub_title, story_path, created_date))
+                # Sort stories by creation date, newest first
+                groups[main_title].stories.sort(key=lambda x: x[2], reverse=True)
             else:
                 # Handle ungrouped stories
                 display_name = file_title
-                ungrouped.stories.append((display_name, story_path))
+                ungrouped.stories.append((display_name, story_path, created_date))
+                # Sort stories by creation date, newest first
+                ungrouped.stories.sort(key=lambda x: x[2], reverse=True)
 
         # Add ungrouped stories only if they exist
         if ungrouped.stories:
@@ -398,7 +411,7 @@ class StorySelectionDialog(QDialog):
                 self.story_list.addItem(header_item)
 
             # Add stories in group
-            for display_name, story_path in sorted(group.stories):
+            for display_name, story_path, _ in sorted(group.stories, key=lambda x: x[2], reverse=True):
                 item = QListWidgetItem("    " + display_name if group.main_title != "Other Stories" else display_name)
                 item.setData(Qt.UserRole, story_path)
                 self.story_list.addItem(item)
