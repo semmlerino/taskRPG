@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 from PyQt5.QtCore import (
     Qt, QModelIndex, QAbstractTableModel, QByteArray, QMimeData
 )
-
+import time
 from modules.tasks.task import Task
 
 class TaskTableModel(QAbstractTableModel):
@@ -20,6 +20,10 @@ class TaskTableModel(QAbstractTableModel):
         
         # Convert tasks dictionary to list while preserving all attributes
         for name, task in tasks.items():
+            # Skip muted tasks
+            if task.muted_until and time.time() < task.muted_until:
+                continue
+                
             self._tasks.append((
                 name,
                 task.min_count,
@@ -247,27 +251,23 @@ class TaskTableModel(QAbstractTableModel):
     def get_tasks(self) -> Dict[str, Task]:
         """Get tasks as dictionary for saving."""
         tasks = {}
-        for task_data in self._tasks:
-            name = task_data[0]
-            if name in self._original_tasks:
-                # Update existing task
-                task = self._original_tasks[name]
-                task.min_count = task_data[1]
-                task.max_count = task_data[2]
-                task.active = task_data[3]
-                task.is_daily = task_data[4]
-                task.is_weekly = task_data[5]
-                task.count = task_data[6]
-            else:
-                # Create new task
-                task = Task(
-                    name=name,
-                    min_count=task_data[1],
-                    max_count=task_data[2],
-                    active=task_data[3],
-                    is_daily=task_data[4],
-                    is_weekly=task_data[5],
-                    count=task_data[6]
-                )
-            tasks[name] = task
+        
+        # Include all tasks from original tasks, not just visible ones
+        for task_name, task in self._original_tasks.items():
+            if task_name in tasks:
+                continue
+                
+            # Update task with current values if it's in the table
+            for task_data in self._tasks:
+                if task_data[0] == task_name:
+                    task.min_count = task_data[1]
+                    task.max_count = task_data[2]
+                    task.active = task_data[3]
+                    task.is_daily = task_data[4]
+                    task.is_weekly = task_data[5]
+                    task.count = task_data[6]
+                    break
+                    
+            tasks[task_name] = task
+            
         return tasks

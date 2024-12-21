@@ -18,6 +18,7 @@ class Task:
     manually_deactivated: bool = False
     count: int = 0  # New field for usage count
     activation_time: Optional[dt_time] = None  # New field for daily activation time
+    muted_until: Optional[float] = None  # Timestamp when task should be unmuted
 
     def __post_init__(self):
         """Validate and fix task data after initialization"""
@@ -54,6 +55,14 @@ class Task:
                 logging.info(f"Task '{self.name}' activated at scheduled time. Activation time cleared.")
                 return True
             return False
+            
+        # Check if task is muted
+        if self.muted_until is not None:
+            current_time = time.time()
+            if current_time >= self.muted_until:
+                self.muted_until = None  # Clear mute if time has passed
+            else:
+                return False  # Still muted
             
         return self.active
 
@@ -144,7 +153,8 @@ class Task:
             next_activation_time=data.get('next_activation_time'),
             manually_deactivated=data.get('manually_deactivated', False),
             count=data.get('count', 0),
-            activation_time=activation_time
+            activation_time=activation_time,
+            muted_until=data.get('muted_until')
         )
 
     def to_dict(self) -> dict:
@@ -157,7 +167,8 @@ class Task:
             'is_weekly': self.is_weekly,
             'next_activation_time': self.next_activation_time,
             'manually_deactivated': self.manually_deactivated,
-            'count': self.count
+            'count': self.count,
+            'muted_until': self.muted_until
         }
         if self.activation_time:
             data['activation_time'] = f"{self.activation_time.hour:02d}:{self.activation_time.minute:02d}"
@@ -170,3 +181,17 @@ class Task:
     def get_hp(self) -> int:
         """Get the HP value based on task count."""
         return max(1, self.get_task_count())
+
+    def mute_until(self, mute_datetime: datetime):
+        """Mute the task until the specified datetime
+        
+        Args:
+            mute_datetime: Datetime when the task should be unmuted
+        """
+        self.muted_until = mute_datetime.timestamp()
+        logging.info(f"Task '{self.name}' muted until {mute_datetime}")
+
+    def unmute(self):
+        """Unmute the task immediately"""
+        self.muted_until = None
+        logging.info(f"Task '{self.name}' unmuted")

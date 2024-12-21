@@ -7,7 +7,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "3DE scripting": {
         "min": 1,
@@ -17,7 +18,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "ToDo": {
         "min": 3,
@@ -27,7 +29,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Mails": {
         "min": 4,
@@ -37,7 +40,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Chair?": {
         "min": 1,
@@ -47,7 +51,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "SG scripting": {
         "min": 1,
@@ -57,7 +62,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "TaskRPG": {
         "min": 1,
@@ -67,7 +73,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Gemini": {
         "min": 2,
@@ -77,7 +84,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "AWS": {
         "min": 1,
@@ -87,7 +95,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "FitRPG": {
         "min": 1,
@@ -97,7 +106,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Gym": {
         "min": 1,
@@ -107,7 +117,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Walk/Shopping": {
         "min": 1,
@@ -117,7 +128,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "GPTs": {
         "min": 8,
@@ -127,17 +139,19 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Hair": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Beard": {
         "min": 1,
@@ -147,7 +161,8 @@
         "is_weekly": true,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Perplexity": {
         "min": 7,
@@ -157,7 +172,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 1
+        "count": 1,
+        "muted_until": null
     },
     "Claude": {
         "min": 6,
@@ -167,9 +183,10 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
-    "NHS": {
+    "NHS, check on refund": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -177,7 +194,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": 1737208343.354
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
@@ -187,7 +205,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Bubble": {
         "min": 1,
@@ -197,7 +216,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Showreel (add JOY/Killer. others...?)": {
         "min": 1,
@@ -207,7 +227,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Tabs": {
         "min": 2,
@@ -217,7 +238,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "TXT": {
         "min": 1,
@@ -227,7 +249,8 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
     },
     "Refund Medicash": {
         "min": 1,
@@ -237,6 +260,29 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0
+        "count": 0,
+        "muted_until": null
+    },
+    "announce my vienna arrival with max": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "AutoDetect Faces": {
+        "min": 1,
+        "max": 3,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
     }
 }

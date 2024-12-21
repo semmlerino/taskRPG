@@ -861,8 +861,9 @@ class TaskRPG(QMainWindow):
         try:
             # First check if we're in fullscreen
             if self.isFullScreen():
-                # If in battle, ensure we can exit
-                if self.battle_manager.is_in_battle():
+                # If in battle and an attack has been performed, ensure we can exit
+                if (self.battle_manager.is_in_battle() and 
+                    self.battle_manager.battle_state.attacks_performed > 0):
                     # Only show compact mode if not already paused
                     if not self.battle_manager.paused:
                         self.battle_manager.toggle_pause()

@@ -3,13 +3,15 @@ import os
 import logging
 from PyQt5.QtCore import (
     Qt, QByteArray, QModelIndex,
-    QSettings, QSize
+    QSettings, QSize, QDateTime
 )
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
-    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu, QComboBox, QApplication
+    QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu, QComboBox, QApplication,
+    QDateTimeEdit
 )
 from PyQt5.QtGui import QFont
+from datetime import datetime, time as dt_time, timedelta
 
 from modules.tasks.task_manager import TaskManager
 from modules.constants import DATA_DIR
@@ -549,24 +551,95 @@ class SettingsDialog(QDialog):
                 current_time_action.setEnabled(False)  # Make it non-clickable
                 menu.addSeparator()
             
-            set_time_action = menu.addAction("Set Activation Time")
+            # Show current mute status if muted
+            if task.muted_until:
+                mute_end = datetime.fromtimestamp(task.muted_until)
+                mute_status = menu.addAction(f"Muted until: {mute_end.strftime('%Y-%m-%d %H:%M')}")
+                mute_status.setEnabled(False)
+                menu.addSeparator()
+                
+                # Add unmute option
+                unmute_action = menu.addAction("Unmute")
+                unmute_action.triggered.connect(lambda: self.unmute_task(row))
+                menu.addSeparator()
+            else:
+                # Mute options
+                mute_menu = menu.addMenu("Mute Until...")
+                
+                # Common mute durations
+                durations = [
+                    ("1 Hour", timedelta(hours=1)),
+                    ("3 Hours", timedelta(hours=3)),
+                    ("6 Hours", timedelta(hours=6)),
+                    ("12 Hours", timedelta(hours=12)),
+                    ("1 Day", timedelta(days=1)),
+                    ("2 Days", timedelta(days=2)),
+                    ("1 Week", timedelta(days=7)),
+                ]
+                
+                for label, delta in durations:
+                    action = mute_menu.addAction(label)
+                    action.triggered.connect(lambda checked, d=delta: self.mute_task(row, d))
+                
+                # Add custom date/time option
+                mute_menu.addSeparator()
+                custom_action = mute_menu.addAction("Custom Date/Time...")
+                custom_action.triggered.connect(lambda: self.show_custom_mute_dialog(row))
+                
+                menu.addSeparator()
             
-            # Only show clear action if there's an activation time set
-            clear_time_action = None
+            # Set activation time action
+            set_time_action = menu.addAction("Set Activation Time...")
+            set_time_action.triggered.connect(lambda: self.set_activation_time(row))
+            
+            # Clear activation time action (only if time is set)
             if task.activation_time:
                 clear_time_action = menu.addAction("Clear Activation Time")
+                clear_time_action.triggered.connect(lambda: self.clear_activation_time(row))
             
-            action = menu.exec_(self.task_view.viewport().mapToGlobal(position))
+            menu.exec_(self.task_view.viewport().mapToGlobal(position))
             
-            if action == set_time_action:
-                self.set_activation_time(row)
-            elif clear_time_action and action == clear_time_action:
-                self.clear_activation_time(row)
-                
         except Exception as e:
             logging.error(f"Error showing context menu: {e}")
             QMessageBox.critical(self, "Error", f"Failed to show context menu: {str(e)}")
+
+    def mute_task(self, row: int, duration: timedelta):
+        """Mute a task for the specified duration."""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
             
+            mute_until = datetime.now() + duration
+            task.mute_until(mute_until)
+            
+            # Create new model to refresh the task list
+            self.task_model = TaskTableModel(self.task_manager.tasks, self)
+            self.task_view.setModel(self.task_model)
+            
+            logging.info(f"Task '{task_name}' muted until {mute_until}")
+            
+        except Exception as e:
+            logging.error(f"Error muting task: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to mute task: {str(e)}")
+
+    def unmute_task(self, row: int):
+        """Unmute a task."""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
+            
+            task.unmute()
+            
+            # Create new model to refresh the task list
+            self.task_model = TaskTableModel(self.task_manager.tasks, self)
+            self.task_view.setModel(self.task_model)
+            
+            logging.info(f"Task '{task_name}' unmuted")
+            
+        except Exception as e:
+            logging.error(f"Error unmuting task: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to unmute task: {str(e)}")
+
     def set_activation_time(self, row):
         """Set activation time for task"""
         try:
@@ -597,12 +670,18 @@ class SettingsDialog(QDialog):
             
             # Buttons
             button_layout = QHBoxLayout()
-            ok_button = QPushButton("OK")
-            cancel_button = QPushButton("Cancel")
-            button_layout.addWidget(ok_button)
-            button_layout.addWidget(cancel_button)
-            layout.addLayout(button_layout)
             
+            ok_button = QPushButton("OK")
+            ok_button.setFont(QFont("Arial", 13))
+            ok_button.clicked.connect(dialog.accept)
+            button_layout.addWidget(ok_button)
+            
+            cancel_button = QPushButton("Cancel")
+            cancel_button.setFont(QFont("Arial", 13))
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(cancel_button)
+            
+            layout.addLayout(button_layout)
             dialog.setLayout(layout)
             
             def validate_time():
@@ -648,6 +727,72 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logging.error(f"Error clearing activation time: {e}")
             QMessageBox.critical(self, "Error", f"Failed to clear activation time: {str(e)}")
+
+    def show_custom_mute_dialog(self, row: int):
+        """Show dialog for selecting custom mute date/time."""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle(f"Mute '{task_name}' Until")
+            dialog.setMinimumWidth(300)
+            
+            layout = QVBoxLayout()
+            layout.setSpacing(10)
+            layout.setContentsMargins(20, 20, 20, 20)
+            
+            # Add datetime picker
+            dt_label = QLabel("Select Date and Time:")
+            dt_label.setFont(QFont("Arial", 13))
+            layout.addWidget(dt_label)
+            
+            dt_edit = QDateTimeEdit()
+            dt_edit.setFont(QFont("Arial", 13))
+            dt_edit.setCalendarPopup(True)  # Allow calendar popup for date selection
+            dt_edit.setDisplayFormat("yyyy-MM-dd HH:mm")  # Set display format
+            
+            # Set minimum datetime to now
+            current_dt = QDateTime.currentDateTime()
+            dt_edit.setMinimumDateTime(current_dt)
+            dt_edit.setDateTime(current_dt.addDays(1))  # Default to tomorrow
+            
+            layout.addWidget(dt_edit)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            
+            ok_button = QPushButton("OK")
+            ok_button.setFont(QFont("Arial", 13))
+            ok_button.clicked.connect(dialog.accept)
+            button_layout.addWidget(ok_button)
+            
+            cancel_button = QPushButton("Cancel")
+            cancel_button.setFont(QFont("Arial", 13))
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(cancel_button)
+            
+            layout.addLayout(button_layout)
+            dialog.setLayout(layout)
+            
+            if dialog.exec_() == QDialog.Accepted:
+                selected_dt = dt_edit.dateTime().toPyDateTime()
+                
+                # Ensure selected time is in the future
+                if selected_dt <= datetime.now():
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Time",
+                        "Please select a future date and time."
+                    )
+                    return
+                
+                # Calculate duration from now until selected time
+                duration = selected_dt - datetime.now()
+                self.mute_task(row, duration)
+            
+        except Exception as e:
+            logging.error(f"Error showing custom mute dialog: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to show custom mute dialog: {str(e)}")
 
     def load_workflow_options(self):
         """Load workflow options from the workflows directory."""
