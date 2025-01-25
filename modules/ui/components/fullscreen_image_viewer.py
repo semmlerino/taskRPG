@@ -174,12 +174,12 @@ class FullscreenImageViewer(QMainWindow):
         self.image_label.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
         
         # Position text at the bottom with wider margins
-        text_height = int(screen_rect.height() * 0.3)  # 30% of screen height
+        text_height = int(screen_rect.height() * 0.30)  # Increase to 30% of screen height
         side_margin = 240  # Increased from 120 to 240 for narrower text
         bottom_margin = 5
         self.text_browser.setGeometry(
             side_margin,  # Left margin
-            screen_rect.height() - text_height - bottom_margin,
+            screen_rect.height() - text_height - bottom_margin - int(text_height * 0.2),  # Move up by 20%
             screen_rect.width() - (side_margin * 2),  # Width (with margins on both sides)
             text_height
         )

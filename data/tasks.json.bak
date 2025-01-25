@@ -68,7 +68,7 @@
     "TaskRPG": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -123,7 +123,7 @@
     "Walk/Shopping": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -145,7 +145,7 @@
     "Hair": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -156,7 +156,7 @@
     "Beard": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -172,7 +172,7 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 1,
+        "count": 2,
         "muted_until": null
     },
     "Claude": {
@@ -195,7 +195,7 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1737208343.354
+        "muted_until": 1739020729.628935
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
@@ -222,7 +222,7 @@
     "Showreel (add JOY/Killer. others...?)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
@@ -231,9 +231,9 @@
         "muted_until": null
     },
     "Tabs": {
-        "min": 2,
-        "max": 4,
-        "active": true,
+        "min": 4,
+        "max": 8,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -242,8 +242,8 @@
         "muted_until": null
     },
     "TXT": {
-        "min": 1,
-        "max": 2,
+        "min": 2,
+        "max": 4,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -274,10 +274,10 @@
         "count": 0,
         "muted_until": null
     },
-    "AutoDetect Faces": {
+    "AutoDetect Faces and enhance anime": {
         "min": 1,
         "max": 3,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
