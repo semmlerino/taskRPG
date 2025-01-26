@@ -151,18 +151,35 @@ class BattleManager:
 
             # Get task (either specified or random)
             task = None
+            
+            # Task override mode
             if 'task_override' in battle_info:
                 task_name = battle_info['task_override']
                 task = self.task_manager.get_task(task_name)
-                if not task or not task.is_active:
-                    logging.warning(f"Specified task {task_name} not found or inactive")
+                if not task:
+                    logging.warning(f"Specified task {task_name} not found")
                     task = None
+                elif not task.is_active:
+                    # Force activate the task if it's specified
+                    task.activate(manual=True)
+                    logging.info(f"Forced activation of task {task_name} for battle")
             
+            # Get random task if none specified
             if not task:
+                # Check for task activations first
+                self.task_manager.check_task_activations()
                 task = self.task_manager.get_random_active_task()
                 
+                # If no active tasks, force activate a random one
+                if not task:
+                    all_tasks = list(self.task_manager.tasks.values())
+                    if all_tasks:
+                        task = random.choice(all_tasks)
+                        task.activate(manual=True)
+                        logging.info(f"Forced activation of random task {task.name} for battle")
+                
             if not task:
-                logging.warning("No active task available for battle")
+                logging.warning("No tasks available for battle")
                 if self.status_bar:
                     self.status_bar.showMessage("No tasks available")
                 return False

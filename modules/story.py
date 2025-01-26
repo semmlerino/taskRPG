@@ -454,17 +454,28 @@ class StoryManager:
             current_node = self.get_current_node()
 
             # Handle battle nodes only if battle manager is available
-            if self.battle_manager and "battle" in current_node and not current_node.get("battle_completed", False):
-                battle_info = current_node["battle"]
-                if self.battle_manager.start_battle(battle_info):
-                    # Mark this battle as completed
-                    current_node["battle_completed"] = True
-                    self.mark_battle_complete(self.current_node_key)
-                    # If this is the last node, return True to indicate successful progression
-                    if not current_node.get('next'):
-                        return True
-                return False  # Battle in progress or couldn't start
-            elif "battle" in current_node and not self.battle_manager:
+            if self.battle_manager:
+                battle_info = None
+                # Check for battle node in either format
+                if "battle" in current_node:
+                    battle_info = current_node["battle"]
+                elif "enemy" in current_node:
+                    # Convert old format to battle info
+                    battle_info = {
+                        "enemy": current_node["enemy"],
+                        "message": current_node.get("message", current_node.get("text", ""))
+                    }
+                
+                if battle_info and not current_node.get("battle_completed", False):
+                    if self.battle_manager.start_battle(battle_info):
+                        # Mark this battle as completed
+                        current_node["battle_completed"] = True
+                        self.mark_battle_complete(self.current_node_key)
+                        # If this is the last node, return True to indicate successful progression
+                        if not current_node.get('next'):
+                            return True
+                    return False  # Battle in progress or couldn't start
+            elif "battle" in current_node or "enemy" in current_node:
                 # Skip battle if battle manager is not available
                 logging.warning("Battle system not available, skipping battle node")
                 if current_node.get('next'):

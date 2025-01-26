@@ -29,7 +29,7 @@ class StoryContent:
             return bool(self.battle_info.get("battle") or 
                        self.battle_info.get("enemy") or 
                        self.battle_info.get("message"))
-        return bool(self.battle_info)  # Handle True/False/None cases
+        return False
 
     def to_html(self) -> str:
         """Convert content to HTML format for display."""

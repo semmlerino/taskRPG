@@ -61,10 +61,21 @@ class Task:
             current_time = time.time()
             if current_time >= self.muted_until:
                 self.muted_until = None  # Clear mute if time has passed
+                logging.info(f"Task '{self.name}' unmuted as mute duration expired")
             else:
                 return False  # Still muted
             
         return self.active
+
+    def activate(self, manual: bool = False):
+        """Activate the task"""
+        if manual:
+            # Manual activation clears all restrictions
+            self.manually_deactivated = False
+            self.muted_until = None
+            self.next_activation_time = None
+            
+        self.active = True
 
     def deactivate(self, manual: bool = False):
         """Deactivate the task and set next activation time if it's daily/weekly"""
@@ -85,15 +96,6 @@ class Task:
                 self.next_activation_time = current_time + (7 * 24 * 3600)  # 7 days
         else:
             self.next_activation_time = None
-
-    def activate(self, manual: bool = False):
-        """Activate the task"""
-        if manual:
-            # Manual activation clears manual deactivation flag
-            self.manually_deactivated = False
-            
-        self.active = True
-        self.next_activation_time = None
 
     def check_reactivation(self) -> bool:
         """Check and handle task reactivation if needed. Returns True if reactivated."""
