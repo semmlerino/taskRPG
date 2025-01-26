@@ -3,6 +3,7 @@ import os
 import logging
 import traceback
 from functools import lru_cache
+from PyQt5.QtCore import Qt, QSize, QRect, pyqtSignal, QTimer
 
 from PyQt5.QtWidgets import (
     QMainWindow, QLabel, QVBoxLayout, QTextBrowser, QApplication, QMessageBox, 
@@ -12,9 +13,12 @@ from PyQt5.QtGui import (
     QPixmap, QPainter, QColor, QKeyEvent, QPen, QPainterPath, 
     QKeySequence, QTextOption, QFont, QTextCursor
 )
-from PyQt5.QtCore import Qt, QSize, QRect, pyqtSignal
 
 from modules.constants import HOTKEYS
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 class OutlinedTextBrowser(QTextBrowser):
     """Text browser with outlined text for better visibility on any background."""
@@ -74,6 +78,7 @@ class OutlinedTextBrowser(QTextBrowser):
             text
         )
 
+
 class FullscreenImageViewer(QMainWindow):
     """Fullscreen image viewer with story progression capability."""
     
@@ -89,6 +94,7 @@ class FullscreenImageViewer(QMainWindow):
         # Initialize state variables first
         self.text_visible = True
         self.prompt_visible = False
+        self._fullscreen = False  # Track fullscreen state
         
         # Set window properties
         self.setStyleSheet("background-color: black;")
@@ -269,52 +275,108 @@ class FullscreenImageViewer(QMainWindow):
         """Toggle text visibility."""
         self.text_visible = not self.text_visible
         self.text_browser.setVisible(self.text_visible)
+        logging.info(f"Text visibility toggled to: {self.text_visible}")
 
     def toggle_prompt(self):
         """Toggle prompt visibility."""
         self.prompt_visible = not self.prompt_visible
         self.prompt_label.setVisible(self.prompt_visible)
-        logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
+        logging.info(f"Prompt visibility toggled to: {self.prompt_visible}")
 
     def advance_story(self):
         """Handle story progression request."""
         try:
-            logging.info("Advance story method called in FullscreenImageViewer")
+            logging.info("[FULLSCREEN] Advance story method called in FullscreenImageViewer")
             self.story_advance_signal.emit()
-            logging.info("Story advance signal emitted from FullscreenImageViewer")
         except Exception as e:
             logging.error(f"Error advancing story: {e}", exc_info=True)
 
     def keyPressEvent(self, event):
         """Handle key press events."""
-        logging.info(f"Key pressed in fullscreen: {event.key()}")
-        
         try:
-            if event.key() in (Qt.Key_G, Qt.Key_Right):  # Both G and right arrow advance story
-                logging.info("Story advance key detected in fullscreen viewer")
-                self.advance_story()
-            elif event.key() == Qt.Key_Left:
-                logging.info("Left arrow detected in fullscreen viewer")
-                self.navigate_back()
-            elif event.key() == Qt.Key_T:
-                self.toggle_text()
-            elif event.key() == Qt.Key_I:
-                self.toggle_prompt()
-            elif event.key() in (Qt.Key_Escape, Qt.Key_F):
+            if event.key() == Qt.Key_Escape:
+                logging.info("[FULLSCREEN] Escape key pressed, closing viewer")
                 self.close()
-            else:
-                super().keyPressEvent(event)
+            elif event.key() in (Qt.Key_G, Qt.Key_Space, Qt.Key_Right):  # Support G, Space, and Right Arrow
+                logging.info(f"[FULLSCREEN] Advance key pressed: {event.key()}")
+                self.story_advance_signal.emit()
+            elif event.key() == Qt.Key_P:
+                logging.info("[FULLSCREEN] Toggle prompt visibility")
+                self.toggle_prompt()
+            elif event.key() in (Qt.Key_Left, Qt.Key_Backspace):
+                logging.info("[FULLSCREEN] Back navigation key pressed")
+                self.navigate_back_signal.emit()
+            event.accept()
         except Exception as e:
-            logging.error(f"Error handling key press in fullscreen viewer: {e}", exc_info=True)
+            logging.error(f"Error handling key press: {e}")
+            event.ignore()
 
-    def navigate_back(self):
-        """Handle navigation back request."""
+    def update_content(self, image_path: str, text: str, prompt: str = None):
+        """Update the viewer content."""
         try:
-            logging.info("Navigate back requested from fullscreen viewer")
-            self.navigate_back_signal.emit()
-            logging.info("Navigate back signal emitted")
+            logging.info(f"[FULLSCREEN] Updating content with prompt: {prompt}")
+            if not self.isVisible():
+                logging.warning("[FULLSCREEN] Attempted to update content of hidden viewer")
+                return
+
+            # Removed fullscreen state restoration to prevent flickering
+            # was_fullscreen = self.isFullScreen()
+            # logging.info(f"[FULLSCREEN] Current state - Fullscreen: {was_fullscreen}")
+            
+            if image_path and os.path.exists(image_path):
+                self.original_pixmap = QPixmap(image_path)
+                self.scale_image()
+                
+            self.text_browser.setHtml(text)
+            self.text_browser.moveCursor(QTextCursor.Start)
+            self.text_browser.ensureCursorVisible()
+            
+            if prompt:
+                logging.info("[FULLSCREEN] Setting prompt text")
+                # Convert prompt to string if it's a dictionary
+                prompt_str = str(prompt) if not isinstance(prompt, dict) else str(prompt)
+                self.prompt_label.setHtml(f"""
+                    <div style='line-height: 1.4;'>
+                        <p style='font-weight: bold; font-size: 28pt; margin-bottom: 10px;'>Image Prompt:</p>
+                        <p style='font-size: 28pt; margin: 0;'>{prompt_str}</p>
+                    </div>
+                """)
+                self.prompt_label.setVisible(False)  # Keep prompt invisible by default
+                self.prompt_visible = False  # Update state
+                self.prompt_label.raise_()
+            else:
+                self.prompt_label.setVisible(False)
+                self.prompt_visible = False
+                
+            # Removed window state restoration to prevent flickering
+            # if was_fullscreen:
+            #     logging.info("[FULLSCREEN] Restoring fullscreen state")
+            #     self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
+            #     self.showFullScreen()
+            #     self.activateWindow()
+            #     self.raise_()
+            #     logging.info("[FULLSCREEN] Restored fullscreen state")
+                
         except Exception as e:
-            logging.error(f"Error navigating back from fullscreen view: {e}")
+            logging.error(f"[FULLSCREEN] Error updating fullscreen content: {e}")
+
+    def showFullScreen(self):
+        """Override showFullScreen to track state."""
+        logging.info("[FULLSCREEN] Entering fullscreen mode")
+        super().showFullScreen()
+        self._fullscreen = True
+        self.activateWindow()
+        self.raise_()
+        logging.info("[FULLSCREEN] Fullscreen mode entered, state set to True")
+
+    def showNormal(self):
+        """Override showNormal to track state."""
+        logging.info("[FULLSCREEN] Exiting fullscreen mode")
+        super().showNormal()
+        self._fullscreen = False
+        self.activateWindow()
+        self.raise_()
+        logging.info("[FULLSCREEN] Normal mode entered, state set to False")
 
     def showEvent(self, event):
         """Handle window show event."""
@@ -352,25 +414,29 @@ class FullscreenImageViewer(QMainWindow):
     def cleanup_resources(self):
         """Clean up resources before closing."""
         try:
-            # Clear keyboard focus and window flags
-            self.releaseKeyboard()
-            self.setWindowFlags(Qt.Widget)
-            
-            # Clear image resources
-            self.original_pixmap = None
-            self.get_scaled_pixmap.cache_clear()
-            
-            # Clear text resources
-            if hasattr(self, 'text_browser'):
-                self.text_browser.clear()
-            if hasattr(self, 'prompt_label'):
-                self.prompt_label.clear()
+            # Only cleanup if we're actually closing
+            if not self.isVisible():
+                logging.info("[FULLSCREEN] Starting cleanup of hidden viewer")
+                # Clear keyboard focus and window flags
+                self.releaseKeyboard()
+                self.setWindowFlags(Qt.Widget)
                 
-            # Force process events to ensure cleanup
-            QApplication.processEvents()
-            
+                # Clear image resources
+                self.original_pixmap = None
+                # self.get_scaled_pixmap.cache_clear()
+                
+                # Clear text resources
+                if hasattr(self, 'text_browser'):
+                    self.text_browser.clear()
+                if hasattr(self, 'prompt_label'):
+                    self.prompt_label.clear()
+                    
+                # Force process events to ensure cleanup
+                QApplication.processEvents()
+                logging.info("[FULLSCREEN] Cleanup completed")
+                
         except Exception as e:
-            logging.error(f"Error cleaning up resources: {e}")
+            logging.error(f"[FULLSCREEN] Error cleaning up resources: {e}")
 
     @lru_cache(maxsize=10)
     def get_scaled_pixmap(self, size_tuple):
@@ -383,44 +449,21 @@ class FullscreenImageViewer(QMainWindow):
             Qt.SmoothTransformation
         )
 
-    def update_content(self, image_path: str, text: str, prompt: str = None):
-        """Update the viewer content."""
-        try:
-            logging.info(f"Updating content with prompt: {prompt}")
-            if not self.isVisible():
-                logging.warning("Attempted to update content of hidden viewer")
-                return
-                
-            if image_path and os.path.exists(image_path):
-                self.original_pixmap = QPixmap(image_path)
-                self.scale_image()
-            self.text_browser.setHtml(text)
-            self.text_browser.moveCursor(QTextCursor.Start)
-            self.text_browser.ensureCursorVisible()
-            if prompt:
-                logging.info("Setting prompt text in update_content")
-                # Convert prompt to string if it's a dictionary
-                if isinstance(prompt, dict):
-                    prompt_str = str(prompt)
-                else:
-                    prompt_str = str(prompt)
-                self.prompt_label.setHtml(f"""
-                    <div style='line-height: 1.4;'>
-                        <p style='font-weight: bold; font-size: 28pt; margin-bottom: 10px;'>Image Prompt:</p>
-                        <p style='font-size: 28pt; margin: 0;'>{prompt_str}</p>
-                    </div>
-                """)
-                self.prompt_label.setVisible(False)  # Keep prompt invisible by default
-                self.prompt_visible = False  # Update state
-                logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
-                logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
-                self.prompt_label.raise_()
-            else:
-                logging.info("No prompt provided, hiding prompt label")
-                self.prompt_label.setVisible(False)
-                self.prompt_visible = False
-        except Exception as e:
-            logging.error(f"Error updating fullscreen content: {e}")
-            # Force cleanup if update fails
-            self.cleanup_resources()
-            self.close()
+
+# Example usage (for testing purposes)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    
+    # Replace these with actual paths and content
+    sample_image_path = "path/to/your/image.jpg"
+    sample_story_text = "<p>Your story text goes here.</p>"
+    sample_image_prompt = {"prompt": "Describe the image."}
+    
+    viewer = FullscreenImageViewer(sample_image_path, sample_story_text, sample_image_prompt)
+    viewer.showFullScreen()
+    
+    # Example signal connections (to be implemented as needed)
+    # viewer.story_advance_signal.connect(your_advance_method)
+    # viewer.navigate_back_signal.connect(your_back_method)
+    
+    sys.exit(app.exec_())

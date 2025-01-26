@@ -42,6 +42,8 @@ class StoryDisplay(QWidget):
         self.current_image_path = None
         self.current_image_prompt = None
         self._fullscreen_viewer = None
+        self._last_fullscreen_state = False
+        self._last_window_geometry = None
         
         # Enable keyboard focus for hotkey support
         self.setFocusPolicy(Qt.StrongFocus)
@@ -97,25 +99,21 @@ class StoryDisplay(QWidget):
     def set_page(self, content: 'StoryContent'):
         """Set the page content."""
         try:
-            logging.info(f"Setting page for node {content.node_key}")
+            logging.info(f"[FULLSCREEN] Setting page for node: {content.node_key}")
             
-            # Store current content before cleanup
+            # Store current content
             self.current_node_key = content.node_key
+            self.current_image_path = content.image_path
             self.current_image_prompt = content.image_prompt
             
-            # Only cleanup viewer if we're not in a battle or if explicitly requested
-            if not content.battle or (content.battle and self._fullscreen_viewer and getattr(content, 'force_cleanup', False)):
-                self.cleanup_viewer()
-            
-            # Clear existing content while preserving battle state
+            # Clear existing content
             self.story_text.clear()
             
             # Update image if provided
             if content.image_path:
-                self.current_image_path = content.image_path
                 self.load_image()
             
-            # Convert content to HTML and display
+            # Update story text
             html_content = content.to_html()
             logging.info(f"Generated HTML content length: {len(html_content)}")
             
@@ -133,25 +131,35 @@ class StoryDisplay(QWidget):
                 </div>
                 """
             
-            # Ensure content is properly displayed
-            self.story_text.clear()
-            self.story_text.append(html_content)
+            # Append to story text
+            self.story_text.append_text(html_content)
             logging.info("Content appended to story text")
             
-            # Update fullscreen viewer if active and appropriate
-            if self._fullscreen_viewer and not content.battle:
+            # Update fullscreen viewer if it exists and is visible
+            if self._fullscreen_viewer and self._fullscreen_viewer.isVisible():
+                logging.info("[FULLSCREEN] Updating existing fullscreen viewer in set_page")
+                # Store current fullscreen state
+                was_fullscreen = self._fullscreen_viewer.isFullScreen()
+                logging.info(f"[FULLSCREEN] Current viewer state - Fullscreen: {was_fullscreen}")
+                
+                # Update content
                 self._fullscreen_viewer.update_content(
-                    self.current_image_path,
+                    content.image_path,
                     self.story_text.toPlainText(),
-                    self.current_image_prompt
+                    content.image_prompt
                 )
+                
+            elif hasattr(self, '_last_fullscreen_state') and self._last_fullscreen_state:
+                logging.info("[FULLSCREEN] Recreating fullscreen viewer with previous state")
+                self._show_fullscreen_viewer()
             
+            # Set focus back to story display
             self.setFocus()
             logging.info("Page set successfully")
             
         except Exception as e:
-            logging.error(f"Error setting page: {e}")
-            self.story_text.append(f"<p style='color: red;'>Failed to set page content: {str(e)}</p>")
+            logging.error(f"[FULLSCREEN] Error setting page: {e}")
+            self.show_error("Failed to set page content")
 
     def clear(self):
         """Clear all content from the display."""
@@ -216,10 +224,26 @@ class StoryDisplay(QWidget):
         """Create and display the fullscreen image viewer."""
         try:
             if not os.path.exists(self.current_image_path):
-                logging.error(f"Image file not found: {self.current_image_path}")
+                logging.error(f"[FULLSCREEN] Image file not found: {self.current_image_path}")
                 self.show_error("Image file not found")
                 return
 
+            # If we already have a viewer, just update its content
+            if self._fullscreen_viewer and self._fullscreen_viewer.isVisible():
+                logging.info("[FULLSCREEN] Updating existing fullscreen viewer in _show_fullscreen_viewer")
+                # Store current fullscreen state
+                was_fullscreen = self._fullscreen_viewer.isFullScreen()
+                logging.info(f"[FULLSCREEN] Current viewer state - Fullscreen: {was_fullscreen}")
+                
+                # Update content
+                self._fullscreen_viewer.update_content(
+                    self.current_image_path,
+                    self.story_text.toPlainText(),
+                    self.current_image_prompt
+                )
+                
+            # Otherwise, create a new viewer
+            logging.info("[FULLSCREEN] Creating new fullscreen viewer")
             self.cleanup_viewer()
             
             logging.info(f"Current image prompt before creating viewer: {self.current_image_prompt}")
@@ -231,11 +255,6 @@ class StoryDisplay(QWidget):
                 self.current_image_prompt
             )
             
-            # Verify prompt was set
-            if hasattr(self._fullscreen_viewer, 'prompt_label'):
-                logging.info(f"Fullscreen viewer prompt text: {self._fullscreen_viewer.prompt_label.toPlainText()}")
-                logging.info(f"Prompt visible: {self._fullscreen_viewer.prompt_label.isVisible()}")
-            
             # Connect signals
             main_window = self.window()
             if main_window:
@@ -244,14 +263,14 @@ class StoryDisplay(QWidget):
                     self._fullscreen_viewer.story_advance_signal.connect(
                         main_window.next_story_segment
                     )
-                    logging.info("Story advance signal connected")
+                    logging.info("[FULLSCREEN] Story advance signal connected")
                 
                 # Connect back navigation signal
                 if hasattr(main_window, 'navigate_back'):
                     self._fullscreen_viewer.navigate_back_signal.connect(
                         main_window.navigate_back
                     )
-                    logging.info("Back navigation signal connected")
+                    logging.info("[FULLSCREEN] Back navigation signal connected")
                 else:
                     logging.warning("Main window does not have navigate_back method")
             
@@ -264,42 +283,67 @@ class StoryDisplay(QWidget):
             self._fullscreen_viewer.closeEvent = lambda event: self._handle_fullscreen_close(event)
             
             self._fullscreen_viewer.showFullScreen()
-            logging.info("Fullscreen viewer displayed")
+            logging.info("[FULLSCREEN] New viewer displayed in fullscreen mode")
             
         except Exception as e:
-            logging.error(f"Error showing fullscreen viewer: {e}")
+            logging.error(f"[FULLSCREEN] Error showing fullscreen viewer: {e}")
             self.show_error("Failed to show fullscreen view")
 
     def _handle_fullscreen_close(self, event):
         """Handle fullscreen viewer close event."""
         try:
-            # Release keyboard grab
+            logging.info("[FULLSCREEN] Handling fullscreen viewer close event")
             if self._fullscreen_viewer:
+                # Store state before cleanup
+                was_fullscreen = self._fullscreen_viewer.isFullScreen()
+                logging.info(f"[FULLSCREEN] State before close - Fullscreen: {was_fullscreen}")
+                
+                # Release keyboard grab
                 self._fullscreen_viewer.releaseKeyboard()
                 
-            # Re-enable global G hotkey
-            main_window = self.window()
-            if hasattr(main_window, 'hotkey_listener'):
-                main_window.hotkey_listener.set_next_story_enabled(True)
-                logging.info("Re-enabled global G hotkey")
-            
-            # Force cleanup of viewer
-            self.cleanup_viewer()
-            
+                # Re-enable global G hotkey
+                main_window = self.window()
+                if hasattr(main_window, 'hotkey_listener'):
+                    main_window.hotkey_listener.set_next_story_enabled(True)
+                    logging.info("[FULLSCREEN] Re-enabled global G hotkey")
+                
+                # Store state for potential restoration
+                if was_fullscreen:
+                    self._last_fullscreen_state = True
+                    logging.info("[FULLSCREEN] Stored state for potential restoration")
+                
+                # Force cleanup of viewer
+                self.cleanup_viewer()
+                
             # Call original close event
             event.accept()
+            logging.info("[FULLSCREEN] Close event handled successfully")
+            
         except Exception as e:
-            logging.error(f"Error handling fullscreen close: {e}")
+            logging.error(f"[FULLSCREEN] Error handling fullscreen close: {e}")
             # Emergency cleanup
             if self._fullscreen_viewer:
-                self._fullscreen_viewer.releaseKeyboard()
-                self._fullscreen_viewer.close()
-                self._fullscreen_viewer = None
+                try:
+                    self._fullscreen_viewer.releaseKeyboard()
+                    self._fullscreen_viewer.close()
+                    self._fullscreen_viewer = None
+                    logging.info("[FULLSCREEN] Emergency cleanup completed")
+                except Exception as cleanup_error:
+                    logging.error(f"[FULLSCREEN] Error during emergency cleanup: {cleanup_error}")
 
     def cleanup_viewer(self):
         """Clean up any existing fullscreen viewer instance."""
         if self._fullscreen_viewer:
             try:
+                logging.info("[FULLSCREEN] Starting viewer cleanup")
+                was_fullscreen = self._fullscreen_viewer.isFullScreen()
+                logging.info(f"[FULLSCREEN] Viewer state before cleanup - Fullscreen: {was_fullscreen}")
+                
+                # Store state for potential restoration
+                if was_fullscreen:
+                    self._last_fullscreen_state = True
+                    logging.info("[FULLSCREEN] Stored state for potential restoration")
+                
                 # First release keyboard and disable window flags
                 self._fullscreen_viewer.releaseKeyboard()
                 self._fullscreen_viewer.setWindowFlags(Qt.Widget)
@@ -309,15 +353,17 @@ class StoryDisplay(QWidget):
                 main_window = self.window()
                 if hasattr(main_window, 'hotkey_listener'):
                     main_window.hotkey_listener.set_next_story_enabled(True)
-                    logging.info("Re-enabled global G hotkey during cleanup")
+                    logging.info("[FULLSCREEN] Re-enabled global G hotkey during cleanup")
                 
                 # Schedule deletion for next event loop
                 self._fullscreen_viewer.deleteLater()
+                logging.info("[FULLSCREEN] Viewer scheduled for deletion")
+                
             except Exception as e:
-                logging.error(f"Error cleaning up viewer: {e}")
+                logging.error(f"[FULLSCREEN] Error cleaning up viewer: {e}")
             finally:
                 self._fullscreen_viewer = None
-                logging.info("Fullscreen viewer cleanup complete")
+                logging.info("[FULLSCREEN] Viewer cleanup complete")
 
     def show_error(self, message: str):
         """Display an error message dialog.
