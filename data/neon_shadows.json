@@ -1,0 +1,39 @@
+{
+  "title": "Neon Shadows:Origins:The Job:001",
+  "character_descriptions": {
+    "Zephyr": "A lithe woman in her early thirties with short, electric blue hair and cybernetic eyes that shift colors with her mood. Her face bears a thin scar along her left cheek, and she moves with the fluid grace of someone who's spent years mastering both physical and magical combat. Her preferred outfit consists of a high-collar synthetic leather jacket with glowing circuit patterns and form-fitting combat pants with multiple hidden compartments.",
+    "Marcus": "A towering man with dark skin and augmented arms covered in flowing magical scripture that pulses with a soft golden light. His head is clean-shaven, and a holographic monocle covers his right eye. Despite his imposing frame, he carries himself with a scholarly air, often adjusting his vintage wire-rimmed glasses with mechanical fingers.",
+    "Shadowblade": "A mysterious figure wrapped in a cloak made of living shadows. Their form seems to constantly shift and blur, making it impossible to determine their true appearance. The only consistent features are two glowing red eyes and a mask made of what appears to be liquid darkness."
+  },
+  "node1": {
+    "text": "The neon-drenched streets of Neo-Hong Kong stretch out before you like a digital river of light and shadow. You adjust your jacket's collar against the acid rain as Marcus's message replay's in your neural feed: 'Got a job. High risk, higher reward. Interested?' As if he needed to ask.",
+    "environment": "Rain-slicked streets of Neo-Hong Kong's lower commercial district, surrounded by towering holograms and street vendors",
+    "image_prompt": "A rain-soaked cyberpunk street scene with neon signs reflecting off wet pavement, dramatic lighting from multiple colored holographic advertisements casting a rainbow of shadows, composition focusing on a solitary figure standing beneath a glowing red awning, warm neon lights contrasting with cool blue ambient lighting, atmospheric perspective showing layers of light and mist in deep background",
+    "next": "node2"
+  },
+  "node2": {
+    "text": "The Lucky Dragon Noodle Shop looks exactly like it did the last time you were here: a hole-in-the-wall joint trying its best to look even more holes-in-the-wall than it actually is. Marcus sits at his usual corner booth, those augmented fingers of his drumming a complex pattern on the scratched synthwood table.",
+    "environment": "Dimly lit noodle shop with steam rising from kitchen, mix of traditional decor and modern tech",
+    "image_prompt": "Intimate indoor scene of a cyberpunk noodle shop, warm yellow lantern light mixing with cool blue LED strips, steam rising from kitchen creating atmospheric depth, Zephyr and Marcus seated in a dark corner booth, focus on the contrast between Marcus's golden augments and the shadows",
+    "next": "node3"
+  },
+  "node3": {
+    "text": "'You're late,' Marcus says, not looking up from his noodles. 'I ordered you the usual.' A bowl of synthetic ramen sits across from him, the steam carrying the perfect replica of traditional spices. 'Job's bigger than I initially thought. You might want to sit down for this one.'",
+    "environment": "Corner booth of noodle shop, partially concealed by holographic privacy screens",
+    "image_prompt": "Close-up composition of two figures in a noodle shop booth, dramatic rim lighting from red paper lanterns, steam from ramen bowls creating atmospheric effects, focus on Marcus's glowing augmented arms and Zephyr's color-shifting cybernetic eyes",
+    "next": "battle"
+  },
+  "battle": {
+    "text": "The windows explode inward as a figure wreathed in living darkness crashes through, twin energy blades humming with deadly purpose. 'The job,' Marcus sighs, already moving, 'might have already found us.'",
+    "environment": "Chaos-filled noodle shop, broken glass and overturned tables, emergency lights strobing",
+    "enemy": "Shadowblade",
+    "message": "The windows explode inward as a figure wreathed in living darkness crashes through, twin energy blades humming with deadly purpose. 'The job,' Marcus sighs, already moving, 'might have already found us.'",
+    "next": "node4"
+  },
+  "node4": {
+    "text": "You dive sideways as a blade of pure darkness cleaves through where your head was a moment ago. The Shadowblade moves like liquid night, each motion flowing into the next with terrifying grace. 'Marcus,' you shout over the chaos of screaming patrons, 'please tell me this isn't related to the job!' His grimace tells you everything you need to know.",
+    "environment": "Chaos-filled noodle shop, broken glass and overturned tables, emergency lights strobing",
+    "image_prompt": "Dynamic action scene in a destroyed noodle shop, emergency lights creating strobing effects, Shadowblade's dark form contrasting with sparks and shattered glass, multiple light sources from broken neon signs and Marcus's glowing augments, composition capturing the height of action",
+    "next": "node5"
+  }
+}

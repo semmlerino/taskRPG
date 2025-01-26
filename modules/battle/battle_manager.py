@@ -365,7 +365,14 @@ class BattleManager:
                 'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
                 'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
                 'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
-                'status_bar': lambda: self.status_bar.showMessage("Battle started!") if self.status_bar else None
+                'story_display': lambda: (
+                    self.story_display.story_text.append(
+                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
+                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
+                        "</div>"
+                    ) if self.story_display else None
+                ),
+                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
             }
             
             self._batch_ui_update(updates)
@@ -414,7 +421,7 @@ class BattleManager:
             
             # Trigger victory animation if enabled
             if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
-                self.main_window.trigger_victory_animation()
+                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
             
             logging.info("Victory UI updates completed")
                 
@@ -451,6 +458,9 @@ class BattleManager:
     def connect_signals(self, hotkey_listener) -> None:
         """Connect battle-related hotkey signals."""
         try:
+            # Store hotkey listener reference
+            self.hotkey_listener = hotkey_listener
+            
             # Connect attack signals directly
             hotkey_listener.normal_attack_signal.connect(
                 lambda: self.perform_attack(is_heavy=False)
@@ -471,8 +481,6 @@ class BattleManager:
             
         except Exception as e:
             logging.error(f"Error connecting battle signals: {e}")
-            if self.status_bar:
-                self.status_bar.showMessage("Error connecting battle controls")
 
     def set_ui_components(self, 
                          story_display=None,
@@ -551,6 +559,11 @@ class BattleManager:
                 self.compact_window.show()
                 self.compact_window.raise_()
                 
+                # Enable attack hotkeys for compact mode
+                if hasattr(self, 'hotkey_listener'):
+                    self.hotkey_listener.set_attack_hotkeys_enabled(True)
+                    logging.debug("Attack hotkeys enabled for compact mode")
+                
                 # Validate state consistency after showing
                 self._validate_pause_state()
                 
@@ -570,6 +583,11 @@ class BattleManager:
                 self.compact_window.close()
                 self.compact_window.deleteLater()
                 self.compact_window = None
+                
+                # Disable attack hotkeys when compact mode is hidden
+                if hasattr(self, 'hotkey_listener'):
+                    self.hotkey_listener.set_attack_hotkeys_enabled(False)
+                    logging.debug("Attack hotkeys disabled after compact mode")
                 
                 # Ensure main window components reflect the correct pause state
                 self.paused = was_paused

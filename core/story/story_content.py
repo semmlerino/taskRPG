@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, Dict, List
 from .character_descriptions import description_manager
+import logging
 
 @dataclass
 class StoryContent:
@@ -32,21 +33,44 @@ class StoryContent:
 
     def to_html(self) -> str:
         """Convert content to HTML format for display."""
-        html_parts = [f"<p>{self.text}</p>"]
-        
-        if self.environment:
-            html_parts.append(f"<p><i>Environment:</i> {self.environment}</p>")
+        try:
+            html_parts = []
             
-        if self.event:
-            html_parts.append(f"<p><i>Event:</i> {self.event}</p>")
+            # Convert plain text to HTML paragraphs
+            if self.text:
+                text_parts = self.text.split('\n')
+                html_parts.extend([f"<p>{part}</p>" if part.strip() else "<br>" for part in text_parts])
             
-        if self.npc_info:
-            html_parts.extend(self._generate_npc_html())
+            if self.environment:
+                html_parts.append(f"<p><i>Environment:</i> {self.environment}</p>")
+                
+            if self.event:
+                html_parts.append(f"<p><i>Event:</i> {self.event}</p>")
+                
+            if self.npc_info:
+                npc_html = self._generate_npc_html()
+                if npc_html:
+                    html_parts.extend(npc_html)
+                
+            if self.battle_info:
+                battle_html = self._generate_battle_html()
+                if battle_html:
+                    html_parts.extend(battle_html)
             
-        if self.battle_info:
-            html_parts.extend(self._generate_battle_html())
+            # Join with newlines and wrap in a div with proper styling
+            html_content = f"""
+            <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333333;'>
+                {"\n".join(html_parts)}
+            </div>
+            """
             
-        return "\n".join(html_parts)
+            logging.info(f"Generated HTML content length: {len(html_content)}")
+            logging.info(f"HTML parts count: {len(html_parts)}")
+            return html_content
+
+        except Exception as e:
+            logging.error(f"Error generating HTML: {e}")
+            return f"<p style='color: red;'>Error generating content: {str(e)}</p>"
 
     def _generate_npc_html(self) -> List[str]:
         """Generate HTML for NPC interactions."""
@@ -66,15 +90,30 @@ class StoryContent:
 
     def _generate_battle_html(self) -> List[str]:
         """Generate HTML for battle information."""
-        html_parts = []
-        
-        # Handle case where battle_info might be True/False
-        if not isinstance(self.battle_info, dict):
-            return html_parts
+        try:
+            html_parts = []
             
-        battle_data = self.battle_info.get("battle", self.battle_info)
-        message = battle_data.get("message", "An enemy appears!")
-        enemy_name = battle_data.get("enemy", "Unknown Enemy")
-        html_parts.append(f"<p><i>{message}</i></p>")
-        html_parts.append(f"<p>A <b>{enemy_name}</b> appears!</p>")
-        return html_parts
+            if not self.battle_info:
+                return html_parts
+                
+            # Extract battle information
+            battle_data = self.battle_info
+            if isinstance(battle_data, dict):
+                enemy_name = battle_data.get("enemy", "Unknown Enemy")
+                message = battle_data.get("message", "")
+                
+                # Add battle message if present
+                if message:
+                    html_parts.append(f"""
+                        <div style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>
+                            <p style='font-style: italic; margin: 5px 0;'>{message}</p>
+                            <p style='font-weight: bold; margin: 5px 0;'>Encountered: <span style='color: #ff0000'>{enemy_name}</span>!</p>
+                        </div>
+                    """)
+                
+            logging.info(f"Generated battle HTML parts: {len(html_parts)}")
+            return html_parts
+
+        except Exception as e:
+            logging.error(f"Error generating battle HTML: {e}")
+            return [f"<p style='color: red;'>Error in battle content: {str(e)}</p>"]

@@ -97,40 +97,61 @@ class StoryDisplay(QWidget):
     def set_page(self, content: 'StoryContent'):
         """Set the page content."""
         try:
-            # Clean up any existing fullscreen viewer before changing content
-            if content.battle and self._fullscreen_viewer:
-                logging.info("Battle node detected, cleaning up fullscreen viewer")
-                self.cleanup_viewer()
+            logging.info(f"Setting page for node {content.node_key}")
             
+            # Store current content before cleanup
             self.current_node_key = content.node_key
-            self.story_text.clear()
-            
-            # Store image prompt
-            logging.info(f"Setting image prompt: {content.image_prompt}")
             self.current_image_prompt = content.image_prompt
             
-            # Only update image if we have a new one
+            # Only cleanup viewer if we're not in a battle or if explicitly requested
+            if not content.battle or (content.battle and self._fullscreen_viewer and getattr(content, 'force_cleanup', False)):
+                self.cleanup_viewer()
+            
+            # Clear existing content while preserving battle state
+            self.story_text.clear()
+            
+            # Update image if provided
             if content.image_path:
                 self.current_image_path = content.image_path
                 self.load_image()
-            # Don't clear the image if no new image is provided
             
-            self.story_text.append(content.to_html())
+            # Convert content to HTML and display
+            html_content = content.to_html()
+            logging.info(f"Generated HTML content length: {len(html_content)}")
             
-            # Update fullscreen viewer if active and not a battle node
+            if not html_content.strip():
+                logging.warning("HTML content is empty, using fallback")
+                # Fallback content if HTML is empty
+                html_content = f"""
+                <div style='font-family: Arial, sans-serif; line-height: 1.6; color: #333333;'>
+                    <p>{content.text}</p>
+                    {f"<p><i>Environment:</i> {content.environment}</p>" if content.environment else ""}
+                    {f"<div style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
+                     f"<p><b>Battle:</b> {content.battle_info.get('message', '')}</p>"
+                     f"<p><b>Enemy:</b> {content.battle_info.get('enemy', '')}</p></div>"
+                     if content.battle_info else ""}
+                </div>
+                """
+            
+            # Ensure content is properly displayed
+            self.story_text.clear()
+            self.story_text.append(html_content)
+            logging.info("Content appended to story text")
+            
+            # Update fullscreen viewer if active and appropriate
             if self._fullscreen_viewer and not content.battle:
-                logging.info(f"Updating fullscreen viewer with prompt: {self.current_image_prompt}")
                 self._fullscreen_viewer.update_content(
                     self.current_image_path,
                     self.story_text.toPlainText(),
                     self.current_image_prompt
                 )
-                
+            
             self.setFocus()
+            logging.info("Page set successfully")
             
         except Exception as e:
             logging.error(f"Error setting page: {e}")
-            self.show_error("Failed to set page content")
+            self.story_text.append(f"<p style='color: red;'>Failed to set page content: {str(e)}</p>")
 
     def clear(self):
         """Clear all content from the display."""
@@ -226,10 +247,13 @@ class StoryDisplay(QWidget):
                     logging.info("Story advance signal connected")
                 
                 # Connect back navigation signal
-                self._fullscreen_viewer.navigate_back_signal.connect(
-                    self.navigate_back_signal.emit
-                )
-                logging.info("Back navigation signal connected")
+                if hasattr(main_window, 'navigate_back'):
+                    self._fullscreen_viewer.navigate_back_signal.connect(
+                        main_window.navigate_back
+                    )
+                    logging.info("Back navigation signal connected")
+                else:
+                    logging.warning("Main window does not have navigate_back method")
             
             # Handle global hotkeys
             if hasattr(main_window, 'hotkey_listener'):

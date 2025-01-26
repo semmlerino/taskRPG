@@ -30,9 +30,9 @@ class GlobalHotkeys(QThread):
         try:
             # Attack hotkeys - always active when in battle
             keyboard.add_hotkey(HOTKEYS['normal_attack'], 
-                              lambda: self.normal_attack_signal.emit())
+                              lambda: self.normal_attack_signal.emit() if self.attack_hotkeys_enabled else None)
             keyboard.add_hotkey(HOTKEYS['heavy_attack'], 
-                              lambda: self.heavy_attack_signal.emit())
+                              lambda: self.heavy_attack_signal.emit() if self.attack_hotkeys_enabled else None)
             keyboard.add_hotkey(HOTKEYS['toggle_pause'], 
                               lambda: self.toggle_pause_signal.emit())
             

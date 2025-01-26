@@ -239,12 +239,22 @@ class TaskTableModel(QAbstractTableModel):
         if row == source_row:
             return False
             
-        # Move the task
+        # Move the task in view model
         self.beginMoveRows(QModelIndex(), source_row, source_row,
                           QModelIndex(), row + (1 if row > source_row else 0))
         task = self._tasks.pop(source_row)
         self._tasks.insert(row, task)
         self.endMoveRows()
+        
+        # Update task order in original tasks
+        # We'll create a new ordered dictionary to preserve the new order
+        ordered_tasks = {}
+        for task_data in self._tasks:
+            task_name = task_data[0]
+            if task_name in self._original_tasks:
+                ordered_tasks[task_name] = self._original_tasks[task_name]
+        self._original_tasks.clear()
+        self._original_tasks.update(ordered_tasks)
         
         return True
 

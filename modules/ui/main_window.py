@@ -65,6 +65,7 @@ from modules.ui.components import (
 )
 from modules.ui.dialogs.settings import SettingsDialog  # Import from new settings package
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
+from modules.ui.dialogs.image_generation_selection_dialog import ImageGenerationSelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.battle.battle_manager import BattleManager
 
@@ -195,7 +196,8 @@ class TaskRPG(QMainWindow):
 
                     # First scan all stories to count total missing images
                     total_missing = 0
-                    story_data_map = {}  # Store story data to avoid reloading
+                    story_data_map = {}
+
                     for story_file in story_files:
                         story_path = os.path.join(STORIES_DIR, story_file)
                         story_name = os.path.splitext(story_file)[0]
@@ -204,8 +206,7 @@ class TaskRPG(QMainWindow):
                             # Load story data
                             with open(story_path, 'r', encoding='utf-8') as f:
                                 story_data = json.load(f)
-                                story_data_map[story_name] = story_data
-
+                                
                             # Scan for missing images
                             missing_images = self.image_generator.scan_story_for_missing_images(
                                 story_data,
@@ -213,6 +214,10 @@ class TaskRPG(QMainWindow):
                             )
                             if missing_images:  # Only count if we got a valid list back
                                 total_missing += len(missing_images)
+                                story_data_map[story_name] = {
+                                    'data': story_data,
+                                    'missing_images': missing_images
+                                }
 
                         except Exception as e:
                             logging.error(f"Error scanning story {story_name}: {e}")
@@ -223,58 +228,61 @@ class TaskRPG(QMainWindow):
                         show_story_selection()
                         return
 
-                    # Create progress dialog for total missing images
+                    # Show selection dialog
+                    selection_dialog = ImageGenerationSelectionDialog(story_data_map, self)
+                    if selection_dialog.exec_() != QDialog.Accepted or not selection_dialog.selected_stories:
+                        logging.info("No stories selected for image generation")
+                        show_story_selection()
+                        return
+
+                    # Create progress dialog for selected missing images
+                    selected_total = sum(
+                        len(story_data_map[story_name]['missing_images'])
+                        for story_name in selection_dialog.selected_stories
+                    )
+
                     progress = QProgressDialog(
-                        f"Found {total_missing} missing images across {len(story_files)} stories",
+                        f"Found {selected_total} missing images in selected stories",
                         "Cancel",
                         0,
-                        total_missing,
+                        selected_total,
                         self
                     )
                     progress.setWindowModality(Qt.WindowModal)
                     progress.setMinimumDuration(0)
                     progress.setAutoClose(False)
 
-                    # Now generate all missing images
+                    # Now generate all missing images for selected stories
                     total_generated = 0
                     current_progress = 0
-                    for story_file in story_files:
+                    
+                    for story_name in selection_dialog.selected_stories:
                         if progress.wasCanceled():
                             break
 
-                        story_name = os.path.splitext(story_file)[0]
-                        story_data = story_data_map.get(story_name)
-                        if not story_data:
-                            continue
+                        story_data = story_data_map[story_name]['data']
 
                         try:
                             # Update progress dialog
                             progress.setLabelText(f"Checking story: {story_name}")
 
-                            # Generate missing images
-                            missing_images = self.image_generator.scan_story_for_missing_images(
-                                story_data,
-                                story_name
+                            # Update dialog for generation
+                            progress.setLabelText(
+                                f"Generating images for '{story_name}'\n"
+                                f"Progress: {current_progress}/{selected_total} images"
                             )
 
-                            if missing_images:
-                                # Update dialog for generation
-                                progress.setLabelText(
-                                    f"Generating images for '{story_name}'\n"
-                                    f"Progress: {current_progress}/{total_missing} images"
-                                )
+                            # Generate missing images
+                            generated = self.image_generator.generate_missing_story_images(
+                                story_data,
+                                story_name,
+                                progress_dialog=progress
+                            )
 
-                                # Generate missing images
-                                generated = self.image_generator.generate_missing_story_images(
-                                    story_data,
-                                    story_name,
-                                    progress_dialog=progress
-                                )
-
-                                if generated:
-                                    total_generated += len(generated)
-                                    current_progress += len(generated)
-                                    progress.setValue(current_progress)
+                            if generated:
+                                total_generated += len(generated)
+                                current_progress += len(generated)
+                                progress.setValue(current_progress)
 
                         except Exception as e:
                             logging.error(f"Error processing story {story_name}: {e}")
@@ -286,7 +294,7 @@ class TaskRPG(QMainWindow):
                         QMessageBox.information(
                             self,
                             "Image Generation Complete",
-                            f"Successfully generated {total_generated} images across {len(story_files)} stories."
+                            f"Successfully generated {total_generated} images for selected stories."
                         )
 
                 except Exception as e:

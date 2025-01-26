@@ -18,6 +18,13 @@ class StoryNode:
     @staticmethod
     def from_dict(key: str, data: Dict[str, Any]) -> 'StoryNode':
         """Create a StoryNode from dictionary data."""
+        # Handle battle information
+        battle_info = data.get('battle')
+        if isinstance(battle_info, dict):
+            # Ensure battle info has the required structure
+            if not battle_info.get('enemy') and not battle_info.get('message'):
+                battle_info = None
+        
         return StoryNode(
             key=key,
             text=data.get('text', ''),
@@ -25,7 +32,7 @@ class StoryNode:
             environment=data.get('environment'),
             event=data.get('event'),
             npc_info=data.get('npc'),
-            battle_info=data.get('battle'),
+            battle_info=battle_info,
             choices=data.get('choices'),
             next_node=data.get('next'),
             is_end=data.get('end', False)

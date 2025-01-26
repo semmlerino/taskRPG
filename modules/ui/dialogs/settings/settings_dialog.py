@@ -357,24 +357,46 @@ class SettingsDialog(QDialog):
 
             if dialog.exec_() == QDialog.Accepted:
                 # Add new task
+                task_name = name_edit.text()
+                min_count = min_spin.value()
+                max_count = max_spin.value()
+                active = active_checkbox.isChecked()
+                is_daily = daily_checkbox.isChecked()
+                is_weekly = weekly_checkbox.isChecked()
+                count = count_spin.value()
+
+                # Add to view model
                 self.task_model.beginInsertRows(QModelIndex(), row_count, row_count)
                 self.task_model._tasks.append((
-                    name_edit.text(),   # name
-                    min_spin.value(),   # min_count
-                    max_spin.value(),   # max_count
-                    active_checkbox.isChecked(),  # active
-                    daily_checkbox.isChecked(),  # is_daily
-                    weekly_checkbox.isChecked(),  # is_weekly
-                    count_spin.value()  # count
+                    task_name,   # name
+                    min_count,   # min_count
+                    max_count,   # max_count
+                    active,      # active
+                    is_daily,    # is_daily
+                    is_weekly,   # is_weekly
+                    count       # count
                 ))
                 self.task_model.endInsertRows()
+
+                # Add to original tasks dictionary
+                from modules.tasks.task import Task
+                new_task = Task(
+                    name=task_name,
+                    min_count=min_count,
+                    max_count=max_count,
+                    active=active,
+                    is_daily=is_daily,
+                    is_weekly=is_weekly,
+                    count=count
+                )
+                self.task_model._original_tasks[task_name] = new_task
 
                 # Select the new task
                 index = self.task_model.index(row_count, 0)
                 self.task_view.setCurrentIndex(index)
                 self.task_view.edit(index)  # Start editing the name
 
-                logging.info(f"Added new task: {name_edit.text()}")
+                logging.info(f"Added new task: {task_name}")
 
         except Exception as e:
             logging.error(f"Error adding task: {e}")
@@ -400,9 +422,15 @@ class SettingsDialog(QDialog):
             )
 
             if reply == QMessageBox.Yes:
+                # Remove from view model
                 self.task_model.beginRemoveRows(QModelIndex(), row, row)
                 del self.task_model._tasks[row]
                 self.task_model.endRemoveRows()
+                
+                # Remove from original tasks dictionary
+                if task_name in self.task_model._original_tasks:
+                    del self.task_model._original_tasks[task_name]
+                
                 logging.info(f"Removed task: {task_name}")
 
         except Exception as e:
@@ -417,11 +445,20 @@ class SettingsDialog(QDialog):
             
             for i, (name, min_count, max_count, active, is_daily, is_weekly, count) in enumerate(tasks):
                 # Check for empty name
-                if not name:
+                if not name or not name.strip():
                     QMessageBox.warning(
                         self,
                         "Invalid Task",
                         f"Task at row {i + 1} has no name."
+                    )
+                    return False
+
+                # Check name length
+                if len(name) > 100:  # Maximum reasonable length for a task name
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Task Name",
+                        f"Task name '{name}' is too long (max 100 characters)."
                     )
                     return False
 
@@ -452,12 +489,29 @@ class SettingsDialog(QDialog):
                     )
                     return False
 
+                # Check reasonable max count limit
+                if max_count > 1000:  # Arbitrary reasonable limit
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Max Count",
+                        f"Task '{name}' has unreasonably high max count: {max_count}. Maximum allowed is 1000."
+                    )
+                    return False
+
                 # Check count value
                 if count < 0:
                     QMessageBox.warning(
                         self,
                         "Invalid Count",
                         f"Task '{name}' has negative count: {count}"
+                    )
+                    return False
+
+                if count > max_count:
+                    QMessageBox.warning(
+                        self,
+                        "Invalid Count",
+                        f"Task '{name}' has count ({count}) greater than max count ({max_count})."
                     )
                     return False
 

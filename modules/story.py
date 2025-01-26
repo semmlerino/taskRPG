@@ -58,12 +58,19 @@ class StoryManager:
             Dict[str, Any]: Validated story data
         """
         try:
+            logging.info(f"Loading story from: {self.filepath}")
             with open(self.filepath, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
 
             # Validate story data structure
             if not isinstance(story_data, dict):
                 raise ValueError("Story data must be a dictionary")
+
+            # Log story structure
+            logging.info(f"Story keys: {list(story_data.keys())}")
+            for key, node in story_data.items():
+                if isinstance(node, dict):
+                    logging.info(f"Node {key} content: {list(node.keys())}")
 
             # Convert all string nodes to dict format for consistency
             validated_data = {}
@@ -135,6 +142,7 @@ class StoryManager:
     def display_story_segment(self) -> bool:
         """Display the current segment of the story with enhanced error handling."""
         try:
+            logging.info(f"Displaying story segment for node: {self.current_node_key}")
             if not self._validate_story_state():
                 return False
 
@@ -143,11 +151,14 @@ class StoryManager:
                 logging.error(f"Invalid node data for key: {self.current_node_key}")
                 return False
 
+            logging.info(f"Node data: {node}")
             # Create node content
             content = self._create_node_content(node)
             if not content:
                 logging.error("Failed to create node content")
                 return False
+
+            logging.info(f"Created content: text={content.text[:100]}..., battle_info={content.battle_info}")
 
             # Handle image persistence with validation
             # Only attempt image handling if image generator is available
@@ -185,8 +196,9 @@ class StoryManager:
 
             # Update UI if available
             if self.ui:
+                logging.info("Updating UI with content")
                 self.ui.story_display.set_page(content)
-                logging.info(f"Displayed story segment for node: {self.current_node_key}")
+                logging.info(f"UI updated for node: {self.current_node_key}")
 
             return True
 
@@ -236,24 +248,43 @@ class StoryManager:
                 logging.error(f"Invalid node data type: {type(node_data)}")
                 return None
 
-            # Create StoryNode from dictionary data
-            node = StoryNode.from_dict(self.current_node_key, node_data)
+            # Extract text and battle information
+            text = node_data.get('text', '')
+            battle_info = None
+            
+            # Handle battle node
+            if 'enemy' in node_data:
+                battle_info = {
+                    'enemy': node_data['enemy'],
+                    'message': node_data.get('message', text)
+                }
+                logging.info(f"Created battle info: {battle_info}")
 
-            return StoryContent(
-                text=node.text,
+            # Create StoryNode from dictionary data
+            node = StoryNode.from_dict(self.current_node_key, {
+                **node_data,
+                'battle': battle_info
+            })
+
+            content = StoryContent(
+                text=text,
                 node_key=self.current_node_key,
                 image_path=self.get_generated_image(self.current_node_key),
                 environment=node.environment,
                 event=node.event,
                 npc_info=node.npc_info,
-                battle_info=node.battle_info,
+                battle_info=battle_info,
                 choices=node.choices,
-                image_prompt=node.image_prompt  # Ensure image_prompt is passed
+                image_prompt=node.image_prompt
             )
+
+            logging.info(f"Created content for node {self.current_node_key}")
+            logging.info(f"Text: {text[:100]}...")
+            logging.info(f"Battle info: {battle_info}")
+            return content
 
         except Exception as e:
             logging.error(f"Error creating node content: {e}")
-            # Return a basic content object with error message
             return StoryContent(
                 text="Error loading story content. Please contact support.",
                 node_key=self.current_node_key

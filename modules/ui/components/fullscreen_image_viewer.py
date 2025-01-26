@@ -10,9 +10,11 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import (
     QPixmap, QPainter, QColor, QKeyEvent, QPen, QPainterPath, 
-    QKeySequence, QTextOption, QFont
+    QKeySequence, QTextOption, QFont, QTextCursor
 )
 from PyQt5.QtCore import Qt, QSize, QRect, pyqtSignal
+
+from modules.constants import HOTKEYS
 
 class OutlinedTextBrowser(QTextBrowser):
     """Text browser with outlined text for better visibility on any background."""
@@ -27,9 +29,15 @@ class OutlinedTextBrowser(QTextBrowser):
                 background: transparent;
                 border: none;
                 color: white;
-                font-size: 26pt;
+                font-size: 28pt;
+                padding: 10px;
             }
         """)
+        # Enable rich text and proper text wrapping
+        self.setAcceptRichText(True)
+        self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
 
     def paintEvent(self, event):
         """Custom paint event for outlined text."""
@@ -78,6 +86,10 @@ class FullscreenImageViewer(QMainWindow):
         logging.info("Initializing FullscreenImageViewer")
         logging.info(f"Image prompt received: {image_prompt}")
         
+        # Initialize state variables first
+        self.text_visible = True
+        self.prompt_visible = False
+        
         # Set window properties
         self.setStyleSheet("background-color: black;")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
@@ -93,26 +105,44 @@ class FullscreenImageViewer(QMainWindow):
         
         # Create text browser
         self.text_browser = OutlinedTextBrowser(central_widget)
-        self.text_browser.setText(story_text)
+        self.text_browser.setHtml(story_text)
         self.text_browser.setReadOnly(True)
-        self.text_browser.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.text_browser.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
+        self.text_browser.moveCursor(QTextCursor.Start)
+        self.text_browser.ensureCursorVisible()
+        # Set size policy to allow vertical expansion
+        self.text_browser.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.MinimumExpanding)
+        # Set minimum height to ensure text has room to display
+        self.text_browser.setMinimumHeight(200)
+        
         # Create prompt label
         self.prompt_label = OutlinedTextBrowser(central_widget)
         self.prompt_label.setStyleSheet("""
             QTextBrowser {
-                background-color: rgba(0, 0, 0, 128);
+                background-color: rgba(0, 0, 0, 0.7);
                 border: 2px solid white;
                 border-radius: 5px;
                 color: white;
-                font-size: 18pt;
+                font-size: 28pt;
                 padding: 10px;
                 margin: 10px;
             }
+            QScrollBar:vertical {
+                border: none;
+                background: rgba(255, 255, 255, 0.1);
+                width: 10px;
+                margin: 0;
+            }
+            QScrollBar::handle:vertical {
+                background: white;
+                min-height: 20px;
+                border-radius: 5px;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0;
+            }
         """)
         self.prompt_label.setReadOnly(True)
-        self.prompt_label.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.prompt_label.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.prompt_label.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.prompt_label.setVisible(False)  # Set prompt to invisible by default
         self.prompt_label.setMinimumHeight(100)  # Ensure minimum height
@@ -123,7 +153,12 @@ class FullscreenImageViewer(QMainWindow):
                 prompt_str = str(image_prompt)
             else:
                 prompt_str = str(image_prompt)
-            self.prompt_label.setText("Image Prompt:\n" + prompt_str)
+            self.prompt_label.setHtml(f"""
+                <div style='line-height: 1.4;'>
+                    <p style='font-weight: bold; font-size: 28pt; margin-bottom: 10px;'>Image Prompt:</p>
+                    <p style='font-size: 28pt; margin: 0;'>{prompt_str}</p>
+                </div>
+            """)
             logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
             logging.info(f"Prompt visible: {self.prompt_label.isVisible()}")
         
@@ -151,16 +186,13 @@ class FullscreenImageViewer(QMainWindow):
         # Setup shortcuts
         self.setup_shortcuts()
         
-        # Initialize state
-        self.text_visible = True
-        self.prompt_visible = False  # Set prompt to invisible by default
-        
         # Set focus policy to accept keyboard input
         self.setFocusPolicy(Qt.StrongFocus)
 
     def setup_shortcuts(self):
         """Setup keyboard shortcuts."""
-        QShortcut(QKeySequence('F'), self, self.close)
+        # Use the HOTKEYS from constants for fullscreen
+        QShortcut(QKeySequence(HOTKEYS['fullscreen'].upper()), self, self.close)
         QShortcut(QKeySequence('Escape'), self, self.close)
         QShortcut(QKeySequence('T'), self, self.toggle_text)
         QShortcut(QKeySequence('G'), self, self.advance_story)
@@ -173,32 +205,42 @@ class FullscreenImageViewer(QMainWindow):
         # Position the image to fill the screen
         self.image_label.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
         
-        # Position text at the bottom with wider margins
-        text_height = int(screen_rect.height() * 0.30)  # Increase to 30% of screen height
-        side_margin = 240  # Increased from 120 to 240 for narrower text
-        bottom_margin = 5
+        # Calculate text dimensions
+        text_height = min(int(screen_rect.height() * 0.4), 500)  # Max 40% of screen or 500px
+        side_margin = int(screen_rect.width() * 0.15)  # 15% margin on each side
+        bottom_margin = 40  # Increased bottom margin
+        
+        # Position text with better spacing
+        text_y = screen_rect.height() - text_height - bottom_margin
+        text_width = screen_rect.width() - (side_margin * 2)
+        
+        # Set text browser geometry
         self.text_browser.setGeometry(
-            side_margin,  # Left margin
-            screen_rect.height() - text_height - bottom_margin - int(text_height * 0.2),  # Move up by 20%
-            screen_rect.width() - (side_margin * 2),  # Width (with margins on both sides)
+            side_margin,
+            text_y,
+            text_width,
             text_height
         )
 
-        # Position prompt at the top with margins
-        prompt_height = max(int(screen_rect.height() * 0.15), 100)  # At least 100px or 15% of screen height
-        prompt_top_margin = 20
+        # Position prompt at the top
+        prompt_height = min(int(screen_rect.height() * 0.35), 300)  # Max 35% of screen or 300px
+        prompt_top_margin = 30
+        prompt_width = text_width
+        
         self.prompt_label.setGeometry(
             side_margin,
             prompt_top_margin,
-            screen_rect.width() - (side_margin * 2),
+            prompt_width,
             prompt_height
         )
         
         # Ensure prompt and text stay on top and are visible
         self.prompt_label.raise_()
         self.text_browser.raise_()
-        self.prompt_label.setVisible(False)  # Keep prompt invisible by default
-        logging.info(f"Position updated - Prompt visible: {self.prompt_label.isVisible()}, Text: {self.prompt_label.toPlainText()}")
+        self.prompt_label.setVisible(self.prompt_visible)  # Use the instance variable
+        self.text_browser.setVisible(self.text_visible)    # Also handle text visibility
+        
+        logging.info(f"Position updated - Prompt visible: {self.prompt_label.isVisible()}, Text visible: {self.text_browser.isVisible()}")
 
     def resizeEvent(self, event):
         """Handle window resize events."""
@@ -272,7 +314,7 @@ class FullscreenImageViewer(QMainWindow):
             self.navigate_back_signal.emit()
             logging.info("Navigate back signal emitted")
         except Exception as e:
-            logging.error(f"Error navigating back from fullscreen view: {e}", exc_info=True)
+            logging.error(f"Error navigating back from fullscreen view: {e}")
 
     def showEvent(self, event):
         """Handle window show event."""
@@ -352,7 +394,9 @@ class FullscreenImageViewer(QMainWindow):
             if image_path and os.path.exists(image_path):
                 self.original_pixmap = QPixmap(image_path)
                 self.scale_image()
-            self.text_browser.setText(text)
+            self.text_browser.setHtml(text)
+            self.text_browser.moveCursor(QTextCursor.Start)
+            self.text_browser.ensureCursorVisible()
             if prompt:
                 logging.info("Setting prompt text in update_content")
                 # Convert prompt to string if it's a dictionary
@@ -360,7 +404,12 @@ class FullscreenImageViewer(QMainWindow):
                     prompt_str = str(prompt)
                 else:
                     prompt_str = str(prompt)
-                self.prompt_label.setText("Image Prompt:\n" + prompt_str)
+                self.prompt_label.setHtml(f"""
+                    <div style='line-height: 1.4;'>
+                        <p style='font-weight: bold; font-size: 28pt; margin-bottom: 10px;'>Image Prompt:</p>
+                        <p style='font-size: 28pt; margin: 0;'>{prompt_str}</p>
+                    </div>
+                """)
                 self.prompt_label.setVisible(False)  # Keep prompt invisible by default
                 self.prompt_visible = False  # Update state
                 logging.info(f"Prompt text set to: {self.prompt_label.toPlainText()}")
@@ -375,26 +424,3 @@ class FullscreenImageViewer(QMainWindow):
             # Force cleanup if update fails
             self.cleanup_resources()
             self.close()
-
-    def format_story_text(self, text: str) -> str:
-        """Format the story text into multiple lines with proper wrapping."""
-        words = text.split()
-        lines = []
-        current_line = []
-        chars_per_line = 80
-        
-        current_length = 0
-        for word in words:
-            word_length = len(word)
-            if current_length + word_length + 1 <= chars_per_line:
-                current_line.append(word)
-                current_length += word_length + 1
-            else:
-                lines.append(' '.join(current_line))
-                current_line = [word]
-                current_length = word_length
-        
-        if current_line:
-            lines.append(' '.join(current_line))
-            
-        return '\n'.join(lines)
