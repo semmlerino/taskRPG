@@ -123,7 +123,7 @@
     "Walk/Shopping": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -132,8 +132,8 @@
         "muted_until": null
     },
     "GPTs": {
-        "min": 8,
-        "max": 14,
+        "min": 6,
+        "max": 11,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -195,18 +195,18 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1739020729.628935
+        "muted_until": null
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1737929161.207085
+        "muted_until": null
     },
     "Bubble": {
         "min": 1,
@@ -244,7 +244,7 @@
     "TXT": {
         "min": 2,
         "max": 4,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -263,22 +263,22 @@
         "count": 0,
         "muted_until": null
     },
-    "Ryanair Refund": {
+    "Laundry": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1738016828.438143
+        "muted_until": null
     },
-    "laundry": {
+    "Teeth": {
         "min": 1,
         "max": 1,
         "active": true,
-        "is_daily": false,
+        "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,

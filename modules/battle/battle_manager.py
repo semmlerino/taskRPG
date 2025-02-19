@@ -277,14 +277,19 @@ class BattleManager:
         """Handle victory with complete update chain."""
         try:
             # Calculate XP with constants
-            xp_gained = max(self.xp_base, self.current_enemy.max_hp * self.xp_multiplier)
+            xp = max(self.xp_base, self.current_enemy.max_hp * self.xp_multiplier)
             
             # Apply modifiers based on performance
             if self.battle_state.turns_taken < self.current_enemy.max_hp:
-                xp_gained = int(xp_gained * 1.2)  # 20% bonus for efficiency
+                xp = int(xp * 1.2)  # 20% bonus for efficiency
             
             # Award XP
-            self.player.gain_experience(xp_gained)
+            self.player.gain_experience(xp)
+            
+            # New coin reward (1 per battle)
+            self.player.earn_coins(1)
+            
+            logging.info(f"Victory! Awarded {xp} XP and 1 coin")
             
             # Handle task completion and count decrementing
             if self.current_enemy and self.current_enemy.task_name:
@@ -311,7 +316,7 @@ class BattleManager:
                 self.story_manager.mark_battle_complete(self.current_enemy.name)
             
             # Update battle state
-            self.battle_state.xp_gained = xp_gained
+            self.battle_state.xp_gained = xp
             self.battle_state.is_active = False
             self.current_enemy = None
             
@@ -330,7 +335,7 @@ class BattleManager:
                 ))
             
             # Update UI with victory fanfare
-            self._update_ui_for_victory(xp_gained)
+            self._update_ui_for_victory(xp)
             
             # Start victory animation if available
             if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
@@ -342,7 +347,7 @@ class BattleManager:
             if self.callbacks.on_battle_end:
                 self.callbacks.on_battle_end()
                 
-            logging.info(f"Victory handled successfully. XP gained: {xp_gained}")
+            logging.info(f"Victory handled successfully. XP gained: {xp}")
                 
         except Exception as e:
             logging.error(f"Error handling victory: {e}")

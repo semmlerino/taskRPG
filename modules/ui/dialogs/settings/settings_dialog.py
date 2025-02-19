@@ -8,7 +8,7 @@ from PyQt5.QtCore import (
 from PyQt5.QtWidgets import (
     QDialog, QPushButton, QLabel, QVBoxLayout, QHBoxLayout,
     QTableView, QHeaderView, QCheckBox, QMessageBox, QLineEdit, QSpinBox, QTextEdit, QMenu, QComboBox, QApplication,
-    QDateTimeEdit
+    QDateTimeEdit, QGroupBox
 )
 from PyQt5.QtGui import QFont
 from datetime import datetime, time as dt_time, timedelta
@@ -23,12 +23,13 @@ from . import styles
 class SettingsDialog(QDialog):
     """Dialog for managing game settings and tasks."""
 
-    def __init__(self, task_manager: TaskManager, parent=None):
+    def __init__(self, task_manager: TaskManager, parent=None, player=None):
         """Initialize the settings dialog."""
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumSize(600, 400)
         self.task_manager = task_manager
+        self.player = player
         self.saved = False
 
         # Initialize settings manager
@@ -56,6 +57,20 @@ class SettingsDialog(QDialog):
         title_label.setFont(QFont("Arial", 18, QFont.Bold))
         title_label.setStyleSheet("color: #2196F3;")
         layout.addWidget(title_label, alignment=Qt.AlignCenter)
+
+        # Player Stats Section (New)
+        if self.player:
+            stats_group = QGroupBox("Player Stats")
+            stats_group.setFont(QFont("Arial", 14))
+            stats_layout = QVBoxLayout()
+            
+            # Coin display
+            coin_label = QLabel(f"Coins: {self.player.stats.coins}")
+            coin_label.setFont(QFont("Arial", 13))
+            stats_layout.addWidget(coin_label)
+            
+            stats_group.setLayout(stats_layout)
+            layout.addWidget(stats_group)
 
         # Task Table
         self.task_view = QTableView()

@@ -63,7 +63,7 @@ from modules.ui.components import (
     ChoicesPanel,
     CompactBattleWindow
 )
-from modules.ui.dialogs.settings import SettingsDialog  # Import from new settings package
+from modules.ui.dialogs.settings.settings_dialog import SettingsDialog
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.dialogs.image_generation_selection_dialog import ImageGenerationSelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
@@ -913,7 +913,7 @@ class TaskRPG(QMainWindow):
     def open_settings(self):
         """Open the settings dialog."""
         try:
-            settings_dialog = SettingsDialog(self.task_manager, self)
+            settings_dialog = SettingsDialog(self.task_manager, self, self.player)
             if settings_dialog.exec_() == QDialog.Accepted:
                 self._apply_settings_changes(settings_dialog)
         except Exception as e:
@@ -1092,32 +1092,19 @@ class TaskRPG(QMainWindow):
         try:
             # Save window settings
             self.save_window_settings()
-
-            # Cleanup components
-            cleanup_errors = []
-
-            # Stop hotkey listener
-            try:
-                self.hotkey_listener.stop()
-                self.hotkey_listener.wait()
-            except Exception as e:
-                cleanup_errors.append(f"Hotkey listener cleanup failed: {str(e)}")
-
-            # Cleanup battle manager
-            if self.battle_manager:
-                try:
-                    self.battle_manager.cleanup()
-                except Exception as e:
-                    cleanup_errors.append(f"Battle manager cleanup failed: {str(e)}")
-
-            if cleanup_errors:
-                error_msg = "Errors during cleanup:\n" + "\n".join(cleanup_errors)
-                logging.error(error_msg)
-
+            
+            # Save player state
+            if hasattr(self, 'player'):
+                self.player.save_state()
+                logging.info("Player state saved on exit")
+            
+            # Cleanup battle manager if it exists
+            if hasattr(self, 'battle_manager'):
+                self.battle_manager.cleanup()
+            
             event.accept()
-
         except Exception as e:
-            logging.critical(f"Critical error during window close: {str(e)}")
+            logging.error(f"Error during close: {str(e)}")
             event.accept()
 
     def save_window_settings(self):

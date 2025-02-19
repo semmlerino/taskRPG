@@ -1,0 +1,15 @@
+from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel
+import logging
+
+class SettingsDialog(QDialog):
+    def __init__(self, player):
+        super().__init__()
+        self.player = player
+        self.setWindowTitle("Player Stats")
+        layout = QVBoxLayout()
+        
+        self.coin_label = QLabel(f"Coins: {self.player.stats.coins}")
+        layout.addWidget(self.coin_label)
+        
+        self.setLayout(layout)
+        logging.info("Settings dialog created with coin display")
