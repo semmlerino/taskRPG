@@ -24,7 +24,8 @@ from PyQt5.QtWidgets import (
     QLabel,
     QWidget,
     QSplitter,
-    QSizePolicy
+    QSizePolicy,
+    QMenu
 )
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtCore import Qt, QSize, QByteArray
@@ -139,6 +140,8 @@ class StorySelectionDialog(QDialog):
                 background-color: #F5F5F5;
             }
         """)
+        self.story_list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.story_list.customContextMenuRequested.connect(self._show_context_menu)
         list_layout.addWidget(self.story_list)
 
         # Right side - Preview Container
@@ -767,3 +770,31 @@ class StorySelectionDialog(QDialog):
 
         except Exception as e:
             logging.error(f"Error saving dialog settings: {e}")
+
+    def _show_context_menu(self, position):
+        """Show context menu for story list items."""
+        item = self.story_list.itemAt(position)
+        if not item:
+            return
+
+        # Get the story path from the item's data
+        story_path = item.data(Qt.UserRole)
+        if not story_path:
+            return
+
+        # Create context menu
+        menu = QMenu()
+        open_action = menu.addAction("Open in Editor")
+        action = menu.exec_(self.story_list.viewport().mapToGlobal(position))
+
+        if action == open_action:
+            try:
+                # Use the default system editor to open the file
+                os.startfile(story_path)
+            except Exception as e:
+                logging.error(f"Failed to open story file: {e}")
+                QMessageBox.warning(
+                    self,
+                    "Error",
+                    f"Failed to open story file:\n{str(e)}"
+                )
