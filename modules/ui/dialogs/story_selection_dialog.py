@@ -289,6 +289,11 @@ class StorySelectionDialog(QDialog):
             node_count = len(story_data.keys())
             preview_parts.append(f"<p><b>Total Nodes:</b> {node_count}</p>")
 
+            # Battle node info
+            has_battles = self._has_valid_battle_nodes(story_data)
+            battle_status = "<span style='color: #4CAF50;'>✓ Has battle content</span>" if has_battles else "<span style='color: #F44336;'>✗ No battle content</span>"
+            preview_parts.append(f"<p><b>Battle Status:</b> {battle_status}</p>")
+
             # Preview the start node
             if 'start' in story_data:
                 start_node = story_data['start']
@@ -324,6 +329,15 @@ class StorySelectionDialog(QDialog):
             error_msg = f"Error loading preview: {str(e)}"
             logging.error(error_msg)
             self.preview_text.setPlainText(error_msg)
+
+    def _has_valid_battle_nodes(self, story_data: Dict[str, Any]) -> bool:
+        """Check if the story has any valid battle nodes."""
+        for node_key, node_data in story_data.items():
+            if 'battle' in node_data and isinstance(node_data['battle'], dict):
+                battle_info = node_data['battle']
+                if battle_info.get('enemy') and battle_info.get('message'):
+                    return True
+        return False
 
     def populate_story_list(self):
         """Loads and groups available stories from the stories directory."""
@@ -398,26 +412,34 @@ class StorySelectionDialog(QDialog):
         """Populate the list widget with grouped stories."""
         self.story_list.clear()
 
-        # Sort groups alphabetically, but ensure 'Other Stories' is last
-        sorted_groups = sorted(
-            story_groups.items(),
-            key=lambda x: ('zz' if x[0] == 'ungrouped' else x[0])
-        )
+        for group in story_groups.values():
+            # Add group header
+            header_item = QListWidgetItem(group.main_title)
+            header_item.setFlags(Qt.ItemIsEnabled)  # Make non-selectable
+            header_item.setFont(QFont("Arial", 12, QFont.Bold))
+            header_item.setBackground(QColor("#F5F5F5"))
+            self.story_list.addItem(header_item)
 
-        for _, group in sorted_groups:
-            if group.main_title != "Other Stories":
-                # Add group header
-                header_item = QListWidgetItem(group.main_title)
-                header_item.setFlags(Qt.ItemIsEnabled)  # Make non-selectable
-                header_item.setBackground(QColor("#E3F2FD"))
-                header_item.setFont(QFont("Arial", 11, QFont.Bold))
-                self.story_list.addItem(header_item)
-
-            # Add stories in group
-            for display_name, story_path, _ in sorted(group.stories, key=lambda x: x[2], reverse=True):
-                item = QListWidgetItem("    " + display_name if group.main_title != "Other Stories" else display_name)
-                item.setData(Qt.UserRole, story_path)
-                self.story_list.addItem(item)
+            # Add stories in the group
+            for display_name, full_path, created_date in group.stories:
+                try:
+                    # Check if story has battles
+                    with open(full_path, 'r', encoding='utf-8') as f:
+                        story_data = json.load(f)
+                        has_battles = self._has_valid_battle_nodes(story_data)
+                        
+                    # Add battle indicator to display name
+                    battle_indicator = "⚔️ " if has_battles else ""
+                    item_text = f"{battle_indicator}{display_name}"
+                    
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.UserRole, full_path)
+                    item.setFont(QFont("Arial", 11))
+                    item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                    self.story_list.addItem(item)
+                except Exception as e:
+                    logging.error(f"Error loading story {full_path}: {str(e)}")
+                    continue
 
     def _handle_no_stories(self):
         """Handle the case when no stories are found."""

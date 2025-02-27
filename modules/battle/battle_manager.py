@@ -1,5 +1,9 @@
 """
-Battle management system for TaskRPG. This is the main battle system which is getting consolidated into a single file from the core one.
+Battle management system for TaskRPG.
+
+This is the consolidated battle system that combines functionality from both
+the core and modules implementations. This file now contains all battle-related
+functionality in a single, unified implementation.
 
 Handles the coordination between tasks, combat, and UI components
 while maintaining the game's task-management metaphor.
@@ -9,12 +13,13 @@ while maintaining the game's task-management metaphor.
 import logging
 import random
 import time
-from typing import Optional, Callable, Dict, Any, Union
+from typing import Optional, Callable, Dict, Any, Union, List, TYPE_CHECKING, Protocol
 from dataclasses import dataclass
+from enum import Enum, auto
 
 # PyQt5 imports
-from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import Qt, QTimer, QRect
+from PyQt5.QtWidgets import QApplication, QMessageBox, QStatusBar, QLabel
+from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal
 
 # Project imports: Core functionality
 from modules.tasks.task_manager import TaskManager
@@ -23,6 +28,21 @@ from modules.players.player import Player
 
 # Project imports: UI components
 from modules.ui.components.compact_battle_window import CompactBattleWindow
+
+if TYPE_CHECKING:
+    from modules.ui.components.story_display import StoryDisplay
+    from modules.ui.components.enemy_panel import EnemyPanel
+    from modules.ui.components.action_buttons import ActionButtons
+    from modules.ui.components.player_panel import PlayerPanel
+    from modules.ui.main_window import TaskRPG
+
+class BattleEvent(Enum):
+    """Battle system events."""
+    BATTLE_START = auto()
+    BATTLE_END = auto()
+    ATTACK_PERFORMED = auto()
+    STATE_CHANGED = auto()
+    ENEMY_DEFEATED = auto()
 
 @dataclass
 class Enemy:
@@ -33,27 +53,49 @@ class Enemy:
     current_hp: Optional[int] = None
 
     def __post_init__(self):
+        """Initialize derived values after creation."""
         if self.current_hp is None:
             self.current_hp = self.max_hp
         logging.debug(f"Enemy initialized - Name: {self.name}, Task: {self.task_name}, Max HP: {self.max_hp}, Current HP: {self.current_hp}")
 
     def take_damage(self, amount: int) -> None:
+        """Reduce enemy HP by damage amount."""
         if self.current_hp is None:
             self.current_hp = self.max_hp
         self.current_hp = max(0, self.current_hp - amount)
         logging.debug(f"{self.name} takes {amount} damage. Current HP: {self.current_hp}")
 
     def is_defeated(self) -> bool:
+        """Check if enemy is defeated (HP <= 0)."""
         return self.current_hp <= 0
 
     def heal(self, amount: int) -> None:
+        """Heal enemy by specified amount, up to max HP."""
         if self.current_hp is None:
             self.current_hp = self.max_hp
         self.current_hp = min(self.max_hp, self.current_hp + amount)
+        logging.debug(f"{self.name} healed for {amount}. Current HP: {self.current_hp}")
 
 @dataclass
 class BattleState:
-    """Tracks the current state of a battle."""
+    """
+    Tracks the current state of a battle.
+    
+    Attributes:
+        is_active: Whether a battle is currently in progress
+        enemy_hp: Current enemy HP
+        enemy_max_hp: Maximum enemy HP
+        enemy_name: Name of current enemy
+        task_name: Name of associated task
+        battle_start_time: Timestamp when battle started
+        last_attack_time: Timestamp of last attack
+        attacks_performed: Number of attacks performed
+        turns_taken: Number of turns in battle
+        last_attack_type: Type of last attack performed
+        xp_gained: Amount of XP gained in battle
+        paused_time: Timestamp when battle was paused
+        total_pause_duration: Total duration of pauses in current battle
+    """
     is_active: bool = False
     enemy_hp: int = 0
     enemy_max_hp: int = 0
@@ -67,6 +109,11 @@ class BattleState:
     xp_gained: int = 0
     paused_time: Optional[float] = None
     total_pause_duration: float = 0
+
+    def __post_init__(self):
+        """Validate state after initialization."""
+        if self.enemy_hp is not None and self.enemy_max_hp is not None:
+            self.enemy_hp = max(0, min(self.enemy_hp, self.enemy_max_hp))
 
 @dataclass
 class BattleCallbacks:
@@ -98,14 +145,14 @@ class BattleManager:
         self.callbacks = BattleCallbacks()
         
         # UI Components (set later via set_ui_components)
-        self.story_display = None
-        self.enemy_panel = None
-        self.action_buttons = None
-        self.player_panel = None
-        self.status_bar = None
-        self.main_window = None
-        self.compact_window = None
-        self.tasks_left_label = None
+        self.story_display: Optional['StoryDisplay'] = None
+        self.enemy_panel: Optional['EnemyPanel'] = None
+        self.action_buttons: Optional['ActionButtons'] = None
+        self.player_panel: Optional['PlayerPanel'] = None
+        self.status_bar: Optional['QStatusBar'] = None
+        self.main_window: Optional['TaskRPG'] = None
+        self.compact_window: Optional['CompactBattleWindow'] = None
+        self.tasks_left_label: Optional['QLabel'] = None
         
         # Signal tracking
         self.signals_connected = False
@@ -133,6 +180,9 @@ class BattleManager:
         self.xp_bonus_per_turn = 10  # Bonus XP per turn taken
         self.xp_time_bonus_factor = 0.5  # Factor for time-based XP bonus
         
+        # Track completed battle nodes
+        self.completed_battle_nodes = set()
+        
         logging.info("BattleManager initialized with task manager and player")
 
     def start_battle(self, battle_info: dict) -> bool:
@@ -144,8 +194,13 @@ class BattleManager:
                 - enemy: Name of the enemy (optional)
                 - message: Battle start message (optional)
                 - task_override: Specific task to use (optional)
+                
+        Returns:
+            bool: True if battle started successfully, False otherwise
         """
         try:
+            logging.debug(f"Starting battle with info: {battle_info}")
+            
             if not self._validate_battle_start():
                 return False
 
@@ -215,6 +270,10 @@ class BattleManager:
             if self.callbacks.on_battle_start:
                 self.callbacks.on_battle_start()
             
+            # Ensure window state is appropriate
+            if self.main_window and self.main_window.isFullScreen():
+                self.main_window.releaseKeyboard()
+            
             logging.info(f"Battle started with {enemy_name} (Task: {task.name})")
             return True
             
@@ -230,6 +289,9 @@ class BattleManager:
         
         Args:
             is_heavy: Whether this is a heavy attack (more damage, longer cooldown)
+            
+        Returns:
+            bool: True if attack was successful, False otherwise
         """
         try:
             if not self._validate_attack():
@@ -238,9 +300,12 @@ class BattleManager:
             # Track attack timing
             current_time = time.time()
             self.battle_state.last_attack_time = current_time
+            self.last_attack_time = current_time
             
             # Calculate and apply damage
             damage = random.randint(2, 4) if is_heavy else 1
+            
+            old_hp = self.current_enemy.current_hp
             self.current_enemy.take_damage(damage)
             new_hp = self.current_enemy.current_hp
             
@@ -249,6 +314,11 @@ class BattleManager:
             self.battle_state.attacks_performed += 1
             self.battle_state.turns_taken += 1
             self.battle_state.last_attack_type = "heavy" if is_heavy else "normal"
+            
+            # Update internal stats too
+            self.attacks_performed += 1
+            self.turns_taken += 1
+            self.last_attack_type = "heavy" if is_heavy else "normal"
             
             # Update UI
             self._update_ui_after_attack(is_heavy)
@@ -260,7 +330,7 @@ class BattleManager:
             # Check for victory
             if self.current_enemy.is_defeated():
                 self._handle_victory()
-            
+                
             # Execute callback
             if self.callbacks.on_attack:
                 self.callbacks.on_attack(damage)
@@ -286,10 +356,10 @@ class BattleManager:
             # Award XP
             self.player.gain_experience(xp)
             
-            # New coin reward (1 per battle)
-            self.player.earn_coins(1)
+            # New coin reward (6 per battle)
+            self.player.earn_coins(6)
             
-            logging.info(f"Victory! Awarded {xp} XP and 1 coin")
+            logging.info(f"Victory! Awarded {xp} XP and 7 coins")
             
             # Handle task completion and count decrementing
             if self.current_enemy and self.current_enemy.task_name:
@@ -314,10 +384,14 @@ class BattleManager:
             # Mark battle as completed in story context
             if hasattr(self, 'story_manager'):
                 self.story_manager.mark_battle_complete(self.current_enemy.name)
+                
+            # Mark this battle as completed  
+            self.mark_battle_complete(self.current_enemy.name)
             
             # Update battle state
             self.battle_state.xp_gained = xp
             self.battle_state.is_active = False
+            self.xp_gained = xp
             self.current_enemy = None
             
             # Handle window state
@@ -392,7 +466,7 @@ class BattleManager:
                         "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
                         f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
                         "</div>"
-                    ) if self.story_display else None
+                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
                 ),
                 'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
             }
@@ -411,8 +485,7 @@ class BattleManager:
             self.enemy_panel.update_panel(self.current_enemy)
         if self.compact_window:
             self.compact_window.update_display(self.current_enemy)
-        if hasattr(self, 'update_tasks_left'):
-            self.update_tasks_left()
+        self.update_tasks_left()
         
         attack_type = "Heavy attack" if was_heavy else "Attack"
         if self.status_bar:
@@ -424,6 +497,7 @@ class BattleManager:
             victory_message = (
                 "<div class='victory-message' style='text-align: center;'>"
                 "<h3>Victory!</h3>"
+                f"<p>You gained <b>{xp_gained}</b> XP and <b>7</b> coins!</p>"
                 "</div>"
             )
             
@@ -655,10 +729,13 @@ class BattleManager:
             current_time = time.time()
             if self.paused:
                 self.battle_state.paused_time = current_time
+                self.paused_time = current_time
             elif self.battle_state.paused_time:
                 pause_duration = current_time - self.battle_state.paused_time
                 self.battle_state.total_pause_duration += pause_duration
+                self.total_pause_duration += pause_duration
                 self.battle_state.paused_time = None
+                self.paused_time = None
 
             # 4. Validate pause state consistency
             self._validate_pause_state()
@@ -716,6 +793,39 @@ class BattleManager:
             self.status_bar.showMessage(message)
         logging.error(message)
 
+    def end_battle(self) -> None:
+        """End the current battle and clean up."""
+        try:
+            logging.debug("Ending battle")
+            
+            # Update battle state
+            self.battle_state.is_active = False
+            self.current_enemy = None
+            self.battle_state.enemy_hp = 0
+            
+            # Hide compact window
+            self.hide_compact_mode()
+            
+            # Ensure main window is visible and focused
+            if self.main_window:
+                self.main_window.show()
+                self.main_window.raise_()
+                self.main_window.activateWindow()
+                
+                # Release any keyboard grab
+                self.main_window.releaseKeyboard()
+                
+                # Force focus to the main window
+                QTimer.singleShot(100, lambda: (
+                    self.main_window.raise_(),
+                    self.main_window.activateWindow()
+                ))
+            
+            logging.info("Battle ended successfully")
+            
+        except Exception as e:
+            logging.error(f"Error ending battle: {e}")
+            
     def cleanup(self) -> None:
         """
         Clean up battle manager resources with proper state management.
@@ -853,3 +963,36 @@ class BattleManager:
                 return False
                 
         return True
+        
+    def _initialize_enemy_hp(self, task: Task) -> int:
+        """Initialize enemy HP based on task."""
+        hp = task.get_hp()
+        logging.debug(f"Initialized enemy HP for task '{task.name}': {hp}")
+        return hp
+        
+    def mark_battle_complete(self, node_key: str):
+        """Mark a battle node as completed."""
+        self.completed_battle_nodes.add(node_key)
+        logging.info(f"Marked battle node {node_key} as completed")
+        
+    def handle_chapter_complete(self) -> None:
+        """Display chapter completion message."""
+        try:
+            completion_message = (
+                "<div style='text-align: center;'>"
+                "<br><b>Chapter Complete!</b><br>"
+                "<p style='margin: 10px 0;'>You have completed all available tasks for now.</p>"
+                "<p style='margin: 10px 0;'>Feel free to start a new chapter or take a break!</p>"
+                "</div>"
+            )
+            
+            if self.story_display:
+                self.story_display.append_text(completion_message)
+                
+            if self.status_bar:
+                self.status_bar.showMessage("Chapter complete!")
+                
+            logging.debug("Chapter completion message displayed")
+            
+        except Exception as e:
+            logging.error(f"Error displaying chapter completion: {e}")

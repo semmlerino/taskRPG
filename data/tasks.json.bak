@@ -98,17 +98,6 @@
         "count": 0,
         "muted_until": null
     },
-    "FitRPG": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "Gym": {
         "min": 1,
         "max": 1,
@@ -131,32 +120,10 @@
         "count": 0,
         "muted_until": null
     },
-    "GPTs": {
-        "min": 6,
-        "max": 11,
-        "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "Hair": {
         "min": 1,
         "max": 1,
         "active": false,
-        "is_daily": false,
-        "is_weekly": true,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
-    "Beard": {
-        "min": 1,
-        "max": 1,
-        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -175,17 +142,6 @@
         "count": 0,
         "muted_until": null
     },
-    "Claude": {
-        "min": 4,
-        "max": 8,
-        "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "NHS, check on refund": {
         "min": 1,
         "max": 1,
@@ -196,17 +152,6 @@
         "manually_deactivated": false,
         "count": 0,
         "muted_until": null
-    },
-    "Clean Room (1 Thema des Tages)": {
-        "min": 1,
-        "max": 1,
-        "active": true,
-        "is_daily": true,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": 1740011078.589404
     },
     "Bubble": {
         "min": 1,
@@ -231,9 +176,9 @@
         "muted_until": null
     },
     "Tabs": {
-        "min": 4,
-        "max": 8,
-        "active": false,
+        "min": 8,
+        "max": 16,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -263,7 +208,84 @@
         "count": 0,
         "muted_until": null
     },
+    "FitRPG": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
     "Laundry": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Claude": {
+        "min": 5,
+        "max": 9,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Beard": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": true,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Clean Room (1 Thema des Tages)": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 1,
+        "muted_until": null
+    },
+    "GPTs": {
+        "min": 6,
+        "max": 10,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Continue Novelcrafter": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "New Claude: Story/Code": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -277,8 +299,19 @@
     "Teeth": {
         "min": 1,
         "max": 1,
-        "active": false,
-        "is_daily": true,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "UKP": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,

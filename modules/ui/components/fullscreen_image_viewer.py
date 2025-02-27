@@ -25,16 +25,36 @@ class OutlinedTextBrowser(QTextBrowser):
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.stroke_color = QColor(0, 0, 0)  # Black outline
-        self.stroke_width = 3  # Width of the outline
+        # Configure text browser for better visibility
         self.setViewportMargins(0, 0, 0, 0)
         self.setStyleSheet("""
             QTextBrowser {
-                background: transparent;
-                border: none;
+                background-color: rgba(0, 0, 0, 0.7);
+                border: 2px solid white;
+                border-radius: 5px;
                 color: white;
                 font-size: 28pt;
                 padding: 10px;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: rgba(255, 255, 255, 0.2);
+                width: 14px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: rgba(255, 255, 255, 0.8);
+                min-height: 30px;
+                border-radius: 7px;
+            }
+            QScrollBar::handle:vertical:hover {
+                background: white;
+            }
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+                height: 0px;
+            }
+            QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+                background: none;
             }
         """)
         # Enable rich text and proper text wrapping
@@ -42,41 +62,46 @@ class OutlinedTextBrowser(QTextBrowser):
         self.setWordWrapMode(QTextOption.WrapAtWordBoundaryOrAnywhere)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-
-    def paintEvent(self, event):
-        """Custom paint event for outlined text."""
-        painter = QPainter(self.viewport())
-        painter.setRenderHint(QPainter.TextAntialiasing)
         
-        # Get the current text
-        text = self.toPlainText()
-        
-        # Set up the text options
-        painter.setFont(self.font())
-        
-        # Draw the outline (stroke) with multiple passes for better visibility
-        painter.setPen(self.stroke_color)
-        offsets = [
-            (-3, -3), (-3, 0), (-3, 3),  # Left side
-            (0, -3), (0, 3),             # Middle
-            (3, -3), (3, 0), (3, 3),     # Right side
-            (-2, -2), (-2, 2), (2, -2), (2, 2),  # Diagonal corners
-            (-1, -1), (-1, 1), (1, -1), (1, 1)   # Inner diagonal corners
-        ]
-        for dx, dy in offsets:
-            painter.drawText(
-                self.viewport().rect().adjusted(dx, dy, dx, dy),
-                Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap,
-                text
-            )
-        
-        # Draw the main text in white
-        painter.setPen(QColor(255, 255, 255))  # White text
-        painter.drawText(
-            self.viewport().rect(),
-            Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap,
-            text
-        )
+        # Set text color and format
+        self.document().setDefaultStyleSheet("body { color: white; }")
+    
+    def wheelEvent(self, event):
+        """Handle mouse wheel events for better scrolling."""
+        try:
+            # Handle zoom with Ctrl+wheel
+            if event.modifiers() & Qt.ControlModifier:
+                if event.angleDelta().y() > 0:
+                    # Zoom in
+                    self.zoomIn(1)
+                else:
+                    # Zoom out
+                    self.zoomOut(1)
+                event.accept()
+            else:
+                # Enhanced scrolling speed for better experience
+                delta = event.angleDelta().y()
+                scrollbar = self.verticalScrollBar()
+                
+                # Calculate scroll amount based on content size
+                scroll_amount = max(50, int(abs(delta) * 1.5))
+                if delta < 0:
+                    # Scroll down
+                    new_value = min(scrollbar.value() + scroll_amount, scrollbar.maximum())
+                else:
+                    # Scroll up
+                    new_value = max(scrollbar.value() - scroll_amount, scrollbar.minimum())
+                
+                # Apply the scroll
+                scrollbar.setValue(new_value)
+                event.accept()
+                
+                # Process events to ensure immediate visual feedback
+                QApplication.processEvents()
+        except Exception as e:
+            logging.error(f"Error in wheelEvent: {e}")
+            # Fall back to default behavior
+            super().wheelEvent(event)
 
 
 class FullscreenImageViewer(QMainWindow):
@@ -212,9 +237,9 @@ class FullscreenImageViewer(QMainWindow):
         self.image_label.setGeometry(0, 0, screen_rect.width(), screen_rect.height())
         
         # Calculate text dimensions
-        text_height = min(int(screen_rect.height() * 0.4), 500)  # Max 40% of screen or 500px
-        side_margin = int(screen_rect.width() * 0.15)  # 15% margin on each side
-        bottom_margin = 40  # Increased bottom margin
+        text_height = min(int(screen_rect.height() * 0.5), 600)  # Increased to 50% of screen or 600px
+        side_margin = int(screen_rect.width() * 0.1)  # Reduced to 10% margin on each side
+        bottom_margin = 20  # Bottom margin
         
         # Position text with better spacing
         text_y = screen_rect.height() - text_height - bottom_margin
@@ -245,6 +270,10 @@ class FullscreenImageViewer(QMainWindow):
         self.text_browser.raise_()
         self.prompt_label.setVisible(self.prompt_visible)  # Use the instance variable
         self.text_browser.setVisible(self.text_visible)    # Also handle text visibility
+        
+        # Ensure scrollbar is visible and working
+        self.text_browser.verticalScrollBar().setVisible(True)
+        self.prompt_label.verticalScrollBar().setVisible(True)
         
         logging.info(f"Position updated - Prompt visible: {self.prompt_label.isVisible()}, Text visible: {self.text_browser.isVisible()}")
 
@@ -326,10 +355,23 @@ class FullscreenImageViewer(QMainWindow):
             if image_path and os.path.exists(image_path):
                 self.original_pixmap = QPixmap(image_path)
                 self.scale_image()
-                
-            self.text_browser.setHtml(text)
+            
+            # Format the text with appropriate styling for better readability
+            formatted_text = f"""
+            <div style='font-family: Arial, sans-serif; line-height: 1.6;'>
+                {text}
+            </div>
+            """
+            
+            # Update text content
+            self.text_browser.setHtml(formatted_text)
+            
+            # Ensure text is visible and scrolled to top
             self.text_browser.moveCursor(QTextCursor.Start)
             self.text_browser.ensureCursorVisible()
+            
+            # Process events to ensure UI updates immediately
+            QApplication.processEvents()
             
             if prompt:
                 logging.info("[FULLSCREEN] Setting prompt text")
