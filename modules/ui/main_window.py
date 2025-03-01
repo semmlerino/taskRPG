@@ -68,6 +68,7 @@ from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.dialogs.image_generation_selection_dialog import ImageGenerationSelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.battle.battle_manager import BattleManager
+from modules.ui.managers.font_scaling_manager import FontScalingManager
 
 # Configure logging
 logging.basicConfig(
@@ -119,10 +120,8 @@ class TaskRPG(QMainWindow):
         # Initialize Shaking Animation
         self.init_animations()
 
-        # Dynamic Font Scaling Timer
-        self.font_scaling_timer = QTimer()
-        self.font_scaling_timer.timeout.connect(self.adjust_fonts)
-        self.font_scaling_timer.start(500)
+        # Initialize font scaling
+        self.init_font_scaling()
 
         # Create timer for checking task activations
         self.task_check_timer = QTimer()
@@ -572,9 +571,30 @@ class TaskRPG(QMainWindow):
 
     def init_font_scaling(self):
         """Initialize dynamic font scaling."""
-        self.font_scaling_timer = QTimer()
-        self.font_scaling_timer.timeout.connect(self.adjust_fonts)
-        self.font_scaling_timer.start(500)
+        self.font_scaling_manager = FontScalingManager(self)
+        
+        # Register components with the font scaling manager
+        self.font_scaling_manager.register_component(self.player_panel.level_label, weight=QFont.Bold)
+        self.font_scaling_manager.register_component(self.player_panel.xp_label)
+        self.font_scaling_manager.register_component(self.enemy_panel.enemy_label, size_offset=2, weight=QFont.Bold)
+        self.font_scaling_manager.register_component(self.enemy_panel.task_label, style=QFont.StyleItalic)
+        self.font_scaling_manager.register_component(self.enemy_panel.hp_bar)
+        self.font_scaling_manager.register_component(self.story_display.story_text, family="Times New Roman")
+        self.font_scaling_manager.register_component(self.settings_button)
+        
+        # Register action buttons if they exist
+        if hasattr(self.action_buttons, 'next_button'):
+            self.font_scaling_manager.register_component(self.action_buttons.next_button, weight=QFont.Bold)
+        if hasattr(self.action_buttons, 'attack_button'):
+            self.font_scaling_manager.register_component(self.action_buttons.attack_button)
+        if hasattr(self.action_buttons, 'heavy_attack_button'):
+            self.font_scaling_manager.register_component(self.action_buttons.heavy_attack_button)
+            
+        # Register all choice buttons
+        for i in range(self.choices_panel.layout.count()):
+            item = self.choices_panel.layout.itemAt(i)
+            if item and item.widget():
+                self.font_scaling_manager.register_component(item.widget())
 
     def _load_window_settings(self):
         """Load and apply window settings."""
@@ -952,48 +972,7 @@ class TaskRPG(QMainWindow):
             logging.error(f"Error applying settings changes: {e}")
             QMessageBox.critical(self, "Error", "Failed to apply settings changes")
 
-    def adjust_fonts(self):
-        """Adjust fonts based on window size."""
-        try:
-            # Calculate font size based on window width
-            width = self.width()
-            font_size = 16  # Default
-            if width < 800:
-                font_size = 12
-            elif width < 1200:
-                font_size = 14
-
-            # Update Player Panel fonts
-            self.player_panel.level_label.setFont(QFont("Arial", font_size, QFont.Bold))
-            self.player_panel.xp_label.setFont(QFont("Arial", font_size))
-
-            # Update Enemy Panel fonts
-            self.enemy_panel.enemy_label.setFont(QFont("Arial", font_size + 2, QFont.Bold))
-            self.enemy_panel.task_label.setFont(QFont("Arial", font_size, QFont.StyleItalic))
-            self.enemy_panel.hp_bar.setFont(QFont("Arial", font_size))
-
-            # Update Story Display fonts
-            self.story_display.story_text.setFont(QFont("Times New Roman", font_size))
-
-            # Update Action Button fonts
-            if hasattr(self.action_buttons, 'next_button'):
-                self.action_buttons.next_button.setFont(QFont("Arial", font_size, QFont.Bold))
-            if hasattr(self.action_buttons, 'attack_button'):
-                self.action_buttons.attack_button.setFont(QFont("Arial", font_size))
-            if hasattr(self.action_buttons, 'heavy_attack_button'):
-                self.action_buttons.heavy_attack_button.setFont(QFont("Arial", font_size))
-
-            # Update Settings Button font
-            self.settings_button.setFont(QFont("Arial", font_size))
-
-            # Update Choices Panel fonts
-            for i in range(self.choices_panel.layout.count()):
-                item = self.choices_panel.layout.itemAt(i)
-                if item and item.widget():
-                    item.widget().setFont(QFont("Arial", font_size))
-
-        except Exception as e:
-            logging.error(f"Error adjusting fonts: {e}")
+    
 
     def trigger_shake_animation(self):
         """Trigger the shaking animation if enabled."""

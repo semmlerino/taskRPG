@@ -241,6 +241,17 @@
         "count": 0,
         "muted_until": null
     },
+    "Continue Novelcrafter": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
     "Laundry": {
         "min": 1,
         "max": 1,
@@ -289,17 +300,6 @@
         "min": 5,
         "max": 9,
         "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
-    "Continue Novelcrafter": {
-        "min": 1,
-        "max": 1,
-        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,

@@ -13,8 +13,7 @@ class StoryTextBrowser(QTextBrowser):
         # Enable rich text
         self.setAcceptRichText(True)
         
-        # Set default font size
-        self.setFontPointSize(12)
+        # Font size will be managed by FontScalingManager
         
         # Enable external links but handle them internally
         self.setOpenExternalLinks(False)
