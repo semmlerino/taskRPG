@@ -294,6 +294,9 @@ class BattleManager:
             bool: True if attack was successful, False otherwise
         """
         try:
+            # FIX: Attempt to repair battle state before validation
+            self.repair_battle_state()
+            
             if not self._validate_attack():
                 return False
 
@@ -705,6 +708,13 @@ class BattleManager:
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
         try:
+            # FIX: Attempt to repair battle state before toggling pause
+            self.repair_battle_state()
+            
+            # FIX: Make sure battle is marked as active when unpausing
+            if self.paused and self.current_enemy is not None:
+                self.battle_state.is_active = True
+            
             # Toggle the central pause state
             self.paused = not self.paused
             status = "paused" if self.paused else "resumed"
@@ -777,6 +787,26 @@ class BattleManager:
             self.current_enemy and 
             self.battle_state.enemy_hp > 0
         )
+        
+    # FIX: Add new repair_battle_state method
+    def repair_battle_state(self) -> None:
+        """Attempt to repair inconsistent battle state."""
+        try:
+            # If we have an enemy but battle isn't active, restore state
+            if self.current_enemy is not None and not self.battle_state.is_active:
+                logging.warning("Repairing inconsistent battle state")
+                self.battle_state.is_active = True
+                self.battle_state.enemy_hp = self.current_enemy.current_hp
+                self.battle_state.enemy_max_hp = self.current_enemy.max_hp
+                self.battle_state.enemy_name = self.current_enemy.name
+                self.battle_state.task_name = self.current_enemy.task_name
+                
+                # Update UI to reflect repaired state
+                self._update_battle_ui()
+                self._update_status("Battle state repaired")
+                
+        except Exception as e:
+            logging.error(f"Error repairing battle state: {e}")
 
     def get_current_enemy(self) -> Optional[Enemy]:
         """Get the current enemy if any."""
