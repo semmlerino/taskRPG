@@ -359,8 +359,8 @@ class BattleManager:
             # Award XP
             self.player.gain_experience(xp)
             
-            # New coin reward (6 per battle)
-            self.player.earn_coins(6)
+            # New coin reward (5 per battle)
+            self.player.earn_coins(5)
             
             logging.info(f"Victory! Awarded {xp} XP and 7 coins")
             
@@ -368,19 +368,18 @@ class BattleManager:
             if self.current_enemy and self.current_enemy.task_name:
                 task = self.task_manager.get_task(self.current_enemy.task_name)
                 if task:
-                    was_decremented = False
                     # Handle count decrementing
                     if task.count > 0:
+                        # Store previous count to check if it's being decremented to 0
+                        previous_count = task.count
                         task.count -= 1
-                        was_decremented = True
-                        if task.count == 0 and was_decremented:
+                        # For daily/weekly tasks, handle reactivation
+                        if task.is_daily or task.is_weekly:
+                            task.deactivate()  # This will handle daily task reactivation logic
+                        # For regular tasks, only deactivate when count is decremented from 1 to 0
+                        elif previous_count == 1 and task.count == 0:
                             task.active = False
-                    
-                    # For daily/weekly tasks, only deactivate if count was decremented
-                    if was_decremented and (task.is_daily or task.is_weekly):
-                        task.deactivate()  # This will handle daily task reactivation logic
-                    elif task.count == 0 and was_decremented:
-                        task.active = False
+                        # Otherwise, tasks with count 0 remain active
                     
                     self.task_manager.save_tasks()  # Save task state changes
             

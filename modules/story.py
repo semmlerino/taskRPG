@@ -6,6 +6,8 @@ import logging
 import shutil
 from typing import Optional, Dict, Any, List, Union, TYPE_CHECKING
 from enum import Enum, auto
+import re
+from json.decoder import JSONDecodeError
 
 from modules.common.types import NavigationDirection
 from core.story.story_content import StoryContent
@@ -59,8 +61,7 @@ class StoryManager:
         """
         try:
             logging.info(f"Loading story from: {self.filepath}")
-            with open(self.filepath, 'r', encoding='utf-8') as f:
-                story_data = json.load(f)
+            story_data = self._robust_json_load(self.filepath)
 
             # Validate story data structure
             if not isinstance(story_data, dict):
@@ -628,6 +629,241 @@ class StoryManager:
         except Exception as e:
             logging.error(f"Error moving story to completed: {e}", exc_info=True)
             return False
+
+    def _robust_json_load(self, filepath: str) -> Dict[str, Any]:
+        """
+        Load a JSON file with robust error handling and automatic fixes.
+        
+        Args:
+            filepath: Path to the JSON file
+            
+        Returns:
+            Dict[str, Any]: The parsed JSON data
+        """
+        logging.info(f"Attempting to load JSON with robust error handling: {filepath}")
+        
+        # First attempt: Standard JSON loading
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except json.JSONDecodeError as e:
+            logging.warning(f"Initial JSON parse failed: {str(e)}. Attempting fixes...")
+            
+            # Read the file content
+            with open(filepath, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Apply fixes to common JSON problems
+            fixed_content = self._fix_json_content(content, e)
+            
+            try:
+                # Try to parse the fixed content
+                return json.loads(fixed_content)
+            except json.JSONDecodeError as e2:
+                logging.error(f"Failed to parse JSON even after fixes: {str(e2)}")
+                
+                # Create a backup of the original file
+                backup_path = filepath + ".backup"
+                if not os.path.exists(backup_path):
+                    with open(backup_path, 'w', encoding='utf-8') as f:
+                        f.write(content)
+                    logging.info(f"Created backup of original file at {backup_path}")
+                
+                # Overwrite the original file with the fixed content
+                with open(filepath, 'w', encoding='utf-8') as f:
+                    f.write(fixed_content)
+                logging.info(f"Overwrote original file with fixed content at {filepath}")
+                
+                # Return a minimal valid story
+                return {
+                    "start": {
+                        "text": f"Error loading story. Please check story file format. Original error: {str(e)}",
+                        "end": True
+                    }
+                }
+    
+    def _fix_json_content(self, content: str, error: json.JSONDecodeError) -> str:
+        """
+        Apply fixes to JSON content to handle common errors.
+        
+        Args:
+            content: The JSON content as a string
+            error: The JSONDecodeError that occurred
+            
+        Returns:
+            str: Fixed JSON content
+        """
+        # Extract line and column information from the error
+        error_line = error.lineno
+        error_col = error.colno
+        error_msg = str(error)
+        
+        logging.info(f"Attempting to fix JSON error on line {error_line}, column {error_col}: {error_msg}")
+        
+        # Split content into lines for processing
+        lines = content.split('\n')
+        
+        # Common character replacements for problematic characters
+        replacements = {
+            '—': '-',  # Replace em dash with hyphen
+            ''': "'",  # Replace curly single quotes
+            ''': "'",
+            '"': '"',  # Replace curly double quotes
+            '"': '"',
+            '…': '...',  # Replace ellipsis
+            '\u2028': ' ',  # Line separator
+            '\u2029': ' '   # Paragraph separator
+        }
+        
+        # Handle specific error types
+        if "Expecting ',' delimiter" in error_msg:
+            # Direct fix for missing comma errors
+            if error_line > 0 and error_line <= len(lines):
+                line = lines[error_line - 1]
+                # If the error is at the beginning of a line, check the previous line
+                if error_col <= 1 and error_line > 1:
+                    prev_line = lines[error_line - 2]
+                    # Add comma at the end of the previous line if it doesn't end with a comma
+                    if not prev_line.rstrip().endswith(',') and not prev_line.rstrip().endswith('{') and not prev_line.rstrip().endswith('['):
+                        lines[error_line - 2] = prev_line.rstrip() + ','
+                        logging.info(f"Added missing comma at the end of line {error_line - 1}")
+                else:
+                    # Insert comma at the error position
+                    before = line[:error_col - 1]
+                    after = line[error_col - 1:]
+                    if not before.endswith(',') and not before.endswith('{') and not before.endswith('['):
+                        lines[error_line - 1] = before + ',' + after
+                        logging.info(f"Added missing comma at position {error_col} in line {error_line}")
+        
+        # Apply fixes based on common patterns
+        fixed_lines = []
+        for i, line in enumerate(lines):
+            fixed_line = line
+            
+            # Apply character replacements
+            for char, replacement in replacements.items():
+                fixed_line = fixed_line.replace(char, replacement)
+            
+            # Fix unterminated strings (especially near line breaks)
+            if i + 1 == error_line and '"' in fixed_line:
+                # Count quotes to see if we have an odd number (indicating unterminated string)
+                quote_count = fixed_line.count('"')
+                if quote_count % 2 == 1:
+                    fixed_line = fixed_line + '"'
+            
+            # Fix missing commas after closing brackets or quotes
+            if (re.search(r'"\s*}$', fixed_line) or re.search(r'"\s*$', fixed_line)) and i < len(lines) - 1:
+                next_line = lines[i+1].strip()
+                if next_line and next_line[0] not in [',', '}', ']']:
+                    fixed_line = fixed_line + ','
+            
+            # Fix other common JSON syntax issues
+            if ":" in fixed_line and not re.search(r'".*:.*"', fixed_line):
+                # Ensure proper quoting of property names (but avoid fixing already quoted content)
+                fixed_line = re.sub(r'(\w+):', r'"\1":', fixed_line)
+                
+            fixed_lines.append(fixed_line)
+        
+        # Join the fixed lines back together
+        fixed_content = '\n'.join(fixed_lines)
+        
+        # Additional fixes for specific error patterns
+        if "Expecting ',' delimiter" in error_msg:
+            # Try to fix missing commas using regex patterns
+            fixed_content = re.sub(r'"\s*\n\s*"', '",\n"', fixed_content)
+            fixed_content = re.sub(r'}\s*\n\s*"', '},\n"', fixed_content)
+            fixed_content = re.sub(r']\s*\n\s*"', '],\n"', fixed_content)
+        
+        # If the error was near special characters, attempt further fixes
+        if "got 'undefined'" in error_msg or "Invalid control character" in error_msg:
+            # Apply additional repairs to the JSON string
+            fixed_content = self._additional_json_fixes(fixed_content)
+        
+        # Try to validate if the fix worked
+        try:
+            json.loads(fixed_content)
+            logging.info("JSON fix successful!")
+            return fixed_content
+        except json.JSONDecodeError as e:
+            logging.warning(f"First fix attempt failed: {str(e)}. Trying more aggressive fixes...")
+            
+            # If we still have errors, try more aggressive fixes
+            if "Expecting ',' delimiter" in str(e):
+                # More aggressive comma fixing
+                fixed_content = self._fix_missing_commas(fixed_content)
+            
+            # Final validation
+            try:
+                json.loads(fixed_content)
+                logging.info("Aggressive JSON fix successful!")
+            except json.JSONDecodeError as e2:
+                logging.error(f"Could not fix JSON after multiple attempts: {str(e2)}")
+        
+        return fixed_content
+    
+    def _fix_missing_commas(self, content: str) -> str:
+        """
+        Apply more aggressive fixes for missing commas in JSON.
+        
+        Args:
+            content: JSON content string
+            
+        Returns:
+            str: Fixed JSON content
+        """
+        # Pattern to find places where commas are likely missing between elements
+        # This looks for patterns like "value""key" or "value"{ or "value"[
+        patterns = [
+            (r'(["}\]])\s*(["{\[])', r'\1,\2'),  # Add comma between values and new elements
+            (r'(["}\]])\s*\n\s*(["{\[])', r'\1,\n\2'),  # Add comma between values and new elements with newlines
+            (r'(["}\]])\s*\n\s*(["])', r'\1,\n\2'),  # Add comma between string values with newlines
+        ]
+        
+        fixed_content = content
+        for pattern, replacement in patterns:
+            fixed_content = re.sub(pattern, replacement, fixed_content)
+        
+        # Try to fix the entire structure by parsing and re-serializing
+        try:
+            # Try to load the JSON to see if our fixes worked
+            parsed = json.loads(fixed_content)
+            # If successful, re-serialize with proper formatting
+            return json.dumps(parsed, indent=2)
+        except json.JSONDecodeError:
+            # If we still can't parse it, return our best attempt
+            return fixed_content
+    
+    def _additional_json_fixes(self, content: str) -> str:
+        """
+        Apply additional fixes for complex JSON errors.
+        
+        Args:
+            content: JSON content string
+            
+        Returns:
+            str: Fixed JSON content
+        """
+        # Remove control characters
+        fixed_content = re.sub(r'[\x00-\x1F\x7F]', '', content)
+        
+        # Fix unescaped backslashes in strings
+        fixed_content = re.sub(r'(?<!\\)\\(?!["\\\/bfnrtu])', r'\\\\', fixed_content)
+        
+        # Fix unescaped quotes in strings
+        in_string = False
+        result = []
+        i = 0
+        while i < len(fixed_content):
+            char = fixed_content[i]
+            if char == '"' and (i == 0 or fixed_content[i-1] != '\\'):
+                in_string = not in_string
+            elif char == '"' and in_string and fixed_content[i-1] != '\\':
+                # Escape the quote
+                result.append('\\')
+            result.append(char)
+            i += 1
+        
+        return ''.join(result)
 
     def reset_state(self):
         """Reset all story state and history."""

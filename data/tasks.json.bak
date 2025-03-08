@@ -32,17 +32,6 @@
         "count": 0,
         "muted_until": null
     },
-    "Mails": {
-        "min": 4,
-        "max": 6,
-        "active": false,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "Chair?": {
         "min": 1,
         "max": 1,
@@ -123,12 +112,12 @@
     "Hair": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0,
+        "count": 1,
         "muted_until": null
     },
     "Perplexity": {
@@ -175,17 +164,6 @@
         "count": 0,
         "muted_until": null
     },
-    "Tabs": {
-        "min": 16,
-        "max": 25,
-        "active": true,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "TXT": {
         "min": 2,
         "max": 4,
@@ -197,7 +175,7 @@
         "count": 0,
         "muted_until": null
     },
-    "Teeth": {
+    "FluxExperimentation": {
         "min": 1,
         "max": 1,
         "active": false,
@@ -205,7 +183,7 @@
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 1,
+        "count": 0,
         "muted_until": null
     },
     "UKP": {
@@ -244,7 +222,7 @@
     "Continue Novelcrafter": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -264,8 +242,8 @@
         "muted_until": null
     },
     "Claude": {
-        "min": 6,
-        "max": 10,
+        "min": 7,
+        "max": 11,
         "active": true,
         "is_daily": false,
         "is_weekly": false,
@@ -285,15 +263,26 @@
         "count": 0,
         "muted_until": null
     },
-    "Clean Room (1 Thema des Tages)": {
-        "min": 1,
-        "max": 1,
+    "Tabs": {
+        "min": 16,
+        "max": 25,
         "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
+        "muted_until": null
+    },
+    "Clean Room (1 Thema des Tages)": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 1,
         "muted_until": null
     },
     "GPTs": {
@@ -307,7 +296,40 @@
         "count": 0,
         "muted_until": null
     },
+    "Teeth": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
     "taskRPG (custom rewards;add ToDo;activationTime)": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Cook": {
+        "min": 1,
+        "max": 1,
+        "active": false,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "teeth": {
         "min": 1,
         "max": 1,
         "active": false,

@@ -7,8 +7,11 @@ Handles story file selection and image generation for story nodes.
 import os
 import json
 import logging
-from typing import Optional, Dict, Any
+import shutil
+import re
+from typing import Optional, Dict, Any, List, Set, Tuple
 from datetime import datetime
+from json.decoder import JSONDecodeError
 
 from PyQt5.QtWidgets import (
     QDialog,
@@ -25,7 +28,10 @@ from PyQt5.QtWidgets import (
     QWidget,
     QSplitter,
     QSizePolicy,
-    QMenu
+    QMenu,
+    QCheckBox,
+    QDialogButtonBox,
+    QApplication
 )
 from PyQt5.QtGui import QFont, QColor
 from PyQt5.QtCore import Qt, QSize, QByteArray
@@ -36,6 +42,7 @@ from modules.ui.dialogs.settings import SettingsDialog
 from modules.story import StoryManager
 from modules.image_generator import ImageGenerator
 
+
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
 
@@ -44,6 +51,192 @@ class StoryGroup:
     def __init__(self, main_title):
         self.main_title = main_title
         self.stories = []  # List of (display_name, full_path, created_date) tuples
+
+
+class JSONFixDialog(QDialog):
+    """Dialog for selecting and fixing corrupted JSON story files."""
+    
+    def __init__(self, corrupted_files: List[Tuple[str, Exception]], parent=None):
+        """
+        Initialize the dialog with a list of corrupted files.
+        
+        Args:
+            corrupted_files: List of tuples (file_path, error) of corrupted JSON files
+            parent: Parent widget
+        """
+        super().__init__(parent)
+        self.setWindowTitle("Fix Story Files")
+        self.resize(600, 450)
+        self.corrupted_files = corrupted_files
+        self.checkboxes = {}  # Store references to checkboxes
+        self.selected_files = set()
+        
+        # Initialize UI
+        self.init_ui()
+        
+    def init_ui(self):
+        """Set up the dialog UI components."""
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Add explanation label
+        info_label = QLabel(
+            "The following story files contain JSON parsing errors. "
+            "Select the files you want to fix automatically. "
+            "Backups will be created before fixes are applied."
+        )
+        info_label.setWordWrap(True)
+        info_label.setStyleSheet("font-size: 13px; margin-bottom: 10px; color: #333;")
+        layout.addWidget(info_label)
+        
+        # Create file list widget
+        self.file_list = QListWidget()
+        self.file_list.setStyleSheet("""
+            QListWidget {
+                border: 1px solid #CCCCCC;
+                border-radius: 4px;
+                background-color: white;
+                padding: 5px;
+                font-size: 14px;
+            }
+            QListWidget::item {
+                padding: 12px;
+                border-bottom: 1px solid #EEEEEE;
+                margin-bottom: 5px;
+            }
+        """)
+        layout.addWidget(self.file_list)
+        
+        # Add the checkbox items properly
+        for file_path, error in self.corrupted_files:
+            self._add_file_item(file_path, error)
+            
+        # Add select all/none buttons in a nicer layout
+        select_layout = QHBoxLayout()
+        select_layout.setSpacing(10)
+        
+        select_all_btn = QPushButton("Select All")
+        select_all_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E3F2FD;
+                border: 1px solid #BBDEFB;
+                border-radius: 4px;
+                padding: 8px 15px;
+                color: #1976D2;
+            }
+            QPushButton:hover {
+                background-color: #BBDEFB;
+            }
+        """)
+        select_all_btn.clicked.connect(self.select_all)
+        select_layout.addWidget(select_all_btn)
+        
+        select_none_btn = QPushButton("Select None")
+        select_none_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #EFEBE9;
+                border: 1px solid #D7CCC8;
+                border-radius: 4px;
+                padding: 8px 15px;
+                color: #5D4037;
+            }
+            QPushButton:hover {
+                background-color: #D7CCC8;
+            }
+        """)
+        select_none_btn.clicked.connect(self.select_none)
+        select_layout.addWidget(select_none_btn)
+        
+        layout.addLayout(select_layout)
+        
+        # Add dialog buttons with better styling
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.setStyleSheet("""
+            QPushButton {
+                padding: 8px 20px;
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton[text="OK"] {
+                background-color: #2196F3;
+                color: white;
+            }
+            QPushButton[text="Cancel"] {
+                background-color: #F5F5F5;
+                color: #333;
+                border: 1px solid #E0E0E0;
+            }
+            QPushButton:hover[text="OK"] {
+                background-color: #1E88E5;
+            }
+            QPushButton:hover[text="Cancel"] {
+                background-color: #E0E0E0;
+            }
+        """)
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+    
+    def _add_file_item(self, file_path: str, error: Exception):
+        """Add a file item with proper checkbox to the list widget."""
+        # Create a widget to hold the checkbox and text
+        item_widget = QWidget()
+        item_layout = QVBoxLayout(item_widget)
+        item_layout.setContentsMargins(8, 8, 8, 8)
+        item_layout.setSpacing(8)
+        
+        # Add the checkbox with the file name
+        file_name = os.path.basename(file_path)
+        checkbox = QCheckBox(file_name)
+        checkbox.setStyleSheet("font-weight: bold; font-size: 16px;")
+        checkbox.setChecked(True)  # Default to checked
+        self.checkboxes[file_path] = checkbox
+        self.selected_files.add(file_path)
+        item_layout.addWidget(checkbox)
+        
+        # Add error message label
+        error_label = QLabel(f"Error: {str(error)}")
+        error_label.setWordWrap(True)
+        error_label.setStyleSheet("color: #F44336; font-size: 14px; margin-left: 24px;")
+        item_layout.addWidget(error_label)
+        
+        # Add item to list
+        list_item = QListWidgetItem()
+        list_item.setData(Qt.UserRole, file_path)
+        self.file_list.addItem(list_item)
+        # Make the item height bigger to accommodate the larger text
+        item_widget.adjustSize()
+        size_hint = item_widget.sizeHint()
+        size_hint.setHeight(size_hint.height() + 20)  # Add extra padding
+        list_item.setSizeHint(size_hint)
+        self.file_list.setItemWidget(list_item, item_widget)
+    
+    def select_all(self):
+        """Select all files in the list."""
+        for file_path, checkbox in self.checkboxes.items():
+            checkbox.setChecked(True)
+            self.selected_files.add(file_path)
+    
+    def select_none(self):
+        """Deselect all files in the list."""
+        for file_path, checkbox in self.checkboxes.items():
+            checkbox.setChecked(False)
+        self.selected_files.clear()
+    
+    def accept(self):
+        """Update selected files before accepting."""
+        self.selected_files.clear()
+        
+        for file_path, checkbox in self.checkboxes.items():
+            if checkbox.isChecked():
+                self.selected_files.add(file_path)
+        
+        super().accept()
+    
+    def get_selected_files(self) -> Set[str]:
+        """Return the set of selected file paths."""
+        return self.selected_files
 
 
 class StorySelectionDialog(QDialog):
@@ -56,8 +249,9 @@ class StorySelectionDialog(QDialog):
         # Initialize splitter as instance variable
         self.splitter = None
         self.selected_story = None
+        self.story_list = None
         
-        # Initialize UI first
+        # Initialize UI first - This will create the story_list widget
         self.init_ui()
         
         # Load saved dimensions and splitter state after UI is initialized
@@ -65,7 +259,133 @@ class StorySelectionDialog(QDialog):
         width = settings.get('width', 600)
         height = settings.get('height', 500)
         self.resize(width, height)
-
+        
+        # Check for corrupted story files - Now UI elements are ready
+        self.corrupted_files = self.check_story_files()
+        
+        # If corrupted files were found, show dialog
+        if self.corrupted_files:
+            self.fix_corrupted_files()
+        
+        # Populate the story list at the end
+        self.populate_story_list()
+    
+    def check_story_files(self) -> List[Tuple[str, Exception]]:
+        """
+        Check all story files for JSON parsing errors.
+        
+        Returns:
+            List of tuples containing corrupted file paths and their errors
+        """
+        corrupted_files = []
+        
+        if os.path.exists(STORIES_DIR):
+            story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
+            
+            for story_file in story_files:
+                story_path = os.path.join(STORIES_DIR, story_file)
+                try:
+                    with open(story_path, 'r', encoding='utf-8') as f:
+                        json.load(f)
+                except Exception as e:
+                    logging.warning(f"Found corrupted story file: {story_path} - Error: {str(e)}")
+                    corrupted_files.append((story_path, e))
+        
+        return corrupted_files
+    
+    def fix_corrupted_files(self):
+        """Show dialog to fix corrupted files and apply fixes to selected files."""
+        if not self.corrupted_files:
+            return
+        
+        # Create and show the fix dialog
+        fix_dialog = JSONFixDialog(self.corrupted_files, self)
+        
+        if fix_dialog.exec_() == QDialog.Accepted:
+            selected_files = fix_dialog.get_selected_files()
+            
+            if not selected_files:
+                return
+            
+            # Show progress dialog
+            progress = QProgressDialog("Fixing story files...", None, 0, len(selected_files), self)
+            progress.setWindowTitle("Fixing Files")
+            progress.setWindowModality(Qt.WindowModal)
+            progress.show()
+            
+            fixed_count = 0
+            failed_count = 0
+            
+            for i, file_path in enumerate(selected_files):
+                progress.setValue(i)
+                QApplication.processEvents()  # Ensure UI updates
+                
+                # Create backup
+                backup_path = file_path + ".backup"
+                try:
+                    # Only create backup if it doesn't exist
+                    if not os.path.exists(backup_path):
+                        shutil.copy2(file_path, backup_path)
+                        logging.info(f"Created backup of {file_path} at {backup_path}")
+                    
+                    # Apply fix using StoryManager's robust JSON loader
+                    # We create a temporary StoryManager just for the fix
+                    from modules.story import StoryManager
+                    temp_manager = StoryManager(file_path)
+                    
+                    # Get the fixed content directly
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+                    
+                    # Find the specific error for this file
+                    error = None
+                    for path, err in self.corrupted_files:
+                        if path == file_path:
+                            error = err
+                            break
+                    
+                    if isinstance(error, JSONDecodeError):
+                        # Fix the content
+                        fixed_content = temp_manager._fix_json_content(content, error)
+                        
+                        # Write fixed content back to the original file
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            f.write(fixed_content)
+                        
+                        logging.info(f"Successfully fixed {file_path}")
+                        fixed_count += 1
+                    else:
+                        # For non-JSONDecodeError, load and save using robust loader
+                        story_data = temp_manager._robust_json_load(file_path)
+                        
+                        # Write the corrected data back to the file
+                        with open(file_path, 'w', encoding='utf-8') as f:
+                            json.dump(story_data, f, indent=2)
+                        
+                        logging.info(f"Successfully fixed {file_path}")
+                        fixed_count += 1
+                    
+                except Exception as e:
+                    logging.error(f"Failed to fix {file_path}: {str(e)}")
+                    failed_count += 1
+            
+            progress.setValue(len(selected_files))
+            
+            # Show result message
+            QMessageBox.information(
+                self,
+                "Fix Complete",
+                f"Fixed {fixed_count} story files.\n"
+                f"Failed to fix {failed_count} files.\n"
+                f"Backups were created with .backup extension."
+            )
+            
+            # Clear the corrupted files list after fixing
+            self.corrupted_files = []
+            
+            # Refresh the story list to show the fixed files
+            self.populate_story_list()
+    
     def init_ui(self):
         """Initialize the dialog UI with improved layout and styling."""
         main_layout = QVBoxLayout(self)
@@ -230,7 +550,7 @@ class StorySelectionDialog(QDialog):
         self.story_list.itemDoubleClicked.connect(self.select_story)
 
         # Initial population
-        self.populate_story_list()
+        # self.populate_story_list()
 
     def filter_stories(self):
         """Filter stories based on search text."""
