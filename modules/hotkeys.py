@@ -2,7 +2,7 @@
 
 import time
 import logging
-from PyQt5.QtCore import QThread, pyqtSignal
+from PyQt5.QtCore import QThread, pyqtSignal, QTimer
 import keyboard
 from .constants import HOTKEYS
 
@@ -76,14 +76,20 @@ class GlobalHotkeys(QThread):
     def _handle_normal_attack(self):
         """Handle normal attack with focus check."""
         if self.attack_hotkeys_enabled:
+            logging.debug("Normal attack hotkey ('d') pressed")
             self.normal_attack_signal.emit()
-            self._register_all_hotkeys()  # Re-register hotkeys after attack
+            # Don't re-register hotkeys immediately after attack as this can cause race conditions
+            # Instead, use a small delay to ensure the signal is processed first
+            QTimer.singleShot(50, self._register_all_hotkeys)
 
     def _handle_heavy_attack(self):
         """Handle heavy attack with focus check."""
         if self.attack_hotkeys_enabled:
+            logging.debug("Heavy attack hotkey ('shift+d') pressed")
             self.heavy_attack_signal.emit()
-            self._register_all_hotkeys()  # Re-register hotkeys after attack
+            # Don't re-register hotkeys immediately after attack as this can cause race conditions
+            # Instead, use a small delay to ensure the signal is processed first
+            QTimer.singleShot(50, self._register_all_hotkeys)
 
     def set_attack_hotkeys_enabled(self, enabled: bool):
         """Enable/disable attack hotkeys."""

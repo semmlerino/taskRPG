@@ -294,10 +294,15 @@ class BattleManager:
             bool: True if attack was successful, False otherwise
         """
         try:
+            attack_type = "heavy" if is_heavy else "normal"
+            logging.debug(f"Processing {attack_type} attack request")
+            
             # FIX: Attempt to repair battle state before validation
             self.repair_battle_state()
             
+            # Validate attack conditions
             if not self._validate_attack():
+                logging.warning(f"{attack_type.capitalize()} attack validation failed")
                 return False
 
             # Track attack timing
@@ -308,7 +313,11 @@ class BattleManager:
             # Calculate and apply damage
             damage = random.randint(2, 4) if is_heavy else 1
             
+            # Log attack details before applying damage
             old_hp = self.current_enemy.current_hp
+            logging.debug(f"Performing {attack_type} attack: Enemy HP before: {old_hp}, Damage: {damage}")
+            
+            # Apply damage
             self.current_enemy.take_damage(damage)
             new_hp = self.current_enemy.current_hp
             
@@ -316,12 +325,19 @@ class BattleManager:
             self.battle_state.enemy_hp = new_hp
             self.battle_state.attacks_performed += 1
             self.battle_state.turns_taken += 1
-            self.battle_state.last_attack_type = "heavy" if is_heavy else "normal"
+            self.battle_state.last_attack_type = attack_type
             
             # Update internal stats too
             self.attacks_performed += 1
             self.turns_taken += 1
-            self.last_attack_type = "heavy" if is_heavy else "normal"
+            self.last_attack_type = attack_type
+            
+            # Log successful attack
+            logging.info(f"{attack_type.capitalize()} attack successful: Enemy HP reduced from {old_hp} to {new_hp}")
+            
+            # Show feedback in status bar
+            if self.status_bar:
+                self.status_bar.showMessage(f"{attack_type.capitalize()} attack: -{damage} HP", 1500)
             
             # Update UI
             self._update_ui_after_attack(is_heavy)
@@ -977,20 +993,36 @@ class BattleManager:
 
     def _validate_attack(self) -> bool:
         """Validate attack conditions."""
-        validation_results = {
-            "battle_active": self.battle_state.is_active,
-            "enemy_exists": self.current_enemy is not None,
-            "not_paused": not self.paused,
-            "has_hp_attribute": hasattr(self.current_enemy, 'current_hp') if self.current_enemy else False
-        }
+        # Check if battle is active first
+        if not self.battle_state.is_active:
+            logging.warning("Attack validation failed: battle is not active")
+            if self.status_bar:
+                self.status_bar.showMessage("No active battle", 2000)
+            return False
+            
+        # Check if enemy exists
+        if self.current_enemy is None:
+            logging.warning("Attack validation failed: no current enemy")
+            if self.status_bar:
+                self.status_bar.showMessage("No enemy to attack", 2000)
+            return False
+            
+        # Check if battle is paused
+        if self.paused:
+            logging.warning("Attack validation failed: battle is paused (press # to unpause)")
+            if self.status_bar:
+                self.status_bar.showMessage("Battle is paused - press # to unpause", 2000)
+            return False
+            
+        # Check if enemy has HP attribute
+        if not hasattr(self.current_enemy, 'current_hp'):
+            logging.warning("Attack validation failed: enemy has no HP attribute")
+            if self.status_bar:
+                self.status_bar.showMessage("Enemy data error", 2000)
+            return False
         
-        logging.debug(f"Attack validation results: {validation_results}")
-        
-        for key, value in validation_results.items():
-            if not value:
-                logging.warning(f"Attack validation failed: {key}")
-                return False
-                
+        # All validations passed
+        logging.debug("Attack validation successful")
         return True
         
     def _initialize_enemy_hp(self, task: Task) -> int:

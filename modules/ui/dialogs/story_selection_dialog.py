@@ -7,11 +7,8 @@ Handles story file selection and image generation for story nodes.
 import os
 import json
 import logging
-import shutil
-import re
-from typing import Optional, Dict, Any, List, Set, Tuple
+from typing import Optional, Dict, Any
 from datetime import datetime
-from json.decoder import JSONDecodeError
 
 from PyQt5.QtWidgets import (
     QDialog,
@@ -28,12 +25,9 @@ from PyQt5.QtWidgets import (
     QWidget,
     QSplitter,
     QSizePolicy,
-    QMenu,
-    QCheckBox,
-    QDialogButtonBox,
-    QApplication
+    QMenu
 )
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QIcon
 from PyQt5.QtCore import Qt, QSize, QByteArray
 
 # Project imports
@@ -41,7 +35,6 @@ from modules.constants import STORIES_DIR, ASSETS_DIR, DATA_DIR
 from modules.ui.dialogs.settings import SettingsDialog
 from modules.story import StoryManager
 from modules.image_generator import ImageGenerator
-
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s')
@@ -51,192 +44,6 @@ class StoryGroup:
     def __init__(self, main_title):
         self.main_title = main_title
         self.stories = []  # List of (display_name, full_path, created_date) tuples
-
-
-class JSONFixDialog(QDialog):
-    """Dialog for selecting and fixing corrupted JSON story files."""
-    
-    def __init__(self, corrupted_files: List[Tuple[str, Exception]], parent=None):
-        """
-        Initialize the dialog with a list of corrupted files.
-        
-        Args:
-            corrupted_files: List of tuples (file_path, error) of corrupted JSON files
-            parent: Parent widget
-        """
-        super().__init__(parent)
-        self.setWindowTitle("Fix Story Files")
-        self.resize(600, 450)
-        self.corrupted_files = corrupted_files
-        self.checkboxes = {}  # Store references to checkboxes
-        self.selected_files = set()
-        
-        # Initialize UI
-        self.init_ui()
-        
-    def init_ui(self):
-        """Set up the dialog UI components."""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Add explanation label
-        info_label = QLabel(
-            "The following story files contain JSON parsing errors. "
-            "Select the files you want to fix automatically. "
-            "Backups will be created before fixes are applied."
-        )
-        info_label.setWordWrap(True)
-        info_label.setStyleSheet("font-size: 13px; margin-bottom: 10px; color: #333;")
-        layout.addWidget(info_label)
-        
-        # Create file list widget
-        self.file_list = QListWidget()
-        self.file_list.setStyleSheet("""
-            QListWidget {
-                border: 1px solid #CCCCCC;
-                border-radius: 4px;
-                background-color: white;
-                padding: 5px;
-                font-size: 14px;
-            }
-            QListWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid #EEEEEE;
-                margin-bottom: 5px;
-            }
-        """)
-        layout.addWidget(self.file_list)
-        
-        # Add the checkbox items properly
-        for file_path, error in self.corrupted_files:
-            self._add_file_item(file_path, error)
-            
-        # Add select all/none buttons in a nicer layout
-        select_layout = QHBoxLayout()
-        select_layout.setSpacing(10)
-        
-        select_all_btn = QPushButton("Select All")
-        select_all_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #E3F2FD;
-                border: 1px solid #BBDEFB;
-                border-radius: 4px;
-                padding: 8px 15px;
-                color: #1976D2;
-            }
-            QPushButton:hover {
-                background-color: #BBDEFB;
-            }
-        """)
-        select_all_btn.clicked.connect(self.select_all)
-        select_layout.addWidget(select_all_btn)
-        
-        select_none_btn = QPushButton("Select None")
-        select_none_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #EFEBE9;
-                border: 1px solid #D7CCC8;
-                border-radius: 4px;
-                padding: 8px 15px;
-                color: #5D4037;
-            }
-            QPushButton:hover {
-                background-color: #D7CCC8;
-            }
-        """)
-        select_none_btn.clicked.connect(self.select_none)
-        select_layout.addWidget(select_none_btn)
-        
-        layout.addLayout(select_layout)
-        
-        # Add dialog buttons with better styling
-        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        button_box.setStyleSheet("""
-            QPushButton {
-                padding: 8px 20px;
-                border-radius: 4px;
-                font-weight: bold;
-            }
-            QPushButton[text="OK"] {
-                background-color: #2196F3;
-                color: white;
-            }
-            QPushButton[text="Cancel"] {
-                background-color: #F5F5F5;
-                color: #333;
-                border: 1px solid #E0E0E0;
-            }
-            QPushButton:hover[text="OK"] {
-                background-color: #1E88E5;
-            }
-            QPushButton:hover[text="Cancel"] {
-                background-color: #E0E0E0;
-            }
-        """)
-        button_box.accepted.connect(self.accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-    
-    def _add_file_item(self, file_path: str, error: Exception):
-        """Add a file item with proper checkbox to the list widget."""
-        # Create a widget to hold the checkbox and text
-        item_widget = QWidget()
-        item_layout = QVBoxLayout(item_widget)
-        item_layout.setContentsMargins(8, 8, 8, 8)
-        item_layout.setSpacing(8)
-        
-        # Add the checkbox with the file name
-        file_name = os.path.basename(file_path)
-        checkbox = QCheckBox(file_name)
-        checkbox.setStyleSheet("font-weight: bold; font-size: 16px;")
-        checkbox.setChecked(True)  # Default to checked
-        self.checkboxes[file_path] = checkbox
-        self.selected_files.add(file_path)
-        item_layout.addWidget(checkbox)
-        
-        # Add error message label
-        error_label = QLabel(f"Error: {str(error)}")
-        error_label.setWordWrap(True)
-        error_label.setStyleSheet("color: #F44336; font-size: 14px; margin-left: 24px;")
-        item_layout.addWidget(error_label)
-        
-        # Add item to list
-        list_item = QListWidgetItem()
-        list_item.setData(Qt.UserRole, file_path)
-        self.file_list.addItem(list_item)
-        # Make the item height bigger to accommodate the larger text
-        item_widget.adjustSize()
-        size_hint = item_widget.sizeHint()
-        size_hint.setHeight(size_hint.height() + 20)  # Add extra padding
-        list_item.setSizeHint(size_hint)
-        self.file_list.setItemWidget(list_item, item_widget)
-    
-    def select_all(self):
-        """Select all files in the list."""
-        for file_path, checkbox in self.checkboxes.items():
-            checkbox.setChecked(True)
-            self.selected_files.add(file_path)
-    
-    def select_none(self):
-        """Deselect all files in the list."""
-        for file_path, checkbox in self.checkboxes.items():
-            checkbox.setChecked(False)
-        self.selected_files.clear()
-    
-    def accept(self):
-        """Update selected files before accepting."""
-        self.selected_files.clear()
-        
-        for file_path, checkbox in self.checkboxes.items():
-            if checkbox.isChecked():
-                self.selected_files.add(file_path)
-        
-        super().accept()
-    
-    def get_selected_files(self) -> Set[str]:
-        """Return the set of selected file paths."""
-        return self.selected_files
 
 
 class StorySelectionDialog(QDialog):
@@ -249,9 +56,8 @@ class StorySelectionDialog(QDialog):
         # Initialize splitter as instance variable
         self.splitter = None
         self.selected_story = None
-        self.story_list = None
         
-        # Initialize UI first - This will create the story_list widget
+        # Initialize UI first
         self.init_ui()
         
         # Load saved dimensions and splitter state after UI is initialized
@@ -259,133 +65,7 @@ class StorySelectionDialog(QDialog):
         width = settings.get('width', 600)
         height = settings.get('height', 500)
         self.resize(width, height)
-        
-        # Check for corrupted story files - Now UI elements are ready
-        self.corrupted_files = self.check_story_files()
-        
-        # If corrupted files were found, show dialog
-        if self.corrupted_files:
-            self.fix_corrupted_files()
-        
-        # Populate the story list at the end
-        self.populate_story_list()
-    
-    def check_story_files(self) -> List[Tuple[str, Exception]]:
-        """
-        Check all story files for JSON parsing errors.
-        
-        Returns:
-            List of tuples containing corrupted file paths and their errors
-        """
-        corrupted_files = []
-        
-        if os.path.exists(STORIES_DIR):
-            story_files = [f for f in os.listdir(STORIES_DIR) if f.endswith('.json')]
-            
-            for story_file in story_files:
-                story_path = os.path.join(STORIES_DIR, story_file)
-                try:
-                    with open(story_path, 'r', encoding='utf-8') as f:
-                        json.load(f)
-                except Exception as e:
-                    logging.warning(f"Found corrupted story file: {story_path} - Error: {str(e)}")
-                    corrupted_files.append((story_path, e))
-        
-        return corrupted_files
-    
-    def fix_corrupted_files(self):
-        """Show dialog to fix corrupted files and apply fixes to selected files."""
-        if not self.corrupted_files:
-            return
-        
-        # Create and show the fix dialog
-        fix_dialog = JSONFixDialog(self.corrupted_files, self)
-        
-        if fix_dialog.exec_() == QDialog.Accepted:
-            selected_files = fix_dialog.get_selected_files()
-            
-            if not selected_files:
-                return
-            
-            # Show progress dialog
-            progress = QProgressDialog("Fixing story files...", None, 0, len(selected_files), self)
-            progress.setWindowTitle("Fixing Files")
-            progress.setWindowModality(Qt.WindowModal)
-            progress.show()
-            
-            fixed_count = 0
-            failed_count = 0
-            
-            for i, file_path in enumerate(selected_files):
-                progress.setValue(i)
-                QApplication.processEvents()  # Ensure UI updates
-                
-                # Create backup
-                backup_path = file_path + ".backup"
-                try:
-                    # Only create backup if it doesn't exist
-                    if not os.path.exists(backup_path):
-                        shutil.copy2(file_path, backup_path)
-                        logging.info(f"Created backup of {file_path} at {backup_path}")
-                    
-                    # Apply fix using StoryManager's robust JSON loader
-                    # We create a temporary StoryManager just for the fix
-                    from modules.story import StoryManager
-                    temp_manager = StoryManager(file_path)
-                    
-                    # Get the fixed content directly
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                    
-                    # Find the specific error for this file
-                    error = None
-                    for path, err in self.corrupted_files:
-                        if path == file_path:
-                            error = err
-                            break
-                    
-                    if isinstance(error, JSONDecodeError):
-                        # Fix the content
-                        fixed_content = temp_manager._fix_json_content(content, error)
-                        
-                        # Write fixed content back to the original file
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            f.write(fixed_content)
-                        
-                        logging.info(f"Successfully fixed {file_path}")
-                        fixed_count += 1
-                    else:
-                        # For non-JSONDecodeError, load and save using robust loader
-                        story_data = temp_manager._robust_json_load(file_path)
-                        
-                        # Write the corrected data back to the file
-                        with open(file_path, 'w', encoding='utf-8') as f:
-                            json.dump(story_data, f, indent=2)
-                        
-                        logging.info(f"Successfully fixed {file_path}")
-                        fixed_count += 1
-                    
-                except Exception as e:
-                    logging.error(f"Failed to fix {file_path}: {str(e)}")
-                    failed_count += 1
-            
-            progress.setValue(len(selected_files))
-            
-            # Show result message
-            QMessageBox.information(
-                self,
-                "Fix Complete",
-                f"Fixed {fixed_count} story files.\n"
-                f"Failed to fix {failed_count} files.\n"
-                f"Backups were created with .backup extension."
-            )
-            
-            # Clear the corrupted files list after fixing
-            self.corrupted_files = []
-            
-            # Refresh the story list to show the fixed files
-            self.populate_story_list()
-    
+
     def init_ui(self):
         """Initialize the dialog UI with improved layout and styling."""
         main_layout = QVBoxLayout(self)
@@ -408,6 +88,23 @@ class StorySelectionDialog(QDialog):
         title_label.setAlignment(Qt.AlignCenter)  # Center align the title
         title_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)  # Prevent vertical expansion
         title_layout.addWidget(title_label)
+
+        # Add refresh button to the right of the title
+        refresh_button = QPushButton("Refresh")
+        refresh_button.setStyleSheet("""
+            QPushButton {
+                padding: 5px 10px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        refresh_button.clicked.connect(self.populate_story_list)
+        title_layout.addWidget(refresh_button)
 
         # Add title layout to main layout
         main_layout.addLayout(title_layout)
@@ -461,7 +158,7 @@ class StorySelectionDialog(QDialog):
             }
         """)
         self.story_list.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.story_list.customContextMenuRequested.connect(self._show_context_menu)
+        self.story_list.customContextMenuRequested.connect(self._open_file_in_editor)
         list_layout.addWidget(self.story_list)
 
         # Right side - Preview Container
@@ -550,7 +247,7 @@ class StorySelectionDialog(QDialog):
         self.story_list.itemDoubleClicked.connect(self.select_story)
 
         # Initial population
-        # self.populate_story_list()
+        self.populate_story_list()
 
     def filter_stories(self):
         """Filter stories based on search text."""
@@ -589,66 +286,102 @@ class StorySelectionDialog(QDialog):
             return
 
         story_path = selected_items[0].data(Qt.UserRole)
-        try:
-            with open(story_path, 'r', encoding='utf-8') as f:
-                story_data = json.load(f)
-
-            # Start building the HTML preview
-            preview_parts = []
-
-            # Story filename
-            filename = os.path.basename(story_path)
-            preview_parts.append(f"<h3 style='color: #1976D2;'>{filename}</h3>")
-
-            # Creation date
-            created_date = os.path.getctime(story_path)
-            created_str = datetime.fromtimestamp(created_date).strftime("%Y-%m-%d %H:%M:%S")
-            preview_parts.append(f"<p><b>Created:</b> {created_str}</p>")
-
-            # Story structure info
-            node_count = len(story_data.keys())
-            preview_parts.append(f"<p><b>Total Nodes:</b> {node_count}</p>")
-
-            # Battle node info
-            has_battles = self._has_valid_battle_nodes(story_data)
-            battle_status = "<span style='color: #4CAF50;'>✓ Has battle content</span>" if has_battles else "<span style='color: #F44336;'>✗ No battle content</span>"
-            preview_parts.append(f"<p><b>Battle Status:</b> {battle_status}</p>")
-
-            # Preview the start node
-            if 'start' in story_data:
-                start_node = story_data['start']
-                preview_parts.append("<h4>Opening Scene:</h4>")
-
-                # Show text
-                if 'text' in start_node:
-                    preview_text = start_node['text'][:200] + "..." if len(start_node['text']) > 200 else start_node['text']
-                    preview_parts.append(f"<p>{preview_text}</p>")
-
-                # Show event if present
-                if 'event' in start_node:
-                    preview_parts.append(f"<p><b>Event:</b> {start_node['event']}</p>")
-
-                # Show if there's an image prompt
-                if 'image_prompt' in start_node:
-                    preview_parts.append("<p><i>Contains image generation prompt</i></p>")
-
-                # Show NPC if present
-                if 'npc' in start_node:
-                    npc_name = start_node['npc'].get('name', 'Unknown NPC')
-                    preview_parts.append(f"<p><b>Featured NPC:</b> {npc_name}</p>")
-
-                # Show if there's a battle
-                if 'battle' in start_node:
-                    preview_parts.append("<p><b>Contains Battle Scene</b></p>")
-
-            # Join all parts with spacing
-            preview_html = "\n".join(preview_parts)
-            self.preview_text.setHtml(preview_html)
-
-        except Exception as e:
-            error_msg = f"Error loading preview: {str(e)}"
-            logging.error(error_msg)
-            self.preview_text.setPlainText(error_msg)
+        is_invalid_json = selected_items[0].data(Qt.UserRole + 1)
+        
+        # Start building the HTML preview
+        preview_parts = []
+        
+        # Story filename
+        filename = os.path.basename(story_path)
+        preview_parts.append(f"<h3 style='color: #1976D2;'>{filename}</h3>")
+        
+        # Creation date
+        created_date = os.path.getctime(story_path)
+        created_str = datetime.fromtimestamp(created_date).strftime("%Y-%m-%d %H:%M:%S")
+        preview_parts.append(f"<p><b>Created:</b> {created_str}</p>")
+        
+        # If this is an invalid JSON file, show error information
+        if is_invalid_json:
+            preview_parts.append(f"<div style='background-color: #FFEBEE; padding: 10px; border-left: 4px solid #FF5722; margin: 10px 0;'>")
+            preview_parts.append(f"<h4 style='color: #D32F2F; margin-top: 0;'>Invalid JSON File</h4>")
+            
+            # Try to read the file content to show the error
+            try:
+                with open(story_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    
+                try:
+                    json.loads(content)
+                except json.JSONDecodeError as e:
+                    preview_parts.append(f"<p><b>Error:</b> {str(e)}</p>")
+                    
+                    # Show the problematic line if possible
+                    if hasattr(e, 'lineno') and hasattr(e, 'colno'):
+                        lines = content.split('\n')
+                        if 0 <= e.lineno - 1 < len(lines):
+                            error_line = lines[e.lineno - 1]
+                            preview_parts.append(f"<p><b>Line {e.lineno}:</b></p>")
+                            preview_parts.append(f"<pre style='background-color: #F5F5F5; padding: 5px; overflow-x: auto;'>{error_line}</pre>")
+                            if e.colno > 0:
+                                pointer = ' ' * (e.colno - 1) + '^'
+                                preview_parts.append(f"<pre style='color: #D32F2F;'>{pointer}</pre>")
+            except Exception as e:
+                preview_parts.append(f"<p>Could not read file content: {str(e)}</p>")
+                
+            preview_parts.append(f"<p>This file contains JSON syntax errors and cannot be loaded properly.</p>")
+            preview_parts.append(f"<p>You may want to repair this file using the JSON Repair Tool.</p>")
+            preview_parts.append(f"</div>")
+        else:
+            # Normal JSON file preview
+            try:
+                with open(story_path, 'r', encoding='utf-8') as f:
+                    story_data = json.load(f)
+                
+                # Story structure info
+                node_count = len(story_data.keys())
+                preview_parts.append(f"<p><b>Total Nodes:</b> {node_count}</p>")
+                
+                # Battle node info
+                has_battles = self._has_valid_battle_nodes(story_data)
+                battle_status = "<span style='color: #4CAF50;'>✓ Has battle content</span>" if has_battles else "<span style='color: #F44336;'>✗ No battle content</span>"
+                preview_parts.append(f"<p><b>Battle Status:</b> {battle_status}</p>")
+                
+                # Preview the start node
+                if 'start' in story_data:
+                    start_node = story_data['start']
+                    preview_parts.append("<h4>Opening Scene:</h4>")
+                    
+                    # Show text
+                    if 'text' in start_node:
+                        preview_text = start_node['text'][:200] + "..." if len(start_node['text']) > 200 else start_node['text']
+                        preview_parts.append(f"<p>{preview_text}</p>")
+                    
+                    # Show event if present
+                    if 'event' in start_node:
+                        preview_parts.append(f"<p><b>Event:</b> {start_node['event']}</p>")
+                    
+                    # Show if there's an image prompt
+                    if 'image_prompt' in start_node:
+                        preview_parts.append("<p><i>Contains image generation prompt</i></p>")
+                    
+                    # Show NPC if present
+                    if 'npc' in start_node:
+                        npc_name = start_node['npc'].get('name', 'Unknown NPC')
+                        preview_parts.append(f"<p><b>Featured NPC:</b> {npc_name}</p>")
+                    
+                    # Show if there's a battle
+                    if 'battle' in start_node:
+                        preview_parts.append("<p><b>Contains Battle Scene</b></p>")
+            except Exception as e:
+                error_msg = f"Error loading preview: {str(e)}"
+                logging.error(error_msg)
+                preview_parts.append(f"<div style='background-color: #FFEBEE; padding: 10px; border-left: 4px solid #FF5722; margin: 10px 0;'>")
+                preview_parts.append(f"<p>{error_msg}</p>")
+                preview_parts.append(f"</div>")
+        
+        # Join all parts with spacing
+        preview_html = "\n".join(preview_parts)
+        self.preview_text.setHtml(preview_html)
 
     def _has_valid_battle_nodes(self, story_data: Dict[str, Any]) -> bool:
         """Check if the story has any valid battle nodes."""
@@ -698,9 +431,15 @@ class StorySelectionDialog(QDialog):
                 with open(story_path, 'r', encoding='utf-8') as f:
                     story_data = json.load(f)
                     file_title = story_data.get('title', story_file)
+            except json.JSONDecodeError as e:
+                logging.error(f"Invalid JSON in {story_path}: {e}")
+                file_title = story_file.replace('.json', '') + " (Invalid JSON)"
+                # Still include the file with error indicator
+                created_date = os.path.getctime(story_path)
             except Exception as e:
                 logging.error(f"Failed to read {story_path}: {e}")
                 file_title = story_file.replace('.json', '')
+                created_date = os.path.getctime(story_path)
 
             # Parse the title
             title_parts = file_title.split(':')
@@ -742,24 +481,48 @@ class StorySelectionDialog(QDialog):
 
             # Add stories in the group
             for display_name, full_path, created_date in group.stories:
+                # Check if this is an invalid JSON file (indicated in the display name)
+                is_invalid_json = "(Invalid JSON)" in display_name
+                
                 try:
-                    # Check if story has battles
-                    with open(full_path, 'r', encoding='utf-8') as f:
-                        story_data = json.load(f)
-                        has_battles = self._has_valid_battle_nodes(story_data)
-                        
-                    # Add battle indicator to display name
-                    battle_indicator = "⚔️ " if has_battles else ""
-                    item_text = f"{battle_indicator}{display_name}"
+                    # Only try to load JSON if it's not already marked as invalid
+                    if not is_invalid_json:
+                        # Check if story has battles
+                        with open(full_path, 'r', encoding='utf-8') as f:
+                            story_data = json.load(f)
+                            has_battles = self._has_valid_battle_nodes(story_data)
+                            
+                        # Add battle indicator to display name
+                        battle_indicator = "⚔️ " if has_battles else ""
+                        item_text = f"{battle_indicator}{display_name}"
+                    else:
+                        # For invalid JSON files, add warning indicator
+                        item_text = f"⚠️ {display_name}"
                     
                     item = QListWidgetItem(item_text)
                     item.setData(Qt.UserRole, full_path)
                     item.setFont(QFont("Arial", 11))
+                    
+                    # Apply special styling for invalid JSON files
+                    if is_invalid_json:
+                        item.setForeground(QColor("#FF5722"))  # Orange-red color for warning
+                        # Store the error status in item data
+                        item.setData(Qt.UserRole + 1, True)  # Mark as invalid JSON
+                    else:
+                        item.setData(Qt.UserRole + 1, False)  # Mark as valid JSON
+                        
                     item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                     self.story_list.addItem(item)
                 except Exception as e:
                     logging.error(f"Error loading story {full_path}: {str(e)}")
-                    continue
+                    # Still add the item but with error indicator
+                    error_item = QListWidgetItem(f"⚠️ {display_name} (Error)")
+                    error_item.setData(Qt.UserRole, full_path)
+                    error_item.setData(Qt.UserRole + 1, True)  # Mark as invalid
+                    error_item.setFont(QFont("Arial", 11))
+                    error_item.setForeground(QColor("#FF5722"))  # Orange-red color
+                    error_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                    self.story_list.addItem(error_item)
 
     def _handle_no_stories(self):
         """Handle the case when no stories are found."""
@@ -790,23 +553,40 @@ class StorySelectionDialog(QDialog):
         if not self.selected_story:
             return
 
+        # Get main window reference
+        main_window = self.parent()
+        if not main_window:
+            logging.error("Parent window not available")
+            QMessageBox.critical(self, "Error", "Could not find main window")
+            return
+
+        # Check if this is an invalid JSON file
+        is_invalid = False
         try:
-            # Load story data
+            # Try to load story data
             with open(self.selected_story, 'r', encoding='utf-8') as f:
                 story_data = json.load(f)
+                
+            # Validate story data structure
+            if not isinstance(story_data, dict):
+                logging.error("Story data must be a dictionary")
+                QMessageBox.critical(self, "Error", "Invalid story format: Story data must be a dictionary")
+                return
         except json.JSONDecodeError as e:
             logging.error(f"Invalid JSON in story file: {e}")
-            QMessageBox.critical(self, "Error", f"The story file contains invalid JSON: {str(e)}")
-            return
+            is_invalid = True
+            
+            # For invalid JSON files, we'll create a minimal valid structure
+            # This allows the story to be loaded but will show an error message
+            story_data = {
+                "start": {
+                    "text": f"ERROR: This story file contains invalid JSON.\n\nError details: {str(e)}\n\nPlease repair this file using the JSON Repair Tool before continuing.",
+                    "choices": []
+                }
+            }
         except Exception as e:
             logging.error(f"Failed to load story data: {e}")
             QMessageBox.critical(self, "Error", f"Failed to load story: {str(e)}")
-            return
-
-        # Validate story data structure
-        if not isinstance(story_data, dict):
-            logging.error("Story data must be a dictionary")
-            QMessageBox.critical(self, "Error", "Invalid story format: Story data must be a dictionary")
             return
 
         # Get story name (used for image folder path)
@@ -821,13 +601,6 @@ class StorySelectionDialog(QDialog):
             QMessageBox.critical(self, "Error", f"Failed to create image folder: {str(e)}")
             return
 
-        # Get main window reference
-        main_window = self.parent()
-        if not main_window:
-            logging.error("Parent window not available")
-            QMessageBox.critical(self, "Error", "Could not find main window")
-            return
-
         try:
             # Initialize story manager without requiring image generator or battle manager
             main_window.story_manager = StoryManager(
@@ -837,6 +610,15 @@ class StorySelectionDialog(QDialog):
                 ui_component=main_window,
                 battle_manager=getattr(main_window, 'battle_manager', None)
             )
+            
+            # If this is an invalid JSON file, show a warning
+            if is_invalid:
+                QMessageBox.warning(
+                    self,
+                    "Invalid JSON File",
+                    "This story file contains invalid JSON and has been loaded in a limited mode.\n\n"
+                    "Please consider repairing this file using the JSON Repair Tool."
+                )
         except Exception as e:
             logging.error(f"Failed to initialize story manager: {e}")
             QMessageBox.critical(self, "Error", f"Failed to initialize story: {str(e)}")
@@ -847,19 +629,20 @@ class StorySelectionDialog(QDialog):
                              main_window.image_generator and 
                              main_window.image_generator.validate_server_connection())
 
-        if not can_generate_images:
-            result = QMessageBox.warning(
-                self,
-                "Image Generation Not Available",
-                "Image generation is not available. Story will load without generating missing images.\n"
-                "Would you like to continue?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
-            )
-            if result == QMessageBox.No:
-                main_window.story_manager = None  # Clean up if user cancels
-                return
-            # If user continues, load without image generation
+        if not can_generate_images or is_invalid:  # Skip image generation for invalid files
+            if not is_invalid:  # Only show this message for valid files
+                result = QMessageBox.warning(
+                    self,
+                    "Image Generation Not Available",
+                    "Image generation is not available. Story will load without generating missing images.\n"
+                    "Would you like to continue?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if result == QMessageBox.No:
+                    main_window.story_manager = None  # Clean up if user cancels
+                    return
+            # If user continues or file is invalid, load without image generation
             super().accept()
             try:
                 main_window.story_manager.display_story_segment()
@@ -975,17 +758,29 @@ class StorySelectionDialog(QDialog):
     def select_story(self):
         """Handle story selection."""
         selected_items = self.story_list.selectedItems()
-        if selected_items:
-            selected_item = selected_items[0]
-            story_path = selected_item.data(Qt.UserRole)
-            self.selected_story = story_path
-            self.accept()
-        else:
-            QMessageBox.warning(
-                self, 
-                "No Selection", 
-                "Please select a story to load."
+        if not selected_items:
+            QMessageBox.warning(self, "No Selection", "Please select a story first.")
+            return
+        
+        story_path = selected_items[0].data(Qt.UserRole)
+        is_invalid_json = selected_items[0].data(Qt.UserRole + 1)
+        
+        # Check if the selected file has invalid JSON
+        if is_invalid_json:
+            reply = QMessageBox.warning(
+                self,
+                "Invalid JSON File",
+                "The selected file contains invalid JSON and may not work properly.\n\n"
+                "Do you want to try to load it anyway?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
             )
+            
+            if reply == QMessageBox.No:
+                return
+        
+        self.selected_story = story_path
+        self.accept()
 
     def extract_story_title(self, story_path: str) -> Optional[str]:
         """Extracts the title from a story file."""
@@ -1113,30 +908,32 @@ class StorySelectionDialog(QDialog):
         except Exception as e:
             logging.error(f"Error saving dialog settings: {e}")
 
-    def _show_context_menu(self, position):
-        """Show context menu for story list items."""
+    def _open_file_in_editor(self, position):
+        """Open the selected file in the default editor."""
         item = self.story_list.itemAt(position)
         if not item:
             return
-
-        # Get the story path from the item's data
-        story_path = item.data(Qt.UserRole)
-        if not story_path:
+            
+        # Don't process headers
+        if item.flags() == Qt.ItemIsEnabled:
             return
-
-        # Create context menu
-        menu = QMenu()
-        open_action = menu.addAction("Open in Editor")
-        action = menu.exec_(self.story_list.viewport().mapToGlobal(position))
-
-        if action == open_action:
-            try:
-                # Use the default system editor to open the file
-                os.startfile(story_path)
-            except Exception as e:
-                logging.error(f"Failed to open story file: {e}")
-                QMessageBox.warning(
-                    self,
-                    "Error",
-                    f"Failed to open story file:\n{str(e)}"
-                )
+            
+        # Get file path
+        file_path = item.data(Qt.UserRole)
+        
+        # Open the file in the default editor
+        try:
+            if os.path.exists(file_path):
+                # Use the appropriate command based on the OS
+                # For Windows, we use 'start' command
+                import subprocess
+                subprocess.Popen(['start', '', file_path], shell=True)
+                logging.info(f"Opening file in editor: {file_path}")
+            else:
+                logging.error(f"File not found: {file_path}")
+                QMessageBox.warning(self, "File Not Found", f"The file {os.path.basename(file_path)} could not be found.")
+        except Exception as e:
+            logging.error(f"Error opening file in editor: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to open file in editor: {str(e)}")
+    
+    # Method removed as per user request to remove JSON repair functionality

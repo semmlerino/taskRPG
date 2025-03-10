@@ -661,6 +661,10 @@ class SettingsDialog(QDialog):
             set_time_action = menu.addAction("Set Activation Time...")
             set_time_action.triggered.connect(lambda: self.set_activation_time(row))
             
+            # Activate at time action
+            activate_at_time_action = menu.addAction("Activate at Time...")
+            activate_at_time_action.triggered.connect(lambda: self.activate_at_time(row))
+            
             # Clear activation time action (only if time is set)
             if task.activation_time:
                 clear_time_action = menu.addAction("Clear Activation Time")
@@ -796,6 +800,91 @@ class SettingsDialog(QDialog):
         except Exception as e:
             logging.error(f"Error clearing activation time: {e}")
             QMessageBox.critical(self, "Error", f"Failed to clear activation time: {str(e)}")
+            
+    def activate_at_time(self, row):
+        """Schedule task activation at a specific time"""
+        try:
+            task_name = self.task_model._tasks[row][0]
+            task = self.task_manager.tasks[task_name]
+            
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Activate at Time")
+            layout = QVBoxLayout()
+            
+            # Time input
+            time_label = QLabel("Enter activation time (HH:MM):")
+            time_label.setFont(QFont("Arial", 13))
+            layout.addWidget(time_label)
+            
+            time_edit = QLineEdit()
+            time_edit.setFont(QFont("Arial", 13))
+            time_edit.setPlaceholderText("14:30")
+            # Set current time + 1 hour as default
+            current_time = datetime.now()
+            default_time = current_time.replace(minute=0) + timedelta(hours=1)
+            time_edit.setText(f"{default_time.hour:02d}:{default_time.minute:02d}")
+            layout.addWidget(time_edit)
+            
+            # Error label (hidden by default)
+            error_label = QLabel()
+            error_label.setStyleSheet("color: red;")
+            error_label.hide()
+            layout.addWidget(error_label)
+            
+            # Description label
+            desc_label = QLabel("The task will be activated at the specified time.")
+            desc_label.setFont(QFont("Arial", 11))
+            desc_label.setWordWrap(True)
+            layout.addWidget(desc_label)
+            
+            # Buttons
+            button_layout = QHBoxLayout()
+            
+            ok_button = QPushButton("OK")
+            ok_button.setFont(QFont("Arial", 13))
+            button_layout.addWidget(ok_button)
+            
+            cancel_button = QPushButton("Cancel")
+            cancel_button.setFont(QFont("Arial", 13))
+            cancel_button.clicked.connect(dialog.reject)
+            button_layout.addWidget(cancel_button)
+            
+            layout.addLayout(button_layout)
+            dialog.setLayout(layout)
+            
+            def validate_time():
+                """Validate time format and range"""
+                time_str = time_edit.text().strip()
+                try:
+                    hour, minute = map(int, time_str.split(':'))
+                    if 0 <= hour < 24 and 0 <= minute < 60:
+                        error_label.hide()
+                        return True
+                    else:
+                        error_label.setText("Invalid time range")
+                        error_label.show()
+                except ValueError:
+                    error_label.setText("Invalid time format (use HH:MM)")
+                    error_label.show()
+                return False
+            
+            def on_ok():
+                if validate_time():
+                    # Set the activation time
+                    task.set_activation_time(time_edit.text().strip())
+                    # Ensure the task is not manually deactivated
+                    task.manually_deactivated = False
+                    self.saved = False  # Mark settings as changed
+                    dialog.accept()
+            
+            ok_button.clicked.connect(on_ok)
+            time_edit.textChanged.connect(lambda: ok_button.setEnabled(validate_time()))
+            
+            dialog.exec_()
+            
+        except Exception as e:
+            logging.error(f"Error setting activation time: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to set activation time: {str(e)}")
 
     def show_custom_mute_dialog(self, row: int):
         """Show dialog for selecting custom mute date/time."""
