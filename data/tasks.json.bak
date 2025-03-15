@@ -178,13 +178,13 @@
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": true,
         "is_weekly": false,
-        "next_activation_time": null,
+        "next_activation_time": 1742085740.1192236,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": 1742063489.62741
     },
     "UKP": {
         "min": 1,
@@ -288,13 +288,14 @@
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "15:00"
     },
     "Claude": {
         "min": 7,
@@ -331,6 +332,17 @@
         "activation_time": "22:30"
     },
     "Eat": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Do NHS": {
         "min": 1,
         "max": 1,
         "active": true,
