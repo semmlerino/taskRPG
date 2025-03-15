@@ -522,6 +522,15 @@ class TaskRPG(QMainWindow):
     def init_managers(self):
         """Initialize managers that depend on UI components."""
         try:
+            # Load coin reward setting from settings
+            settings_file = os.path.join(DATA_DIR, 'settings.json')
+            settings_manager = SettingsManager(settings_file)
+            settings = settings_manager.load_settings()
+            coin_reward = settings.get('coin_reward', 5)  # Default to 5 if not set
+            
+            # Set coin reward in battle manager
+            self.battle_manager.coin_reward = coin_reward
+            
             # Set up battle manager UI components
             self.battle_manager.set_ui_components(
                 story_display=self.story_display,
@@ -538,7 +547,7 @@ class TaskRPG(QMainWindow):
                 on_victory=self.player_panel.update_panel
             )
 
-            logging.info("Managers initialized with UI components")
+            logging.info(f"Managers initialized with UI components. Coin reward set to {coin_reward}")
 
         except Exception as e:
             logging.error(f"Error initializing managers: {e}")
@@ -943,26 +952,40 @@ class TaskRPG(QMainWindow):
     def _apply_settings_changes(self, settings_dialog: SettingsDialog):
         """Apply changes from settings dialog."""
         try:
+            logging.info("Applying settings changes")
             if settings_dialog.saved:
                 # Update task manager
                 self.task_manager = settings_dialog.task_manager
                 self.task_manager.save_tasks()
 
-                # Load and apply shake animation setting
+                # Load and apply settings
                 settings_file = os.path.join(DATA_DIR, 'settings.json')
                 if os.path.exists(settings_file):
                     with open(settings_file, 'r', encoding='utf-8') as f:
                         settings = json.load(f)
+                    
+                    # Apply shake animation setting
                     shake_enabled = settings.get('shake_animation', True)
                     status = "enabled" if shake_enabled else "disabled"
                     self.story_display.append_text(
                         f"<p>Shaking animation has been <b>{status}</b>.</p>"
                     )
-                    self.status_bar.showMessage(f"Shaking animation {status}")
+                    
+                    # Apply coin reward setting
+                    coin_reward = settings.get('coin_reward', 5)  # Default to 5 if not set
+                    if hasattr(self, 'battle_manager') and self.battle_manager:
+                        old_reward = self.battle_manager.coin_reward
+                        self.battle_manager.coin_reward = coin_reward
+                        if old_reward != coin_reward:
+                            self.story_display.append_text(
+                                f"<p>Coin reward per victory updated from <b>{old_reward}</b> to <b>{coin_reward}</b>.</p>"
+                            )
+                            logging.info(f"Coin reward updated from {old_reward} to {coin_reward}")
+                    
+                    self.status_bar.showMessage(f"Settings updated successfully")
 
                 # Update UI
                 self.story_display.append_text("<p>Settings updated successfully.</p>")
-                self.status_bar.showMessage("Settings updated successfully")
 
                 # Update tasks display if not in battle
                 if not self.battle_manager.is_in_battle():
@@ -1116,3 +1139,6 @@ if __name__ == "__main__":
     game = TaskRPG()
     game.show()
     sys.exit(app.exec_())
+
+# Project imports
+from modules.ui.dialogs.settings.settings_manager import SettingsManager

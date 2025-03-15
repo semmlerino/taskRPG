@@ -17,6 +17,8 @@ class TaskTableModel(QAbstractTableModel):
         self._headers = ['Name', 'Min', 'Max', 'Active', 'Daily', 'Weekly', 'Count']
         self._original_tasks = tasks
         self._drag_source_row = -1
+        self._sort_column = -1  # No sorting by default
+        self._sort_order = Qt.AscendingOrder
         
         # Convert tasks dictionary to list while preserving all attributes
         for name, task in tasks.items():
@@ -183,9 +185,25 @@ class TaskTableModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
         """Return the header data for the given role and section."""
         if orientation == Qt.Horizontal and role == Qt.DisplayRole:
-            return self._headers[section]
+            header_text = self._headers[section]
+            if section == self._sort_column:
+                # Add sort indicator to header text
+                arrow = "▲" if self._sort_order == Qt.AscendingOrder else "▼"
+                header_text = f"{header_text} {arrow}"
+            return header_text
         return None
 
+    def sort(self, column: int, order=Qt.AscendingOrder):
+        """Sort table by given column and order."""
+        self.layoutAboutToBeChanged.emit()
+        self._sort_column = column
+        self._sort_order = order
+        
+        # Sort the tasks list based on the column and order
+        self._tasks.sort(key=lambda x: x[column], reverse=(order == Qt.DescendingOrder))
+        
+        self.layoutChanged.emit()
+        
     def supportedDropActions(self):
         """Return supported drop actions."""
         return Qt.MoveAction

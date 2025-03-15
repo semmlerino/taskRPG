@@ -144,7 +144,7 @@
   },
   "chapter5": {
     "node14": {
-      "text": "Having faced your inner demons, you reach the core of the Ethereal Spire. Here, the true nature of the collective consciousness is revealed – a vast, living network of all human minds, past and present.",
+      "text": "Having faced your inner demons, you reach the core of the Ethereal Spire. Here, the true nature of the collective consciousness is revealed - a vast, living network of all human minds, past and present.",
       "environment": "The core is a massive chamber, filled with swirling energies and countless threads of light representing individual consciousnesses. At the center floats a pulsating orb of pure thought.",
       "npc": {
         "name": "Avatar of Collective Consciousness",
@@ -157,7 +157,7 @@
       "text": "As you contemplate the gravity of your choice, the leader of the Cognoscenti arrives, having pursued you to the very heart of the Spire.",
       "npc": {
         "name": "Cognoscenti Leader",
-        "dialogue": "Septimus! The power to shape humanity's mind is too great for one person. Join us, and together we can guide Rome – no, the world – into a new age of enlightenment and order!"
+        "dialogue": "Septimus! The power to shape humanity's mind is too great for one person. Join us, and together we can guide Rome - no, the world - into a new age of enlightenment and order!"
       },
       "battle": {
         "enemy": "Cognoscenti Leader",
@@ -177,7 +177,7 @@
       "environment": "As you descend the Spire, you see Rome in turmoil. Steam-powered communication devices spread the knowledge rapidly, and the streets are filled with people grappling with this new understanding of reality.",
       "npc": {
         "name": "Livia",
-        "dialogue": "We've done it, Septimus. For better or worse, the world will never be the same. The real work begins now – helping humanity navigate this new reality."
+        "dialogue": "We've done it, Septimus. For better or worse, the world will never be the same. The real work begins now - helping humanity navigate this new reality."
       },
       "image_prompt": "A view of Rome from the descending Ethereal Spire. The city is a mix of celebration and chaos. Steam-powered news tickers and projection devices spread the newfound knowledge. Septimus and Livia watch from a floating platform, their expressions a mix of hope and concern. Style: Panoramic city view, 8K resolution, highly detailed, inspired by the intricate cityscapes of James Gurney.",
       "next": "epilogue"

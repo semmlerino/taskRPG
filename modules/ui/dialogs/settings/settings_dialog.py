@@ -109,6 +109,9 @@ class SettingsDialog(QDialog):
         header.setStretchLastSection(False)  # Important to show all columns
         header.setStyleSheet(styles.HEADER_STYLE)
         
+        # Connect header click to sorting function
+        header.sectionClicked.connect(self.sort_table)
+        
         # Set column widths and alignment
         self.task_view.setColumnWidth(0, 200)  # Name
         self.task_view.setColumnWidth(1, 60)   # Min
@@ -194,6 +197,27 @@ class SettingsDialog(QDialog):
         workflow_layout.addWidget(self.workflow_combo)
         workflow_layout.addStretch()  # Add stretch to prevent widgets from expanding too much
         layout.addLayout(workflow_layout)
+        
+        # Coin Reward Setting
+        coin_reward_layout = QHBoxLayout()
+        coin_reward_layout.setContentsMargins(0, 5, 0, 5)
+        coin_reward_layout.setSpacing(10)
+        
+        coin_reward_label = QLabel("Coins per Victory:")
+        coin_reward_label.setFont(QFont("Arial", 13))
+        coin_reward_label.setFixedWidth(200)  # Fixed width for label
+        coin_reward_layout.addWidget(coin_reward_label)
+        
+        self.coin_reward_spin = QSpinBox()
+        self.coin_reward_spin.setFont(QFont("Arial", 13))
+        self.coin_reward_spin.setFixedWidth(100)
+        self.coin_reward_spin.setMinimum(1)
+        self.coin_reward_spin.setMaximum(100)
+        self.coin_reward_spin.setValue(self.settings.get('coin_reward', 5))
+        self.coin_reward_spin.valueChanged.connect(lambda value: logging.info(f"Coin reward set to: {value}"))
+        coin_reward_layout.addWidget(self.coin_reward_spin)
+        coin_reward_layout.addStretch()
+        layout.addLayout(coin_reward_layout)
 
         # Shake Animation Toggle
         self.shake_checkbox = QCheckBox("Enable Shaking Animation")
@@ -540,6 +564,28 @@ class SettingsDialog(QDialog):
     def save_settings(self):
         """Save settings and tasks."""
         try:
+            # Save window geometry
+            geometry_bytes = self.saveGeometry()
+            geometry_base64 = bytes(geometry_bytes.toBase64()).decode('utf-8')
+            
+            # Get column widths
+            col_widths = [self.task_view.columnWidth(i) for i in range(self.task_model.columnCount())]
+            
+            # Save settings
+            settings = {
+                'shake_animation': self.shake_checkbox.isChecked(),
+                'window_geometry': geometry_base64,
+                'selected_workflow': self.workflow_combo.currentText(),
+                'column_widths': col_widths,
+                'coin_reward': self.coin_reward_spin.value(),
+                'window': {
+                    'width': self.width(),
+                    'height': self.height()
+                }
+            }
+            
+            logging.info(f"Settings saved: {settings}")
+            
             if not self.validate_tasks():
                 return
 
@@ -548,21 +594,15 @@ class SettingsDialog(QDialog):
             self.task_manager.tasks = new_tasks
             if not self.task_manager.save_tasks():
                 raise Exception("Failed to save tasks")
-
-            # Get window geometry using base64 encoding
-            window_geometry = self.saveGeometry().toBase64().data().decode('utf-8')
-            logging.debug(f"Window geometry (base64): {window_geometry}")
-
-            # Prepare settings dictionary
-            settings = {
-                'shake_animation': bool(self.shake_checkbox.isChecked()),
-                'window_geometry': window_geometry,
-                'selected_workflow': self.workflow_combo.currentText(),
-                'column_widths': [
-                    int(self.task_view.columnWidth(i))
-                    for i in range(self.task_view.model().columnCount())
-                ]
-            }
+                
+            # Save settings
+            if self.settings_manager.save_settings(settings):
+                self.saved = True
+                QMessageBox.information(self, "Settings Saved",
+                    "Settings have been saved successfully.")
+                self.accept()
+            else:
+                raise Exception("Failed to save settings")
 
             # Save settings
             if self.settings_manager.save_settings(settings):
@@ -996,3 +1036,21 @@ class SettingsDialog(QDialog):
             # Clear and add only default workflow if there's an error
             self.workflow_combo.clear()
             self.workflow_combo.addItem("newFluxWorkflow")
+
+    def sort_table(self, column_index):
+        """Sort the table by the clicked column."""
+        # Get current sort order for the column
+        header = self.task_view.horizontalHeader()
+        
+        # If already sorting by this column, toggle the sort order
+        if self.task_model._sort_column == column_index:
+            order = Qt.AscendingOrder if self.task_model._sort_order == Qt.DescendingOrder else Qt.DescendingOrder
+        else:
+            # Default to ascending order for a new sort column
+            order = Qt.AscendingOrder
+        
+        # Sort the model
+        self.task_model.sort(column_index, order)
+        
+        # Update the UI to show the sort indicator
+        self.task_view.horizontalHeader().setSortIndicator(column_index, order)

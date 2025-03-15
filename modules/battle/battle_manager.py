@@ -180,6 +180,9 @@ class BattleManager:
         self.xp_bonus_per_turn = 10  # Bonus XP per turn taken
         self.xp_time_bonus_factor = 0.5  # Factor for time-based XP bonus
         
+        # Coin reward configuration
+        self.coin_reward = 5  # Default coins per victory
+        
         # Track completed battle nodes
         self.completed_battle_nodes = set()
         
@@ -375,10 +378,10 @@ class BattleManager:
             # Award XP
             self.player.gain_experience(xp)
             
-            # New coin reward (5 per battle)
-            self.player.earn_coins(5)
+            # Award coins using the configurable coin_reward value
+            self.player.earn_coins(self.coin_reward)
             
-            logging.info(f"Victory! Awarded {xp} XP and 7 coins")
+            logging.info(f"Victory! Awarded {xp} XP and {self.coin_reward} coins")
             
             # Handle task completion and count decrementing
             if self.current_enemy and self.current_enemy.task_name:
@@ -515,7 +518,7 @@ class BattleManager:
             victory_message = (
                 "<div class='victory-message' style='text-align: center;'>"
                 "<h3>Victory!</h3>"
-                f"<p>You gained <b>{xp_gained}</b> XP and <b>7</b> coins!</p>"
+                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
                 "</div>"
             )
             
@@ -616,17 +619,28 @@ class BattleManager:
             
             # Connect UI signals
             if self.action_buttons:
-                self.action_buttons.attack_clicked.connect(
-                    lambda: self.perform_attack(is_heavy=False)
-                )
-                self.action_buttons.heavy_attack_clicked.connect(
-                    lambda: self.perform_attack(is_heavy=True)
-                )
-                
-            logging.info("UI components set and signals connected")
+                try:
+                    self.action_buttons.attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=False)
+                    )
+                    self.action_buttons.heavy_attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=True)
+                    )
+                    logging.debug("Action buttons signals connected")
+                    
+                    logging.info("UI components set and signals connected")
+                    return True
+                    
+                except Exception as e:
+                    logging.error(f"Error connecting action button signals: {e}")
+                    return False
             
+            logging.info("UI components set successfully")
+            return True
+        
         except Exception as e:
             logging.error(f"Error setting UI components: {e}")
+            return False
 
     def update_tasks_left(self) -> None:
         """Update the tasks remaining display."""
@@ -1057,3 +1071,805 @@ class BattleManager:
             
         except Exception as e:
             logging.error(f"Error displaying chapter completion: {e}")
+
+    def _batch_ui_update(self, updates: dict) -> None:
+        """
+        Perform multiple UI updates in a single batch.
+        
+        Args:
+            updates: Dictionary of update functions to execute
+        """
+        try:
+            # Temporarily disable window updates if possible
+            if self.main_window:
+                self.main_window.setUpdatesEnabled(False)
+            
+            # Execute all updates
+            for update_name, update_func in updates.items():
+                try:
+                    update_func()
+                except Exception as e:
+                    logging.error(f"Error in UI update '{update_name}': {e}")
+                    
+        finally:
+            # Re-enable window updates
+            if self.main_window:
+                self.main_window.setUpdatesEnabled(True)
+                self.main_window.repaint()
+
+    def _update_battle_ui(self) -> None:
+        """Update all UI components with current battle state."""
+        try:
+            updates = {
+                'enemy_panel': lambda: self.enemy_panel.update_panel(self.current_enemy) if self.enemy_panel else None,
+                'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
+                'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
+                'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
+                'story_display': lambda: (
+                    self.story_display.story_text.append(
+                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
+                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
+                        "</div>"
+                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
+                ),
+                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
+            }
+            
+            self._batch_ui_update(updates)
+            logging.debug("Battle UI updated successfully")
+                
+        except Exception as e:
+            logging.error(f"Error updating battle UI: {e}")
+            if self.status_bar:
+                self.status_bar.showMessage("Error updating battle display")
+
+    def _update_ui_after_attack(self, was_heavy: bool) -> None:
+        """Update UI components after an attack."""
+        if self.enemy_panel:
+            self.enemy_panel.update_panel(self.current_enemy)
+        if self.compact_window:
+            self.compact_window.update_display(self.current_enemy)
+        self.update_tasks_left()
+        
+        attack_type = "Heavy attack" if was_heavy else "Attack"
+        if self.status_bar:
+            self.status_bar.showMessage(f"{attack_type} landed!")
+
+    def _update_ui_for_victory(self, xp_gained: int) -> None:
+        """Update UI elements after victory with enhanced feedback."""
+        try:
+            victory_message = (
+                "<div class='victory-message' style='text-align: center;'>"
+                "<h3>Victory!</h3>"
+                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
+                "</div>"
+            )
+            
+            # Update UI components
+            updates = {
+                'story_display': lambda: self.story_display.append_text(victory_message) if self.story_display else None,
+                'status_bar': lambda: self.status_bar.showMessage("Victory!") if self.status_bar else None,
+                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
+                'player_panel': lambda: self.player_panel.update_panel() if self.player_panel else None,
+                'action_buttons': lambda: (
+                    self.action_buttons.hide_attack_buttons(),
+                    self.action_buttons.next_button.show()
+                ) if self.action_buttons else None
+            }
+            
+            self._batch_ui_update(updates)
+            
+            # Trigger victory animation if enabled
+            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
+                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
+            
+            logging.info("Victory UI updates completed")
+                
+        except Exception as e:
+            logging.error(f"Error updating UI for victory: {e}")
+            if self.status_bar:
+                self.status_bar.showMessage("Error updating victory display")
+
+    def _validate_battle_start(self) -> bool:
+        """
+        Validate battle start conditions.
+        
+        Checks:
+        - No active battle in progress
+        - Game not paused
+        - UI components ready
+        """
+        if self.battle_state.is_active:
+            logging.warning("Battle already in progress")
+            self._update_status("Battle already in progress")
+            return False
+            
+        if self.paused:
+            logging.warning("Cannot start battle while paused")
+            self._update_status("Game is paused")
+            return False
+            
+        if not all([self.enemy_panel, self.action_buttons, self.status_bar]):
+            logging.warning("UI components not ready")
+            return False
+            
+        return True
+
+    def connect_signals(self, hotkey_listener) -> None:
+        """Connect battle-related hotkey signals."""
+        try:
+            # Store hotkey listener reference
+            self.hotkey_listener = hotkey_listener
+            
+            # Connect attack signals directly
+            hotkey_listener.normal_attack_signal.connect(
+                lambda: self.perform_attack(is_heavy=False)
+            )
+            hotkey_listener.heavy_attack_signal.connect(
+                lambda: self.perform_attack(is_heavy=True)
+            )
+            hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
+            
+            # Mark signals as connected
+            self.signals_connected = True
+            
+            # Update UI if available
+            if self.status_bar:
+                self.status_bar.showMessage("Battle controls ready", 2000)
+            
+            logging.info("Battle hotkeys connected successfully")
+            
+        except Exception as e:
+            logging.error(f"Error connecting battle signals: {e}")
+
+    def set_ui_components(self, 
+                         story_display=None,
+                         enemy_panel=None,
+                         action_buttons=None,
+                         player_panel=None,
+                         status_bar=None,
+                         tasks_left_label=None,
+                         main_window=None) -> None:
+        """Set UI component references."""
+        try:
+            self.story_display = story_display
+            self.enemy_panel = enemy_panel
+            self.action_buttons = action_buttons
+            self.player_panel = player_panel
+            self.status_bar = status_bar
+            self.tasks_left_label = tasks_left_label
+            self.main_window = main_window
+            
+            # Connect UI signals
+            if self.action_buttons:
+                try:
+                    self.action_buttons.attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=False)
+                    )
+                    self.action_buttons.heavy_attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=True)
+                    )
+                    logging.debug("Action buttons signals connected")
+                    
+                    logging.info("UI components set and signals connected")
+                    return True
+                    
+                except Exception as e:
+                    logging.error(f"Error connecting action button signals: {e}")
+                    return False
+            
+            logging.info("UI components set successfully")
+            return True
+        
+        except Exception as e:
+            logging.error(f"Error setting UI components: {e}")
+            return False
+
+    def update_tasks_left(self) -> None:
+        """Update the tasks remaining display."""
+        try:
+            if self.current_enemy and self.tasks_left_label:
+                current_hp = self.battle_state.enemy_hp
+                tasks_left = max(0, current_hp)
+                self.tasks_left_label.setText(str(tasks_left))
+
+                # Update compact window if it exists
+                if self.compact_window:
+                    self.compact_window.update_tasks(tasks_left)
+                    
+            logging.debug(f"Tasks left updated: {tasks_left if 'tasks_left' in locals() else 'None'}")
+                    
+        except Exception as e:
+            logging.error(f"Error updating tasks left: {e}")
+
+    def show_compact_mode(self) -> None:
+        """Show compact battle window."""
+        try:
+            if not self.compact_window and self.is_in_battle():
+                logging.debug("Creating new compact battle window")
+                self.compact_window = CompactBattleWindow()
+                
+                # Position the window
+                screen = QApplication.primaryScreen()
+                screen_geo = screen.availableGeometry()
+                margin = 10
+                x = screen_geo.width() - self.compact_window.width() - margin
+                y = margin
+                self.compact_window.move(x, y)
+                
+                # Initialize pause state before showing window
+                self.compact_window.update_pause_state(self.paused)
+                logging.debug(f"Initialized compact window pause state: {self.paused}")
+                
+                # Update display if we have an enemy
+                if self.current_enemy:
+                    self.compact_window.update_display(self.current_enemy)
+                    logging.debug("Updated compact window with enemy display")
+                
+                # Show and raise window
+                self.compact_window.show()
+                self.compact_window.raise_()
+                
+                # Enable attack hotkeys for compact mode
+                if hasattr(self, 'hotkey_listener'):
+                    self.hotkey_listener.set_attack_hotkeys_enabled(True)
+                    logging.debug("Attack hotkeys enabled for compact mode")
+                
+                # Validate state consistency after showing
+                self._validate_pause_state()
+                
+                logging.info(f"Compact battle window shown and initialized with pause state: {self.paused}")
+                
+        except Exception as e:
+            logging.error(f"Error showing compact window: {e}")
+
+    def hide_compact_mode(self) -> None:
+        """Hide and cleanup compact battle window."""
+        try:
+            if self.compact_window:
+                # Store the current pause state before cleanup
+                was_paused = self.compact_window._is_paused
+                
+                # Cleanup the window
+                self.compact_window.close()
+                self.compact_window.deleteLater()
+                self.compact_window = None
+                
+                # Disable attack hotkeys when compact mode is hidden
+                if hasattr(self, 'hotkey_listener'):
+                    self.hotkey_listener.set_attack_hotkeys_enabled(False)
+                    logging.debug("Attack hotkeys disabled after compact mode")
+                
+                # Ensure main window components reflect the correct pause state
+                self.paused = was_paused
+                if self.enemy_panel:
+                    self.enemy_panel.update_pause_state(was_paused)
+                if self.action_buttons:
+                    self.action_buttons.setEnabled(not was_paused)
+                
+                # Validate state consistency
+                self._validate_pause_state()
+                
+                logging.info(f"Compact battle window hidden and cleaned up. Pause state synchronized: {was_paused}")
+                
+        except Exception as e:
+            logging.error(f"Error hiding compact window: {e}")
+            # Attempt force cleanup
+            self.compact_window = None
+
+    def toggle_pause(self) -> None:
+        """Toggle battle pause state."""
+        try:
+            # FIX: Attempt to repair battle state before toggling pause
+            self.repair_battle_state()
+            
+            # FIX: Make sure battle is marked as active when unpausing
+            if self.paused and self.current_enemy is not None:
+                self.battle_state.is_active = True
+            
+            # Toggle the central pause state
+            self.paused = not self.paused
+            status = "paused" if self.paused else "resumed"
+            logging.debug(f"Toggling pause state to: {status}")
+
+            # Synchronize UI components in a specific order to maintain consistency
+            # 1. First update main window components
+            if self.action_buttons:
+                self.action_buttons.setEnabled(not self.paused)
+                logging.debug("Action buttons pause state updated")
+    
+            if self.enemy_panel:
+                self.enemy_panel.update_pause_state(self.paused)
+                logging.debug("Enemy panel pause state updated")
+
+            # 2. Then update compact window if it exists
+            if self.compact_window:
+                self.compact_window.update_pause_state(self.paused)
+                logging.debug("Compact window pause state updated")
+
+            # 3. Update battle state timing
+            current_time = time.time()
+            if self.paused:
+                self.battle_state.paused_time = current_time
+                self.paused_time = current_time
+            elif self.battle_state.paused_time:
+                pause_duration = current_time - self.battle_state.paused_time
+                self.battle_state.total_pause_duration += pause_duration
+                self.total_pause_duration += pause_duration
+                self.battle_state.paused_time = None
+                self.paused_time = None
+
+            # 4. Validate pause state consistency
+            self._validate_pause_state()
+        
+            self._update_status(f"Battle {status}")
+    
+        except Exception as e:
+            logging.error(f"Error toggling pause: {e}")
+            self._show_error("Failed to toggle pause state")
+
+    def _validate_pause_state(self) -> None:
+        """Validate that pause state is consistent across all components."""
+        try:
+            # Check compact window state
+            if self.compact_window and self.compact_window._is_paused != self.paused:
+                logging.warning("Pause state mismatch detected in compact window")
+                self.compact_window.update_pause_state(self.paused)
+        
+            # Check enemy panel state
+            if self.enemy_panel and hasattr(self.enemy_panel, '_is_paused'):
+                if self.enemy_panel._is_paused != self.paused:
+                    logging.warning("Pause state mismatch detected in enemy panel")
+                    self.enemy_panel.update_pause_state(self.paused)
+        
+            # Check action buttons state
+            if self.action_buttons and self.action_buttons.isEnabled() == self.paused:
+                logging.warning("Action buttons state inconsistent with pause state")
+                self.action_buttons.setEnabled(not self.paused)
+            
+            logging.debug(f"Pause state validation complete. Current state: {self.paused}")
+            
+        except Exception as e:
+            logging.error(f"Error validating pause state: {e}")
+
+    def is_in_battle(self) -> bool:
+        """Check if currently in battle."""
+        return bool(
+            self.battle_state.is_active and 
+            self.current_enemy and 
+            self.battle_state.enemy_hp > 0
+        )
+        
+    # FIX: Add new repair_battle_state method
+    def repair_battle_state(self) -> None:
+        """Attempt to repair inconsistent battle state."""
+        try:
+            # If we have an enemy but battle isn't active, restore state
+            if self.current_enemy is not None and not self.battle_state.is_active:
+                logging.warning("Repairing inconsistent battle state")
+                self.battle_state.is_active = True
+                self.battle_state.enemy_hp = self.current_enemy.current_hp
+                self.battle_state.enemy_max_hp = self.current_enemy.max_hp
+                self.battle_state.enemy_name = self.current_enemy.name
+                self.battle_state.task_name = self.current_enemy.task_name
+                
+                # Update UI to reflect repaired state
+                self._update_battle_ui()
+                self._update_status("Battle state repaired")
+                
+        except Exception as e:
+            logging.error(f"Error repairing battle state: {e}")
+
+    def get_current_enemy(self) -> Optional[Enemy]:
+        """Get the current enemy if any."""
+        return self.current_enemy
+
+    def _update_status(self, message: str) -> None:
+        """Update status bar with message."""
+        if self.status_bar:
+            self.status_bar.showMessage(message)
+
+    def _show_error(self, message: str) -> None:
+        """Show error message to user."""
+        if self.status_bar:
+            self.status_bar.showMessage(message)
+        logging.error(message)
+
+    def end_battle(self) -> None:
+        """End the current battle and clean up."""
+        try:
+            logging.debug("Ending battle")
+            
+            # Update battle state
+            self.battle_state.is_active = False
+            self.current_enemy = None
+            self.battle_state.enemy_hp = 0
+            
+            # Hide compact window
+            self.hide_compact_mode()
+            
+            # Ensure main window is visible and focused
+            if self.main_window:
+                self.main_window.show()
+                self.main_window.raise_()
+                self.main_window.activateWindow()
+                
+                # Release any keyboard grab
+                self.main_window.releaseKeyboard()
+                
+                # Force focus to the main window
+                QTimer.singleShot(100, lambda: (
+                    self.main_window.raise_(),
+                    self.main_window.activateWindow()
+                ))
+            
+            logging.info("Battle ended successfully")
+            
+        except Exception as e:
+            logging.error(f"Error ending battle: {e}")
+            
+    def cleanup(self) -> None:
+        """
+        Clean up battle manager resources with proper state management.
+        
+        Handles:
+        - Window cleanup
+        - State reset
+        - UI updates
+        - Memory cleanup
+        - Signal disconnection
+        """
+        try:
+            logging.info("Starting battle manager cleanup")
+            
+            # Clean up windows
+            self.hide_compact_mode()
+            
+            # Reset state
+            self.battle_state = BattleState()
+            self.current_enemy = None
+            self.paused = False
+            
+            # Release window focus
+            if self.main_window:
+                self.main_window.releaseKeyboard()
+            
+            # Update UI components
+            cleanup_updates = {
+                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
+                'action_buttons': lambda: self.action_buttons.hide_attack_buttons() if self.action_buttons else None,
+                'tasks_left': lambda: self.tasks_left_label.setText("0") if self.tasks_left_label else None
+            }
+            
+            self._batch_ui_update(cleanup_updates)
+            
+            # Disconnect signals if connected
+            if self.signals_connected:
+                self._disconnect_signals()
+            
+            # Clear any remaining timers
+            if hasattr(self, 'active_timers'):
+                for timer in self.active_timers:
+                    timer.stop()
+                self.active_timers.clear()
+            
+            logging.info("Battle manager cleanup complete")
+            
+        except Exception as e:
+            logging.error(f"Error during battle manager cleanup: {e}")
+            # Attempt emergency cleanup
+            self._emergency_cleanup()
+
+    def _emergency_cleanup(self):
+        """Emergency cleanup for critical failures."""
+        try:
+            if self.compact_window:
+                self.compact_window.close()
+                self.compact_window = None
+            
+            if self.main_window:
+                self.main_window.releaseKeyboard()
+                
+            self.battle_state = BattleState()
+            self.current_enemy = None
+            
+            logging.warning("Emergency cleanup performed")
+            
+        except Exception as e:
+            logging.critical(f"Emergency cleanup failed: {e}")
+            
+    def _disconnect_signals(self):
+        """Disconnect all signal connections."""
+        try:
+            # Disconnect UI signals
+            if self.action_buttons:
+                try:
+                    self.action_buttons.attack_clicked.disconnect()
+                    self.action_buttons.heavy_attack_clicked.disconnect()
+                except Exception:
+                    pass
+                    
+            # Clear callbacks
+            self.callbacks = BattleCallbacks()
+            
+            self.signals_connected = False
+            logging.debug("Battle signals disconnected")
+            
+        except Exception as e:
+            logging.error(f"Error disconnecting signals: {e}")
+
+    def register_callbacks(self,
+                          on_battle_start: Optional[Callable] = None,
+                          on_battle_end: Optional[Callable] = None,
+                          on_attack: Optional[Callable] = None,
+                          on_state_change: Optional[Callable] = None,
+                          on_victory: Optional[Callable] = None) -> None:
+        """
+        Register callback functions for battle events.
+        
+        Args:
+            on_battle_start: Called when battle starts
+            on_battle_end: Called when battle ends
+            on_attack: Called when attack performed
+            on_state_change: Called when battle state changes
+            on_victory: Called on victory
+        """
+        try:
+            self.callbacks = BattleCallbacks(
+                on_battle_start=on_battle_start,
+                on_battle_end=on_battle_end,
+                on_attack=on_attack,
+                on_state_change=on_state_change,
+                on_victory=on_victory
+            )
+            
+            logging.debug("Battle callbacks registered")
+            
+        except Exception as e:
+            logging.error(f"Error registering battle callbacks: {e}")
+
+    def _validate_attack(self) -> bool:
+        """Validate attack conditions."""
+        # Check if battle is active first
+        if not self.battle_state.is_active:
+            logging.warning("Attack validation failed: battle is not active")
+            if self.status_bar:
+                self.status_bar.showMessage("No active battle", 2000)
+            return False
+            
+        # Check if enemy exists
+        if self.current_enemy is None:
+            logging.warning("Attack validation failed: no current enemy")
+            if self.status_bar:
+                self.status_bar.showMessage("No enemy to attack", 2000)
+            return False
+            
+        # Check if battle is paused
+        if self.paused:
+            logging.warning("Attack validation failed: battle is paused (press # to unpause)")
+            if self.status_bar:
+                self.status_bar.showMessage("Battle is paused - press # to unpause", 2000)
+            return False
+            
+        # Check if enemy has HP attribute
+        if not hasattr(self.current_enemy, 'current_hp'):
+            logging.warning("Attack validation failed: enemy has no HP attribute")
+            if self.status_bar:
+                self.status_bar.showMessage("Enemy data error", 2000)
+            return False
+        
+        # All validations passed
+        logging.debug("Attack validation successful")
+        return True
+        
+    def _initialize_enemy_hp(self, task: Task) -> int:
+        """Initialize enemy HP based on task."""
+        hp = task.get_hp()
+        logging.debug(f"Initialized enemy HP for task '{task.name}': {hp}")
+        return hp
+        
+    def mark_battle_complete(self, node_key: str):
+        """Mark a battle node as completed."""
+        self.completed_battle_nodes.add(node_key)
+        logging.info(f"Marked battle node {node_key} as completed")
+        
+    def handle_chapter_complete(self) -> None:
+        """Display chapter completion message."""
+        try:
+            completion_message = (
+                "<div style='text-align: center;'>"
+                "<br><b>Chapter Complete!</b><br>"
+                "<p style='margin: 10px 0;'>You have completed all available tasks for now.</p>"
+                "<p style='margin: 10px 0;'>Feel free to start a new chapter or take a break!</p>"
+                "</div>"
+            )
+            
+            if self.story_display:
+                self.story_display.append_text(completion_message)
+                
+            if self.status_bar:
+                self.status_bar.showMessage("Chapter complete!")
+                
+            logging.debug("Chapter completion message displayed")
+            
+        except Exception as e:
+            logging.error(f"Error displaying chapter completion: {e}")
+
+    def _batch_ui_update(self, updates: dict) -> None:
+        """
+        Perform multiple UI updates in a single batch.
+        
+        Args:
+            updates: Dictionary of update functions to execute
+        """
+        try:
+            # Temporarily disable window updates if possible
+            if self.main_window:
+                self.main_window.setUpdatesEnabled(False)
+            
+            # Execute all updates
+            for update_name, update_func in updates.items():
+                try:
+                    update_func()
+                except Exception as e:
+                    logging.error(f"Error in UI update '{update_name}': {e}")
+                    
+        finally:
+            # Re-enable window updates
+            if self.main_window:
+                self.main_window.setUpdatesEnabled(True)
+                self.main_window.repaint()
+
+    def _update_battle_ui(self) -> None:
+        """Update all UI components with current battle state."""
+        try:
+            updates = {
+                'enemy_panel': lambda: self.enemy_panel.update_panel(self.current_enemy) if self.enemy_panel else None,
+                'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
+                'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
+                'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
+                'story_display': lambda: (
+                    self.story_display.story_text.append(
+                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
+                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
+                        "</div>"
+                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
+                ),
+                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
+            }
+            
+            self._batch_ui_update(updates)
+            logging.debug("Battle UI updated successfully")
+                
+        except Exception as e:
+            logging.error(f"Error updating battle UI: {e}")
+            if self.status_bar:
+                self.status_bar.showMessage("Error updating battle display")
+
+    def _update_ui_after_attack(self, was_heavy: bool) -> None:
+        """Update UI components after an attack."""
+        if self.enemy_panel:
+            self.enemy_panel.update_panel(self.current_enemy)
+        if self.compact_window:
+            self.compact_window.update_display(self.current_enemy)
+        self.update_tasks_left()
+        
+        attack_type = "Heavy attack" if was_heavy else "Attack"
+        if self.status_bar:
+            self.status_bar.showMessage(f"{attack_type} landed!")
+
+    def _update_ui_for_victory(self, xp_gained: int) -> None:
+        """Update UI elements after victory with enhanced feedback."""
+        try:
+            victory_message = (
+                "<div class='victory-message' style='text-align: center;'>"
+                "<h3>Victory!</h3>"
+                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
+                "</div>"
+            )
+            
+            # Update UI components
+            updates = {
+                'story_display': lambda: self.story_display.append_text(victory_message) if self.story_display else None,
+                'status_bar': lambda: self.status_bar.showMessage("Victory!") if self.status_bar else None,
+                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
+                'player_panel': lambda: self.player_panel.update_panel() if self.player_panel else None,
+                'action_buttons': lambda: (
+                    self.action_buttons.hide_attack_buttons(),
+                    self.action_buttons.next_button.show()
+                ) if self.action_buttons else None
+            }
+            
+            self._batch_ui_update(updates)
+            
+            # Trigger victory animation if enabled
+            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
+                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
+            
+            logging.info("Victory UI updates completed")
+                
+        except Exception as e:
+            logging.error(f"Error updating UI for victory: {e}")
+            if self.status_bar:
+                self.status_bar.showMessage("Error updating victory display")
+
+    def _validate_battle_start(self) -> bool:
+        """
+        Validate battle start conditions.
+        
+        Checks:
+        - No active battle in progress
+        - Game not paused
+        - UI components ready
+        """
+        if self.battle_state.is_active:
+            logging.warning("Battle already in progress")
+            self._update_status("Battle already in progress")
+            return False
+            
+        if self.paused:
+            logging.warning("Cannot start battle while paused")
+            self._update_status("Game is paused")
+            return False
+            
+        if not all([self.enemy_panel, self.action_buttons, self.status_bar]):
+            logging.warning("UI components not ready")
+            return False
+            
+        return True
+
+    def connect_signals(self, hotkey_listener) -> None:
+        """Connect battle-related hotkey signals."""
+        try:
+            # Store hotkey listener reference
+            self.hotkey_listener = hotkey_listener
+            
+            # Connect attack signals directly
+            hotkey_listener.normal_attack_signal.connect(
+                lambda: self.perform_attack(is_heavy=False)
+            )
+            hotkey_listener.heavy_attack_signal.connect(
+                lambda: self.perform_attack(is_heavy=True)
+            )
+            hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
+            
+            # Mark signals as connected
+            self.signals_connected = True
+            
+            # Update UI if available
+            if self.status_bar:
+                self.status_bar.showMessage("Battle controls ready", 2000)
+            
+            logging.info("Battle hotkeys connected successfully")
+            
+        except Exception as e:
+            logging.error(f"Error connecting battle signals: {e}")
+
+    def set_ui_components(self, 
+                         story_display=None,
+                         enemy_panel=None,
+                         action_buttons=None,
+                         player_panel=None,
+                         status_bar=None,
+                         tasks_left_label=None,
+                         main_window=None) -> None:
+        """Set UI component references."""
+        try:
+            self.story_display = story_display
+            self.enemy_panel = enemy_panel
+            self.action_buttons = action_buttons
+            self.player_panel = player_panel
+            self.status_bar = status_bar
+            self.tasks_left_label = tasks_left_label
+            self.main_window = main_window
+            
+            # Connect UI signals
+            if self.action_buttons:
+                self.action_buttons.connect_signals()
+                logging.debug("Action buttons signals connected")
+            
+            logging.info("UI components set successfully")
+            return True
+                
+        except Exception as e:
+            logging.error(f"Error setting UI components: {e}")

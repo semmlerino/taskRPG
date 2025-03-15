@@ -11,8 +11,9 @@
         159,
         80
     ],
+    "coin_reward": 3,
     "window": {
-        "width": 900,
-        "height": 736
+        "width": 1272,
+        "height": 1093
     }
 }
