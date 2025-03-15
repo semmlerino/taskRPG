@@ -14,7 +14,6 @@ import logging
 import random
 import time
 from typing import Optional, Callable, Dict, Any, Union, List, TYPE_CHECKING, Protocol
-from dataclasses import dataclass
 from enum import Enum, auto
 
 # PyQt5 imports
@@ -25,6 +24,11 @@ from PyQt5.QtCore import Qt, QTimer, QRect, pyqtSignal
 from modules.tasks.task_manager import TaskManager
 from modules.tasks.task import Task
 from modules.players.player import Player
+
+# Project imports: Battle components
+from modules.battle.enemy import Enemy
+from modules.battle.battle_state import BattleState
+from modules.battle.battle_callbacks import BattleCallbacks
 
 # Project imports: UI components
 from modules.ui.components.compact_battle_window import CompactBattleWindow
@@ -43,86 +47,6 @@ class BattleEvent(Enum):
     ATTACK_PERFORMED = auto()
     STATE_CHANGED = auto()
     ENEMY_DEFEATED = auto()
-
-@dataclass
-class Enemy:
-    """Represents an enemy in battle."""
-    name: str
-    max_hp: int
-    task_name: str
-    current_hp: Optional[int] = None
-
-    def __post_init__(self):
-        """Initialize derived values after creation."""
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        logging.debug(f"Enemy initialized - Name: {self.name}, Task: {self.task_name}, Max HP: {self.max_hp}, Current HP: {self.current_hp}")
-
-    def take_damage(self, amount: int) -> None:
-        """Reduce enemy HP by damage amount."""
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        self.current_hp = max(0, self.current_hp - amount)
-        logging.debug(f"{self.name} takes {amount} damage. Current HP: {self.current_hp}")
-
-    def is_defeated(self) -> bool:
-        """Check if enemy is defeated (HP <= 0)."""
-        return self.current_hp <= 0
-
-    def heal(self, amount: int) -> None:
-        """Heal enemy by specified amount, up to max HP."""
-        if self.current_hp is None:
-            self.current_hp = self.max_hp
-        self.current_hp = min(self.max_hp, self.current_hp + amount)
-        logging.debug(f"{self.name} healed for {amount}. Current HP: {self.current_hp}")
-
-@dataclass
-class BattleState:
-    """
-    Tracks the current state of a battle.
-    
-    Attributes:
-        is_active: Whether a battle is currently in progress
-        enemy_hp: Current enemy HP
-        enemy_max_hp: Maximum enemy HP
-        enemy_name: Name of current enemy
-        task_name: Name of associated task
-        battle_start_time: Timestamp when battle started
-        last_attack_time: Timestamp of last attack
-        attacks_performed: Number of attacks performed
-        turns_taken: Number of turns in battle
-        last_attack_type: Type of last attack performed
-        xp_gained: Amount of XP gained in battle
-        paused_time: Timestamp when battle was paused
-        total_pause_duration: Total duration of pauses in current battle
-    """
-    is_active: bool = False
-    enemy_hp: int = 0
-    enemy_max_hp: int = 0
-    enemy_name: str = ""
-    task_name: str = ""
-    battle_start_time: float = 0
-    last_attack_time: float = 0
-    attacks_performed: int = 0
-    turns_taken: int = 0
-    last_attack_type: str = ""
-    xp_gained: int = 0
-    paused_time: Optional[float] = None
-    total_pause_duration: float = 0
-
-    def __post_init__(self):
-        """Validate state after initialization."""
-        if self.enemy_hp is not None and self.enemy_max_hp is not None:
-            self.enemy_hp = max(0, min(self.enemy_hp, self.enemy_max_hp))
-
-@dataclass
-class BattleCallbacks:
-    """Container for battle event callbacks."""
-    on_battle_start: Optional[Callable] = None
-    on_battle_end: Optional[Callable] = None
-    on_attack: Optional[Callable] = None
-    on_state_change: Optional[Callable] = None
-    on_victory: Optional[Callable] = None
 
 class BattleManager:
     """
@@ -662,77 +586,31 @@ class BattleManager:
     def show_compact_mode(self) -> None:
         """Show compact battle window."""
         try:
-            if not self.compact_window and self.is_in_battle():
-                logging.debug("Creating new compact battle window")
+            # Create compact window if it doesn't exist
+            if not self.compact_window:
                 self.compact_window = CompactBattleWindow()
+                self.compact_window.attack_clicked.connect(lambda: self.perform_attack(is_heavy=False))
+                self.compact_window.heavy_attack_clicked.connect(lambda: self.perform_attack(is_heavy=True))
                 
-                # Position the window
-                screen = QApplication.primaryScreen()
-                screen_geo = screen.availableGeometry()
-                margin = 10
-                x = screen_geo.width() - self.compact_window.width() - margin
-                y = margin
-                self.compact_window.move(x, y)
+            # Update with current enemy
+            if self.current_enemy:
+                self.compact_window.update_display(self.current_enemy)
                 
-                # Initialize pause state before showing window
-                self.compact_window.update_pause_state(self.paused)
-                logging.debug(f"Initialized compact window pause state: {self.paused}")
-                
-                # Update display if we have an enemy
-                if self.current_enemy:
-                    self.compact_window.update_display(self.current_enemy)
-                    logging.debug("Updated compact window with enemy display")
-                
-                # Show and raise window
-                self.compact_window.show()
-                self.compact_window.raise_()
-                
-                # Enable attack hotkeys for compact mode
-                if hasattr(self, 'hotkey_listener'):
-                    self.hotkey_listener.set_attack_hotkeys_enabled(True)
-                    logging.debug("Attack hotkeys enabled for compact mode")
-                
-                # Validate state consistency after showing
-                self._validate_pause_state()
-                
-                logging.info(f"Compact battle window shown and initialized with pause state: {self.paused}")
-                
+            # Show and position window
+            self.compact_window.show()
+            self.compact_window.raise_()
+            self.compact_window.activateWindow()
+            
+            logging.info("Compact battle window displayed")
+            
         except Exception as e:
-            logging.error(f"Error showing compact window: {e}")
+            logging.error(f"Error showing compact battle window: {e}")
 
     def hide_compact_mode(self) -> None:
-        """Hide and cleanup compact battle window."""
-        try:
-            if self.compact_window:
-                # Store the current pause state before cleanup
-                was_paused = self.compact_window._is_paused
-                
-                # Cleanup the window
-                self.compact_window.close()
-                self.compact_window.deleteLater()
-                self.compact_window = None
-                
-                # Disable attack hotkeys when compact mode is hidden
-                if hasattr(self, 'hotkey_listener'):
-                    self.hotkey_listener.set_attack_hotkeys_enabled(False)
-                    logging.debug("Attack hotkeys disabled after compact mode")
-                
-                # Ensure main window components reflect the correct pause state
-                self.paused = was_paused
-                if self.enemy_panel:
-                    self.enemy_panel.update_pause_state(was_paused)
-                if self.action_buttons:
-                    self.action_buttons.setEnabled(not was_paused)
-                
-                # Validate state consistency
-                self._validate_pause_state()
-                
-                logging.info(f"Compact battle window hidden and cleaned up. Pause state synchronized: {was_paused}")
-                
-        except Exception as e:
-            logging.error(f"Error hiding compact window: {e}")
-            # Attempt force cleanup
-            self.compact_window = None
+        """Hide compact battle window."""
+        if self.compact_window:
+            self.compact_window.hide()
+            logging.debug("Compact battle window hidden")
 
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
@@ -841,10 +719,10 @@ class BattleManager:
         """Get the current enemy if any."""
         return self.current_enemy
 
-    def _update_status(self, message: str) -> None:
+    def _update_status(self, message: str, timeout: int = 0) -> None:
         """Update status bar with message."""
-        if self.status_bar:
-            self.status_bar.showMessage(message)
+        # Delegate to UI manager
+        self.ui_manager.update_status(message, timeout)
 
     def _show_error(self, message: str) -> None:
         """Show error message to user."""
@@ -981,29 +859,14 @@ class BattleManager:
                           on_attack: Optional[Callable] = None,
                           on_state_change: Optional[Callable] = None,
                           on_victory: Optional[Callable] = None) -> None:
-        """
-        Register callback functions for battle events.
-        
-        Args:
-            on_battle_start: Called when battle starts
-            on_battle_end: Called when battle ends
-            on_attack: Called when attack performed
-            on_state_change: Called when battle state changes
-            on_victory: Called on victory
-        """
-        try:
-            self.callbacks = BattleCallbacks(
-                on_battle_start=on_battle_start,
-                on_battle_end=on_battle_end,
-                on_attack=on_attack,
-                on_state_change=on_state_change,
-                on_victory=on_victory
-            )
-            
-            logging.debug("Battle callbacks registered")
-            
-        except Exception as e:
-            logging.error(f"Error registering battle callbacks: {e}")
+        """Register callback functions for battle events."""
+        self.callbacks.register(
+            on_battle_start=on_battle_start,
+            on_battle_end=on_battle_end,
+            on_attack=on_attack,
+            on_state_change=on_state_change,
+            on_victory=on_victory
+        )
 
     def _validate_attack(self) -> bool:
         """Validate attack conditions."""
@@ -1061,12 +924,13 @@ class BattleManager:
                 "</div>"
             )
             
-            if self.story_display:
-                self.story_display.append_text(completion_message)
-                
-            if self.status_bar:
-                self.status_bar.showMessage("Chapter complete!")
-                
+            # Use UI manager to update UI components
+            updates = {
+                'story_display': lambda: self.story_display.append_text(completion_message) if self.story_display else None,
+                'status_bar': lambda: self.status_bar.showMessage("Chapter complete!") if self.status_bar else None
+            }
+            
+            self.ui_manager.batch_ui_update(updates)
             logging.debug("Chapter completion message displayed")
             
         except Exception as e:
@@ -1285,77 +1149,31 @@ class BattleManager:
     def show_compact_mode(self) -> None:
         """Show compact battle window."""
         try:
-            if not self.compact_window and self.is_in_battle():
-                logging.debug("Creating new compact battle window")
+            # Create compact window if it doesn't exist
+            if not self.compact_window:
                 self.compact_window = CompactBattleWindow()
+                self.compact_window.attack_clicked.connect(lambda: self.perform_attack(is_heavy=False))
+                self.compact_window.heavy_attack_clicked.connect(lambda: self.perform_attack(is_heavy=True))
                 
-                # Position the window
-                screen = QApplication.primaryScreen()
-                screen_geo = screen.availableGeometry()
-                margin = 10
-                x = screen_geo.width() - self.compact_window.width() - margin
-                y = margin
-                self.compact_window.move(x, y)
+            # Update with current enemy
+            if self.current_enemy:
+                self.compact_window.update_display(self.current_enemy)
                 
-                # Initialize pause state before showing window
-                self.compact_window.update_pause_state(self.paused)
-                logging.debug(f"Initialized compact window pause state: {self.paused}")
-                
-                # Update display if we have an enemy
-                if self.current_enemy:
-                    self.compact_window.update_display(self.current_enemy)
-                    logging.debug("Updated compact window with enemy display")
-                
-                # Show and raise window
-                self.compact_window.show()
-                self.compact_window.raise_()
-                
-                # Enable attack hotkeys for compact mode
-                if hasattr(self, 'hotkey_listener'):
-                    self.hotkey_listener.set_attack_hotkeys_enabled(True)
-                    logging.debug("Attack hotkeys enabled for compact mode")
-                
-                # Validate state consistency after showing
-                self._validate_pause_state()
-                
-                logging.info(f"Compact battle window shown and initialized with pause state: {self.paused}")
-                
+            # Show and position window
+            self.compact_window.show()
+            self.compact_window.raise_()
+            self.compact_window.activateWindow()
+            
+            logging.info("Compact battle window displayed")
+            
         except Exception as e:
-            logging.error(f"Error showing compact window: {e}")
+            logging.error(f"Error showing compact battle window: {e}")
 
     def hide_compact_mode(self) -> None:
-        """Hide and cleanup compact battle window."""
-        try:
-            if self.compact_window:
-                # Store the current pause state before cleanup
-                was_paused = self.compact_window._is_paused
-                
-                # Cleanup the window
-                self.compact_window.close()
-                self.compact_window.deleteLater()
-                self.compact_window = None
-                
-                # Disable attack hotkeys when compact mode is hidden
-                if hasattr(self, 'hotkey_listener'):
-                    self.hotkey_listener.set_attack_hotkeys_enabled(False)
-                    logging.debug("Attack hotkeys disabled after compact mode")
-                
-                # Ensure main window components reflect the correct pause state
-                self.paused = was_paused
-                if self.enemy_panel:
-                    self.enemy_panel.update_pause_state(was_paused)
-                if self.action_buttons:
-                    self.action_buttons.setEnabled(not was_paused)
-                
-                # Validate state consistency
-                self._validate_pause_state()
-                
-                logging.info(f"Compact battle window hidden and cleaned up. Pause state synchronized: {was_paused}")
-                
-        except Exception as e:
-            logging.error(f"Error hiding compact window: {e}")
-            # Attempt force cleanup
-            self.compact_window = None
+        """Hide compact battle window."""
+        if self.compact_window:
+            self.compact_window.hide()
+            logging.debug("Compact battle window hidden")
 
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
@@ -1464,10 +1282,10 @@ class BattleManager:
         """Get the current enemy if any."""
         return self.current_enemy
 
-    def _update_status(self, message: str) -> None:
+    def _update_status(self, message: str, timeout: int = 0) -> None:
         """Update status bar with message."""
-        if self.status_bar:
-            self.status_bar.showMessage(message)
+        # Delegate to UI manager
+        self.ui_manager.update_status(message, timeout)
 
     def _show_error(self, message: str) -> None:
         """Show error message to user."""
@@ -1604,29 +1422,14 @@ class BattleManager:
                           on_attack: Optional[Callable] = None,
                           on_state_change: Optional[Callable] = None,
                           on_victory: Optional[Callable] = None) -> None:
-        """
-        Register callback functions for battle events.
-        
-        Args:
-            on_battle_start: Called when battle starts
-            on_battle_end: Called when battle ends
-            on_attack: Called when attack performed
-            on_state_change: Called when battle state changes
-            on_victory: Called on victory
-        """
-        try:
-            self.callbacks = BattleCallbacks(
-                on_battle_start=on_battle_start,
-                on_battle_end=on_battle_end,
-                on_attack=on_attack,
-                on_state_change=on_state_change,
-                on_victory=on_victory
-            )
-            
-            logging.debug("Battle callbacks registered")
-            
-        except Exception as e:
-            logging.error(f"Error registering battle callbacks: {e}")
+        """Register callback functions for battle events."""
+        self.callbacks.register(
+            on_battle_start=on_battle_start,
+            on_battle_end=on_battle_end,
+            on_attack=on_attack,
+            on_state_change=on_state_change,
+            on_victory=on_victory
+        )
 
     def _validate_attack(self) -> bool:
         """Validate attack conditions."""
@@ -1684,12 +1487,13 @@ class BattleManager:
                 "</div>"
             )
             
-            if self.story_display:
-                self.story_display.append_text(completion_message)
-                
-            if self.status_bar:
-                self.status_bar.showMessage("Chapter complete!")
-                
+            # Use UI manager to update UI components
+            updates = {
+                'story_display': lambda: self.story_display.append_text(completion_message) if self.story_display else None,
+                'status_bar': lambda: self.status_bar.showMessage("Chapter complete!") if self.status_bar else None
+            }
+            
+            self.ui_manager.batch_ui_update(updates)
             logging.debug("Chapter completion message displayed")
             
         except Exception as e:
@@ -1865,11 +1669,77 @@ class BattleManager:
             
             # Connect UI signals
             if self.action_buttons:
-                self.action_buttons.connect_signals()
-                logging.debug("Action buttons signals connected")
+                try:
+                    self.action_buttons.attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=False)
+                    )
+                    self.action_buttons.heavy_attack_clicked.connect(
+                        lambda: self.perform_attack(is_heavy=True)
+                    )
+                    logging.debug("Action buttons signals connected")
+                    
+                    logging.info("UI components set and signals connected")
+                    return True
+                    
+                except Exception as e:
+                    logging.error(f"Error connecting action button signals: {e}")
+                    return False
             
             logging.info("UI components set successfully")
             return True
                 
         except Exception as e:
             logging.error(f"Error setting UI components: {e}")
+            return False
+
+    def update_tasks_left(self) -> None:
+        """Update the tasks remaining display."""
+        try:
+            if self.current_enemy and self.tasks_left_label:
+                current_hp = self.battle_state.enemy_hp
+                tasks_left = max(0, current_hp)
+                self.tasks_left_label.setText(str(tasks_left))
+
+                # Update compact window if it exists
+                if self.compact_window:
+                    self.compact_window.update_tasks(tasks_left)
+                    
+            logging.debug(f"Tasks left updated: {tasks_left if 'tasks_left' in locals() else 'None'}")
+                    
+        except Exception as e:
+            logging.error(f"Error updating tasks left: {e}")
+
+    def show_compact_mode(self) -> None:
+        """Show compact battle window."""
+        try:
+            if not self.compact_window and self.is_in_battle():
+                logging.debug("Creating new compact battle window")
+                self.compact_window = CompactBattleWindow()
+                
+                # Position the window
+                screen = QApplication.primaryScreen()
+                screen_geo = screen.availableGeometry()
+                margin = 10
+                x = screen_geo.width() - self.compact_window.width() - margin
+                y = margin
+                self.compact_window.move(x, y)
+                
+                # Initialize pause state before showing window
+                self.compact_window.update_pause_state(self.paused)
+                logging.debug(f"Initialized compact window pause state: {self.paused}")
+                
+                # Update display if we have an enemy
+                if self.current_enemy:
+                    self.compact_window.update_display(self.current_enemy)
+                    logging.debug("Updated compact window with enemy display")
+                
+                # Show and raise window
+                self.compact_window.show()
+                self.compact_window.raise_()
+                
+                # Enable attack hotkeys for compact mode
+                if hasattr(self, 'hotkey_listener'):
+                    self.hotkey_listener.enable()
+                    logging.debug("Enabled hotkeys for compact mode")
+        except Exception as e:
+            logging.error(f"Error showing compact mode: {e}")

@@ -184,7 +184,7 @@
         "next_activation_time": 1742085740.1192236,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1742063489.62741
+        "muted_until": null
     },
     "UKP": {
         "min": 1,
@@ -261,7 +261,8 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 1,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "04:50"
     },
     "Beard": {
         "min": 1,
