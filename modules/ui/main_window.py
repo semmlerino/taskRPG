@@ -1131,7 +1131,7 @@ class TaskRPG(QMainWindow):
     def check_task_activations(self):
         """Check for task activations and update UI if needed"""
         if self.task_manager.check_task_activations():
-            self.update_task_list()  # Refresh the task list if any tasks were activated
+            self.update_tasks_left()  # Refresh the task list if any tasks were activated
 
 
 if __name__ == "__main__":

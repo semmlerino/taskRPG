@@ -29,6 +29,7 @@ from modules.players.player import Player
 from modules.battle.enemy import Enemy
 from modules.battle.battle_state import BattleState
 from modules.battle.battle_callbacks import BattleCallbacks
+from modules.battle.ui.battle_ui_manager import BattleUIManager
 
 # Project imports: UI components
 from modules.ui.components.compact_battle_window import CompactBattleWindow
@@ -67,6 +68,9 @@ class BattleManager:
         self.current_enemy: Optional[Enemy] = None
         self.paused: bool = False
         self.callbacks = BattleCallbacks()
+        
+        # Initialize UI Manager
+        self.ui_manager = BattleUIManager()
         
         # UI Components (set later via set_ui_components)
         self.story_display: Optional['StoryDisplay'] = None
@@ -376,100 +380,41 @@ class BattleManager:
     def _batch_ui_update(self, updates: dict) -> None:
         """
         Perform multiple UI updates in a single batch.
+        Delegates to the UI manager's batch_ui_update method.
         
         Args:
             updates: Dictionary of update functions to execute
         """
-        try:
-            # Temporarily disable window updates if possible
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(False)
-            
-            # Execute all updates
-            for update_name, update_func in updates.items():
-                try:
-                    update_func()
-                except Exception as e:
-                    logging.error(f"Error in UI update '{update_name}': {e}")
-                    
-        finally:
-            # Re-enable window updates
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(True)
-                self.main_window.repaint()
+        # Delegate to UI manager
+        self.ui_manager.batch_ui_update(updates)
 
     def _update_battle_ui(self) -> None:
-        """Update all UI components with current battle state."""
+        """Update all UI components with current battle state using the UI manager."""
         try:
-            updates = {
-                'enemy_panel': lambda: self.enemy_panel.update_panel(self.current_enemy) if self.enemy_panel else None,
-                'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
-                'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
-                'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
-                'story_display': lambda: (
-                    self.story_display.story_text.append(
-                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
-                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
-                        "</div>"
-                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
-                ),
-                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
-            }
+            # Ensure compact window is initialized if needed
+            if not self.compact_window and hasattr(self, 'show_compact_mode'):
+                self.show_compact_mode(self.current_enemy, self.perform_attack, lambda: self.perform_attack(True))
             
-            self._batch_ui_update(updates)
-            logging.debug("Battle UI updated successfully")
-                
+            # Delegate to UI manager
+            self.ui_manager.update_battle_ui(self.current_enemy)
+            
+            # Log successful update
+            logging.debug("Battle UI updated successfully via UI manager")
+            
         except Exception as e:
-            logging.error(f"Error updating battle UI: {e}")
+            logging.error(f"Error in _update_battle_ui: {e}")
             if self.status_bar:
-                self.status_bar.showMessage("Error updating battle display")
+                self.status_bar.showMessage("Error updating battle UI")
 
     def _update_ui_after_attack(self, was_heavy: bool) -> None:
-        """Update UI components after an attack."""
-        if self.enemy_panel:
-            self.enemy_panel.update_panel(self.current_enemy)
-        if self.compact_window:
-            self.compact_window.update_display(self.current_enemy)
-        self.update_tasks_left()
-        
-        attack_type = "Heavy attack" if was_heavy else "Attack"
-        if self.status_bar:
-            self.status_bar.showMessage(f"{attack_type} landed!")
+        """Update UI components after an attack using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_after_attack(self.current_enemy, was_heavy)
 
     def _update_ui_for_victory(self, xp_gained: int) -> None:
-        """Update UI elements after victory with enhanced feedback."""
-        try:
-            victory_message = (
-                "<div class='victory-message' style='text-align: center;'>"
-                "<h3>Victory!</h3>"
-                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
-                "</div>"
-            )
-            
-            # Update UI components
-            updates = {
-                'story_display': lambda: self.story_display.append_text(victory_message) if self.story_display else None,
-                'status_bar': lambda: self.status_bar.showMessage("Victory!") if self.status_bar else None,
-                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
-                'player_panel': lambda: self.player_panel.update_panel() if self.player_panel else None,
-                'action_buttons': lambda: (
-                    self.action_buttons.hide_attack_buttons(),
-                    self.action_buttons.next_button.show()
-                ) if self.action_buttons else None
-            }
-            
-            self._batch_ui_update(updates)
-            
-            # Trigger victory animation if enabled
-            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
-                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
-            
-            logging.info("Victory UI updates completed")
-                
-        except Exception as e:
-            logging.error(f"Error updating UI for victory: {e}")
-            if self.status_bar:
-                self.status_bar.showMessage("Error updating victory display")
+        """Update UI elements after victory with enhanced feedback using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_for_victory(xp_gained, self.coin_reward)
 
     def _validate_battle_start(self) -> bool:
         """
@@ -490,8 +435,19 @@ class BattleManager:
             self._update_status("Game is paused")
             return False
             
-        if not all([self.enemy_panel, self.action_buttons, self.status_bar]):
+        # Check both battle manager and UI manager components
+        battle_manager_ui_ready = all([self.enemy_panel, self.action_buttons, self.status_bar])
+        ui_manager_ui_ready = all([self.ui_manager.enemy_panel, self.ui_manager.action_buttons, self.ui_manager.status_bar])
+        
+        if not (battle_manager_ui_ready and ui_manager_ui_ready):
             logging.warning("UI components not ready")
+            # Log which components are missing for debugging
+            if not battle_manager_ui_ready:
+                logging.debug(f"Battle manager UI components missing: enemy_panel={bool(self.enemy_panel)}, "
+                             f"action_buttons={bool(self.action_buttons)}, status_bar={bool(self.status_bar)}")
+            if not ui_manager_ui_ready:
+                logging.debug(f"UI manager components missing: enemy_panel={bool(self.ui_manager.enemy_panel)}, "
+                             f"action_buttons={bool(self.ui_manager.action_buttons)}, status_bar={bool(self.ui_manager.status_bar)}")
             return False
             
         return True
@@ -533,6 +489,7 @@ class BattleManager:
                          main_window=None) -> None:
         """Set UI component references."""
         try:
+            # Set components in the BattleManager
             self.story_display = story_display
             self.enemy_panel = enemy_panel
             self.action_buttons = action_buttons
@@ -540,6 +497,18 @@ class BattleManager:
             self.status_bar = status_bar
             self.tasks_left_label = tasks_left_label
             self.main_window = main_window
+            
+            # Also set components in the UI Manager
+            self.ui_manager.set_ui_components(
+                story_display=story_display,
+                enemy_panel=enemy_panel,
+                action_buttons=action_buttons,
+                player_panel=player_panel,
+                status_bar=status_bar,
+                tasks_left_label=tasks_left_label,
+                main_window=main_window,
+                compact_window=self.compact_window
+            )
             
             # Connect UI signals
             if self.action_buttons:
@@ -567,50 +536,28 @@ class BattleManager:
             return False
 
     def update_tasks_left(self) -> None:
-        """Update the tasks remaining display."""
-        try:
-            if self.current_enemy and self.tasks_left_label:
-                current_hp = self.battle_state.enemy_hp
-                tasks_left = max(0, current_hp)
-                self.tasks_left_label.setText(str(tasks_left))
-
-                # Update compact window if it exists
-                if self.compact_window:
-                    self.compact_window.update_tasks(tasks_left)
-                    
-            logging.debug(f"Tasks left updated: {tasks_left if 'tasks_left' in locals() else 'None'}")
-                    
-        except Exception as e:
-            logging.error(f"Error updating tasks left: {e}")
+        """Update the tasks remaining display using the UI manager."""
+        if self.current_enemy:
+            # Delegate to UI manager
+            self.ui_manager.update_tasks_left(self.current_enemy)
 
     def show_compact_mode(self) -> None:
-        """Show compact battle window."""
-        try:
-            # Create compact window if it doesn't exist
-            if not self.compact_window:
-                self.compact_window = CompactBattleWindow()
-                self.compact_window.attack_clicked.connect(lambda: self.perform_attack(is_heavy=False))
-                self.compact_window.heavy_attack_clicked.connect(lambda: self.perform_attack(is_heavy=True))
-                
-            # Update with current enemy
-            if self.current_enemy:
-                self.compact_window.update_display(self.current_enemy)
-                
-            # Show and position window
-            self.compact_window.show()
-            self.compact_window.raise_()
-            self.compact_window.activateWindow()
-            
-            logging.info("Compact battle window displayed")
-            
-        except Exception as e:
-            logging.error(f"Error showing compact battle window: {e}")
+        """Show compact battle window using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.show_compact_mode(
+            self.current_enemy,
+            lambda: self.perform_attack(is_heavy=False),
+            lambda: self.perform_attack(is_heavy=True)
+        )
+        # Store reference to compact window for other methods
+        self.compact_window = self.ui_manager.compact_window
 
     def hide_compact_mode(self) -> None:
-        """Hide compact battle window."""
-        if self.compact_window:
-            self.compact_window.hide()
-            logging.debug("Compact battle window hidden")
+        """Hide compact battle window using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.hide_compact_mode()
+        # Keep reference in sync
+        self.compact_window = self.ui_manager.compact_window
 
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
@@ -627,22 +574,10 @@ class BattleManager:
             status = "paused" if self.paused else "resumed"
             logging.debug(f"Toggling pause state to: {status}")
 
-            # Synchronize UI components in a specific order to maintain consistency
-            # 1. First update main window components
-            if self.action_buttons:
-                self.action_buttons.setEnabled(not self.paused)
-                logging.debug("Action buttons pause state updated")
-    
-            if self.enemy_panel:
-                self.enemy_panel.update_pause_state(self.paused)
-                logging.debug("Enemy panel pause state updated")
+            # Update UI components using the UI manager
+            self.ui_manager.update_pause_state(self.paused)
 
-            # 2. Then update compact window if it exists
-            if self.compact_window:
-                self.compact_window.update_pause_state(self.paused)
-                logging.debug("Compact window pause state updated")
-
-            # 3. Update battle state timing
+            # Update battle state timing
             current_time = time.time()
             if self.paused:
                 self.battle_state.paused_time = current_time
@@ -654,7 +589,7 @@ class BattleManager:
                 self.battle_state.paused_time = None
                 self.paused_time = None
 
-            # 4. Validate pause state consistency
+            # Validate pause state consistency
             self._validate_pause_state()
         
             self._update_status(f"Battle {status}")
@@ -725,10 +660,9 @@ class BattleManager:
         self.ui_manager.update_status(message, timeout)
 
     def _show_error(self, message: str) -> None:
-        """Show error message to user."""
-        if self.status_bar:
-            self.status_bar.showMessage(message)
-        logging.error(message)
+        """Show error message to user using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.show_error(message)
 
     def end_battle(self) -> None:
         """End the current battle and clean up."""
@@ -740,28 +674,14 @@ class BattleManager:
             self.current_enemy = None
             self.battle_state.enemy_hp = 0
             
-            # Hide compact window
-            self.hide_compact_mode()
-            
-            # Ensure main window is visible and focused
-            if self.main_window:
-                self.main_window.show()
-                self.main_window.raise_()
-                self.main_window.activateWindow()
-                
-                # Release any keyboard grab
-                self.main_window.releaseKeyboard()
-                
-                # Force focus to the main window
-                QTimer.singleShot(100, lambda: (
-                    self.main_window.raise_(),
-                    self.main_window.activateWindow()
-                ))
+            # Update UI components using the UI manager
+            self.ui_manager.update_ui_for_battle_end()
             
             logging.info("Battle ended successfully")
             
         except Exception as e:
             logging.error(f"Error ending battle: {e}")
+            self._show_error("Error ending battle")
             
     def cleanup(self) -> None:
         """
@@ -777,26 +697,13 @@ class BattleManager:
         try:
             logging.info("Starting battle manager cleanup")
             
-            # Clean up windows
-            self.hide_compact_mode()
+            # Clean up UI components using the UI manager
+            self.ui_manager.cleanup_ui()
             
             # Reset state
             self.battle_state = BattleState()
             self.current_enemy = None
             self.paused = False
-            
-            # Release window focus
-            if self.main_window:
-                self.main_window.releaseKeyboard()
-            
-            # Update UI components
-            cleanup_updates = {
-                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
-                'action_buttons': lambda: self.action_buttons.hide_attack_buttons() if self.action_buttons else None,
-                'tasks_left': lambda: self.tasks_left_label.setText("0") if self.tasks_left_label else None
-            }
-            
-            self._batch_ui_update(cleanup_updates)
             
             # Disconnect signals if connected
             if self.signals_connected:
@@ -818,13 +725,10 @@ class BattleManager:
     def _emergency_cleanup(self):
         """Emergency cleanup for critical failures."""
         try:
-            if self.compact_window:
-                self.compact_window.close()
-                self.compact_window = None
+            # Delegate UI emergency cleanup to UI manager
+            self.ui_manager.emergency_cleanup_ui()
             
-            if self.main_window:
-                self.main_window.releaseKeyboard()
-                
+            # Reset state
             self.battle_state = BattleState()
             self.current_enemy = None
             
@@ -914,125 +818,53 @@ class BattleManager:
         logging.info(f"Marked battle node {node_key} as completed")
         
     def handle_chapter_complete(self) -> None:
-        """Display chapter completion message."""
+        """Display chapter completion message using the UI manager."""
         try:
-            completion_message = (
-                "<div style='text-align: center;'>"
-                "<br><b>Chapter Complete!</b><br>"
-                "<p style='margin: 10px 0;'>You have completed all available tasks for now.</p>"
-                "<p style='margin: 10px 0;'>Feel free to start a new chapter or take a break!</p>"
-                "</div>"
-            )
-            
-            # Use UI manager to update UI components
-            updates = {
-                'story_display': lambda: self.story_display.append_text(completion_message) if self.story_display else None,
-                'status_bar': lambda: self.status_bar.showMessage("Chapter complete!") if self.status_bar else None
-            }
-            
-            self.ui_manager.batch_ui_update(updates)
-            logging.debug("Chapter completion message displayed")
+            # Delegate to UI manager
+            self.ui_manager.handle_chapter_complete()
+            logging.debug("Chapter completion delegated to UI manager")
             
         except Exception as e:
-            logging.error(f"Error displaying chapter completion: {e}")
+            logging.error(f"Error handling chapter completion: {e}")
 
     def _batch_ui_update(self, updates: dict) -> None:
         """
         Perform multiple UI updates in a single batch.
+        Delegates to the UI manager's batch_ui_update method.
         
         Args:
             updates: Dictionary of update functions to execute
         """
-        try:
-            # Temporarily disable window updates if possible
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(False)
-            
-            # Execute all updates
-            for update_name, update_func in updates.items():
-                try:
-                    update_func()
-                except Exception as e:
-                    logging.error(f"Error in UI update '{update_name}': {e}")
-                    
-        finally:
-            # Re-enable window updates
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(True)
-                self.main_window.repaint()
+        # Delegate to UI manager
+        self.ui_manager.batch_ui_update(updates)
 
     def _update_battle_ui(self) -> None:
-        """Update all UI components with current battle state."""
+        """Update all UI components with current battle state using the UI manager."""
         try:
-            updates = {
-                'enemy_panel': lambda: self.enemy_panel.update_panel(self.current_enemy) if self.enemy_panel else None,
-                'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
-                'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
-                'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
-                'story_display': lambda: (
-                    self.story_display.story_text.append(
-                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
-                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
-                        "</div>"
-                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
-                ),
-                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
-            }
+            # Ensure compact window is initialized if needed
+            if not self.compact_window and hasattr(self, 'show_compact_mode'):
+                self.show_compact_mode(self.current_enemy, self.perform_attack, lambda: self.perform_attack(True))
             
-            self._batch_ui_update(updates)
-            logging.debug("Battle UI updated successfully")
-                
+            # Delegate to UI manager
+            self.ui_manager.update_battle_ui(self.current_enemy)
+            
+            # Log successful update
+            logging.debug("Battle UI updated successfully via UI manager")
+            
         except Exception as e:
-            logging.error(f"Error updating battle UI: {e}")
+            logging.error(f"Error in _update_battle_ui: {e}")
             if self.status_bar:
-                self.status_bar.showMessage("Error updating battle display")
+                self.status_bar.showMessage("Error updating battle UI")
 
     def _update_ui_after_attack(self, was_heavy: bool) -> None:
-        """Update UI components after an attack."""
-        if self.enemy_panel:
-            self.enemy_panel.update_panel(self.current_enemy)
-        if self.compact_window:
-            self.compact_window.update_display(self.current_enemy)
-        self.update_tasks_left()
-        
-        attack_type = "Heavy attack" if was_heavy else "Attack"
-        if self.status_bar:
-            self.status_bar.showMessage(f"{attack_type} landed!")
+        """Update UI components after an attack using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_after_attack(self.current_enemy, was_heavy)
 
     def _update_ui_for_victory(self, xp_gained: int) -> None:
-        """Update UI elements after victory with enhanced feedback."""
-        try:
-            victory_message = (
-                "<div class='victory-message' style='text-align: center;'>"
-                "<h3>Victory!</h3>"
-                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
-                "</div>"
-            )
-            
-            # Update UI components
-            updates = {
-                'story_display': lambda: self.story_display.append_text(victory_message) if self.story_display else None,
-                'status_bar': lambda: self.status_bar.showMessage("Victory!") if self.status_bar else None,
-                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
-                'player_panel': lambda: self.player_panel.update_panel() if self.player_panel else None,
-                'action_buttons': lambda: (
-                    self.action_buttons.hide_attack_buttons(),
-                    self.action_buttons.next_button.show()
-                ) if self.action_buttons else None
-            }
-            
-            self._batch_ui_update(updates)
-            
-            # Trigger victory animation if enabled
-            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
-                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
-            
-            logging.info("Victory UI updates completed")
-                
-        except Exception as e:
-            logging.error(f"Error updating UI for victory: {e}")
-            if self.status_bar:
-                self.status_bar.showMessage("Error updating victory display")
+        """Update UI elements after victory with enhanced feedback using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_for_victory(xp_gained, self.coin_reward)
 
     def _validate_battle_start(self) -> bool:
         """
@@ -1053,8 +885,19 @@ class BattleManager:
             self._update_status("Game is paused")
             return False
             
-        if not all([self.enemy_panel, self.action_buttons, self.status_bar]):
+        # Check both battle manager and UI manager components
+        battle_manager_ui_ready = all([self.enemy_panel, self.action_buttons, self.status_bar])
+        ui_manager_ui_ready = all([self.ui_manager.enemy_panel, self.ui_manager.action_buttons, self.ui_manager.status_bar])
+        
+        if not (battle_manager_ui_ready and ui_manager_ui_ready):
             logging.warning("UI components not ready")
+            # Log which components are missing for debugging
+            if not battle_manager_ui_ready:
+                logging.debug(f"Battle manager UI components missing: enemy_panel={bool(self.enemy_panel)}, "
+                             f"action_buttons={bool(self.action_buttons)}, status_bar={bool(self.status_bar)}")
+            if not ui_manager_ui_ready:
+                logging.debug(f"UI manager components missing: enemy_panel={bool(self.ui_manager.enemy_panel)}, "
+                             f"action_buttons={bool(self.ui_manager.action_buttons)}, status_bar={bool(self.ui_manager.status_bar)}")
             return False
             
         return True
@@ -1096,6 +939,7 @@ class BattleManager:
                          main_window=None) -> None:
         """Set UI component references."""
         try:
+            # Set components in the BattleManager
             self.story_display = story_display
             self.enemy_panel = enemy_panel
             self.action_buttons = action_buttons
@@ -1103,6 +947,18 @@ class BattleManager:
             self.status_bar = status_bar
             self.tasks_left_label = tasks_left_label
             self.main_window = main_window
+            
+            # Also set components in the UI Manager
+            self.ui_manager.set_ui_components(
+                story_display=story_display,
+                enemy_panel=enemy_panel,
+                action_buttons=action_buttons,
+                player_panel=player_panel,
+                status_bar=status_bar,
+                tasks_left_label=tasks_left_label,
+                main_window=main_window,
+                compact_window=self.compact_window
+            )
             
             # Connect UI signals
             if self.action_buttons:
@@ -1130,50 +986,28 @@ class BattleManager:
             return False
 
     def update_tasks_left(self) -> None:
-        """Update the tasks remaining display."""
-        try:
-            if self.current_enemy and self.tasks_left_label:
-                current_hp = self.battle_state.enemy_hp
-                tasks_left = max(0, current_hp)
-                self.tasks_left_label.setText(str(tasks_left))
-
-                # Update compact window if it exists
-                if self.compact_window:
-                    self.compact_window.update_tasks(tasks_left)
-                    
-            logging.debug(f"Tasks left updated: {tasks_left if 'tasks_left' in locals() else 'None'}")
-                    
-        except Exception as e:
-            logging.error(f"Error updating tasks left: {e}")
+        """Update the tasks remaining display using the UI manager."""
+        if self.current_enemy:
+            # Delegate to UI manager
+            self.ui_manager.update_tasks_left(self.current_enemy)
 
     def show_compact_mode(self) -> None:
-        """Show compact battle window."""
-        try:
-            # Create compact window if it doesn't exist
-            if not self.compact_window:
-                self.compact_window = CompactBattleWindow()
-                self.compact_window.attack_clicked.connect(lambda: self.perform_attack(is_heavy=False))
-                self.compact_window.heavy_attack_clicked.connect(lambda: self.perform_attack(is_heavy=True))
-                
-            # Update with current enemy
-            if self.current_enemy:
-                self.compact_window.update_display(self.current_enemy)
-                
-            # Show and position window
-            self.compact_window.show()
-            self.compact_window.raise_()
-            self.compact_window.activateWindow()
-            
-            logging.info("Compact battle window displayed")
-            
-        except Exception as e:
-            logging.error(f"Error showing compact battle window: {e}")
+        """Show compact battle window using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.show_compact_mode(
+            self.current_enemy,
+            lambda: self.perform_attack(is_heavy=False),
+            lambda: self.perform_attack(is_heavy=True)
+        )
+        # Store reference to compact window for other methods
+        self.compact_window = self.ui_manager.compact_window
 
     def hide_compact_mode(self) -> None:
-        """Hide compact battle window."""
-        if self.compact_window:
-            self.compact_window.hide()
-            logging.debug("Compact battle window hidden")
+        """Hide compact battle window using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.hide_compact_mode()
+        # Keep reference in sync
+        self.compact_window = self.ui_manager.compact_window
 
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
@@ -1190,22 +1024,10 @@ class BattleManager:
             status = "paused" if self.paused else "resumed"
             logging.debug(f"Toggling pause state to: {status}")
 
-            # Synchronize UI components in a specific order to maintain consistency
-            # 1. First update main window components
-            if self.action_buttons:
-                self.action_buttons.setEnabled(not self.paused)
-                logging.debug("Action buttons pause state updated")
-    
-            if self.enemy_panel:
-                self.enemy_panel.update_pause_state(self.paused)
-                logging.debug("Enemy panel pause state updated")
+            # Update UI components using the UI manager
+            self.ui_manager.update_pause_state(self.paused)
 
-            # 2. Then update compact window if it exists
-            if self.compact_window:
-                self.compact_window.update_pause_state(self.paused)
-                logging.debug("Compact window pause state updated")
-
-            # 3. Update battle state timing
+            # Update battle state timing
             current_time = time.time()
             if self.paused:
                 self.battle_state.paused_time = current_time
@@ -1217,7 +1039,7 @@ class BattleManager:
                 self.battle_state.paused_time = None
                 self.paused_time = None
 
-            # 4. Validate pause state consistency
+            # Validate pause state consistency
             self._validate_pause_state()
         
             self._update_status(f"Battle {status}")
@@ -1288,10 +1110,9 @@ class BattleManager:
         self.ui_manager.update_status(message, timeout)
 
     def _show_error(self, message: str) -> None:
-        """Show error message to user."""
-        if self.status_bar:
-            self.status_bar.showMessage(message)
-        logging.error(message)
+        """Show error message to user using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.show_error(message)
 
     def end_battle(self) -> None:
         """End the current battle and clean up."""
@@ -1303,28 +1124,14 @@ class BattleManager:
             self.current_enemy = None
             self.battle_state.enemy_hp = 0
             
-            # Hide compact window
-            self.hide_compact_mode()
-            
-            # Ensure main window is visible and focused
-            if self.main_window:
-                self.main_window.show()
-                self.main_window.raise_()
-                self.main_window.activateWindow()
-                
-                # Release any keyboard grab
-                self.main_window.releaseKeyboard()
-                
-                # Force focus to the main window
-                QTimer.singleShot(100, lambda: (
-                    self.main_window.raise_(),
-                    self.main_window.activateWindow()
-                ))
+            # Update UI components using the UI manager
+            self.ui_manager.update_ui_for_battle_end()
             
             logging.info("Battle ended successfully")
             
         except Exception as e:
             logging.error(f"Error ending battle: {e}")
+            self._show_error("Error ending battle")
             
     def cleanup(self) -> None:
         """
@@ -1340,26 +1147,13 @@ class BattleManager:
         try:
             logging.info("Starting battle manager cleanup")
             
-            # Clean up windows
-            self.hide_compact_mode()
+            # Clean up UI components using the UI manager
+            self.ui_manager.cleanup_ui()
             
             # Reset state
             self.battle_state = BattleState()
             self.current_enemy = None
             self.paused = False
-            
-            # Release window focus
-            if self.main_window:
-                self.main_window.releaseKeyboard()
-            
-            # Update UI components
-            cleanup_updates = {
-                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
-                'action_buttons': lambda: self.action_buttons.hide_attack_buttons() if self.action_buttons else None,
-                'tasks_left': lambda: self.tasks_left_label.setText("0") if self.tasks_left_label else None
-            }
-            
-            self._batch_ui_update(cleanup_updates)
             
             # Disconnect signals if connected
             if self.signals_connected:
@@ -1381,13 +1175,10 @@ class BattleManager:
     def _emergency_cleanup(self):
         """Emergency cleanup for critical failures."""
         try:
-            if self.compact_window:
-                self.compact_window.close()
-                self.compact_window = None
+            # Delegate UI emergency cleanup to UI manager
+            self.ui_manager.emergency_cleanup_ui()
             
-            if self.main_window:
-                self.main_window.releaseKeyboard()
-                
+            # Reset state
             self.battle_state = BattleState()
             self.current_enemy = None
             
@@ -1477,125 +1268,53 @@ class BattleManager:
         logging.info(f"Marked battle node {node_key} as completed")
         
     def handle_chapter_complete(self) -> None:
-        """Display chapter completion message."""
+        """Display chapter completion message using the UI manager."""
         try:
-            completion_message = (
-                "<div style='text-align: center;'>"
-                "<br><b>Chapter Complete!</b><br>"
-                "<p style='margin: 10px 0;'>You have completed all available tasks for now.</p>"
-                "<p style='margin: 10px 0;'>Feel free to start a new chapter or take a break!</p>"
-                "</div>"
-            )
-            
-            # Use UI manager to update UI components
-            updates = {
-                'story_display': lambda: self.story_display.append_text(completion_message) if self.story_display else None,
-                'status_bar': lambda: self.status_bar.showMessage("Chapter complete!") if self.status_bar else None
-            }
-            
-            self.ui_manager.batch_ui_update(updates)
-            logging.debug("Chapter completion message displayed")
+            # Delegate to UI manager
+            self.ui_manager.handle_chapter_complete()
+            logging.debug("Chapter completion delegated to UI manager")
             
         except Exception as e:
-            logging.error(f"Error displaying chapter completion: {e}")
+            logging.error(f"Error handling chapter completion: {e}")
 
     def _batch_ui_update(self, updates: dict) -> None:
         """
         Perform multiple UI updates in a single batch.
+        Delegates to the UI manager's batch_ui_update method.
         
         Args:
             updates: Dictionary of update functions to execute
         """
-        try:
-            # Temporarily disable window updates if possible
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(False)
-            
-            # Execute all updates
-            for update_name, update_func in updates.items():
-                try:
-                    update_func()
-                except Exception as e:
-                    logging.error(f"Error in UI update '{update_name}': {e}")
-                    
-        finally:
-            # Re-enable window updates
-            if self.main_window:
-                self.main_window.setUpdatesEnabled(True)
-                self.main_window.repaint()
+        # Delegate to UI manager
+        self.ui_manager.batch_ui_update(updates)
 
     def _update_battle_ui(self) -> None:
-        """Update all UI components with current battle state."""
+        """Update all UI components with current battle state using the UI manager."""
         try:
-            updates = {
-                'enemy_panel': lambda: self.enemy_panel.update_panel(self.current_enemy) if self.enemy_panel else None,
-                'compact_window': lambda: self.compact_window.update_display(self.current_enemy) if self.compact_window else None,
-                'tasks_left': lambda: self.update_tasks_left() if hasattr(self, 'update_tasks_left') else None,
-                'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
-                'story_display': lambda: (
-                    self.story_display.story_text.append(
-                        "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
-                        f"<p><b>{self.current_enemy.name}</b> - HP: {self.current_enemy.current_hp}/{self.current_enemy.max_hp}</p>"
-                        "</div>"
-                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
-                ),
-                'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
-            }
+            # Ensure compact window is initialized if needed
+            if not self.compact_window and hasattr(self, 'show_compact_mode'):
+                self.show_compact_mode(self.current_enemy, self.perform_attack, lambda: self.perform_attack(True))
             
-            self._batch_ui_update(updates)
-            logging.debug("Battle UI updated successfully")
-                
+            # Delegate to UI manager
+            self.ui_manager.update_battle_ui(self.current_enemy)
+            
+            # Log successful update
+            logging.debug("Battle UI updated successfully via UI manager")
+            
         except Exception as e:
-            logging.error(f"Error updating battle UI: {e}")
+            logging.error(f"Error in _update_battle_ui: {e}")
             if self.status_bar:
-                self.status_bar.showMessage("Error updating battle display")
+                self.status_bar.showMessage("Error updating battle UI")
 
     def _update_ui_after_attack(self, was_heavy: bool) -> None:
-        """Update UI components after an attack."""
-        if self.enemy_panel:
-            self.enemy_panel.update_panel(self.current_enemy)
-        if self.compact_window:
-            self.compact_window.update_display(self.current_enemy)
-        self.update_tasks_left()
-        
-        attack_type = "Heavy attack" if was_heavy else "Attack"
-        if self.status_bar:
-            self.status_bar.showMessage(f"{attack_type} landed!")
+        """Update UI components after an attack using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_after_attack(self.current_enemy, was_heavy)
 
     def _update_ui_for_victory(self, xp_gained: int) -> None:
-        """Update UI elements after victory with enhanced feedback."""
-        try:
-            victory_message = (
-                "<div class='victory-message' style='text-align: center;'>"
-                "<h3>Victory!</h3>"
-                f"<p>You gained <b>{xp_gained}</b> XP and <b>{self.coin_reward}</b> coins!</p>"
-                "</div>"
-            )
-            
-            # Update UI components
-            updates = {
-                'story_display': lambda: self.story_display.append_text(victory_message) if self.story_display else None,
-                'status_bar': lambda: self.status_bar.showMessage("Victory!") if self.status_bar else None,
-                'enemy_panel': lambda: self.enemy_panel.update_panel(None) if self.enemy_panel else None,
-                'player_panel': lambda: self.player_panel.update_panel() if self.player_panel else None,
-                'action_buttons': lambda: (
-                    self.action_buttons.hide_attack_buttons(),
-                    self.action_buttons.next_button.show()
-                ) if self.action_buttons else None
-            }
-            
-            self._batch_ui_update(updates)
-            
-            # Trigger victory animation if enabled
-            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
-                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
-            
-            logging.info("Victory UI updates completed")
-                
-        except Exception as e:
-            logging.error(f"Error updating UI for victory: {e}")
-            if self.status_bar:
-                self.status_bar.showMessage("Error updating victory display")
+        """Update UI elements after victory with enhanced feedback using the UI manager."""
+        # Delegate to UI manager
+        self.ui_manager.update_ui_for_victory(xp_gained, self.coin_reward)
 
     def _validate_battle_start(self) -> bool:
         """
@@ -1616,8 +1335,19 @@ class BattleManager:
             self._update_status("Game is paused")
             return False
             
-        if not all([self.enemy_panel, self.action_buttons, self.status_bar]):
+        # Check both battle manager and UI manager components
+        battle_manager_ui_ready = all([self.enemy_panel, self.action_buttons, self.status_bar])
+        ui_manager_ui_ready = all([self.ui_manager.enemy_panel, self.ui_manager.action_buttons, self.ui_manager.status_bar])
+        
+        if not (battle_manager_ui_ready and ui_manager_ui_ready):
             logging.warning("UI components not ready")
+            # Log which components are missing for debugging
+            if not battle_manager_ui_ready:
+                logging.debug(f"Battle manager UI components missing: enemy_panel={bool(self.enemy_panel)}, "
+                             f"action_buttons={bool(self.action_buttons)}, status_bar={bool(self.status_bar)}")
+            if not ui_manager_ui_ready:
+                logging.debug(f"UI manager components missing: enemy_panel={bool(self.ui_manager.enemy_panel)}, "
+                             f"action_buttons={bool(self.ui_manager.action_buttons)}, status_bar={bool(self.ui_manager.status_bar)}")
             return False
             
         return True
@@ -1659,6 +1389,7 @@ class BattleManager:
                          main_window=None) -> None:
         """Set UI component references."""
         try:
+            # Set components in the BattleManager
             self.story_display = story_display
             self.enemy_panel = enemy_panel
             self.action_buttons = action_buttons
@@ -1666,6 +1397,18 @@ class BattleManager:
             self.status_bar = status_bar
             self.tasks_left_label = tasks_left_label
             self.main_window = main_window
+            
+            # Also set components in the UI Manager
+            self.ui_manager.set_ui_components(
+                story_display=story_display,
+                enemy_panel=enemy_panel,
+                action_buttons=action_buttons,
+                player_panel=player_panel,
+                status_bar=status_bar,
+                tasks_left_label=tasks_left_label,
+                main_window=main_window,
+                compact_window=self.compact_window
+            )
             
             # Connect UI signals
             if self.action_buttons:
@@ -1687,59 +1430,35 @@ class BattleManager:
             
             logging.info("UI components set successfully")
             return True
-                
+        
         except Exception as e:
             logging.error(f"Error setting UI components: {e}")
             return False
 
     def update_tasks_left(self) -> None:
-        """Update the tasks remaining display."""
-        try:
-            if self.current_enemy and self.tasks_left_label:
-                current_hp = self.battle_state.enemy_hp
-                tasks_left = max(0, current_hp)
-                self.tasks_left_label.setText(str(tasks_left))
-
-                # Update compact window if it exists
-                if self.compact_window:
-                    self.compact_window.update_tasks(tasks_left)
-                    
-            logging.debug(f"Tasks left updated: {tasks_left if 'tasks_left' in locals() else 'None'}")
-                    
-        except Exception as e:
-            logging.error(f"Error updating tasks left: {e}")
+        """Update the tasks remaining display using the UI manager."""
+        if self.current_enemy:
+            # Delegate to UI manager
+            self.ui_manager.update_tasks_left(self.current_enemy)
 
     def show_compact_mode(self) -> None:
-        """Show compact battle window."""
+        """Show compact battle window using the UI manager."""
         try:
-            if not self.compact_window and self.is_in_battle():
-                logging.debug("Creating new compact battle window")
-                self.compact_window = CompactBattleWindow()
-                
-                # Position the window
-                screen = QApplication.primaryScreen()
-                screen_geo = screen.availableGeometry()
-                margin = 10
-                x = screen_geo.width() - self.compact_window.width() - margin
-                y = margin
-                self.compact_window.move(x, y)
-                
-                # Initialize pause state before showing window
-                self.compact_window.update_pause_state(self.paused)
-                logging.debug(f"Initialized compact window pause state: {self.paused}")
-                
-                # Update display if we have an enemy
-                if self.current_enemy:
-                    self.compact_window.update_display(self.current_enemy)
-                    logging.debug("Updated compact window with enemy display")
-                
-                # Show and raise window
-                self.compact_window.show()
-                self.compact_window.raise_()
+            if self.is_in_battle():
+                # Delegate to UI manager
+                self.ui_manager.show_compact_mode(
+                    self.current_enemy,
+                    lambda: self.perform_attack(is_heavy=False),
+                    lambda: self.perform_attack(is_heavy=True)
+                )
+                # Store reference to compact window for other methods
+                self.compact_window = self.ui_manager.compact_window
                 
                 # Enable attack hotkeys for compact mode
                 if hasattr(self, 'hotkey_listener'):
                     self.hotkey_listener.enable()
                     logging.debug("Enabled hotkeys for compact mode")
+                    
+                logging.debug("Compact mode shown via UI manager")
         except Exception as e:
             logging.error(f"Error showing compact mode: {e}")

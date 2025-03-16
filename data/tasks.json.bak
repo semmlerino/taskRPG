@@ -181,7 +181,7 @@
         "active": false,
         "is_daily": true,
         "is_weekly": false,
-        "next_activation_time": 1742085740.1192236,
+        "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
         "muted_until": null
@@ -211,7 +211,7 @@
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -255,7 +255,7 @@
     "Laundry": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -328,13 +328,12 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1742073818.657516,
-        "activation_time": "22:30"
+        "muted_until": null
     },
     "Eat": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,

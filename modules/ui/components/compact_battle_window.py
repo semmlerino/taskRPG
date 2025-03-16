@@ -1,5 +1,5 @@
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar
-from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from typing import Optional, TYPE_CHECKING
 import logging
@@ -10,12 +10,16 @@ if TYPE_CHECKING:
 class CompactBattleWindow(QWidget):
     """A compact overlay window displaying battle stats when main window loses focus."""
     
+    # Add signal definitions
+    attack_clicked = pyqtSignal()
+    heavy_attack_clicked = pyqtSignal()
+    
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         self.setWindowFlag(Qt.Tool)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.NoFocus)
-        self.setFixedSize(250, 120)
+        self.setFixedSize(250, 100)  # Reduced height since we're removing buttons
         
         # Initialize pause state
         self._is_paused = False
@@ -74,6 +78,8 @@ class CompactBattleWindow(QWidget):
         """)
         layout.addWidget(self.tasks_label)
         
+        # Removed attack buttons section
+        
         self.setLayout(layout)
         
         # Window styling
@@ -85,7 +91,7 @@ class CompactBattleWindow(QWidget):
             }
         """)
         
-        # Tooltip with hotkeys
+        # Tooltip with hotkeys - keep this to show available shortcuts
         self.setToolTip("D: Normal Attack\nShift+D: Heavy Attack\n#: Pause/Resume")
         
     def update_display(self, enemy: Optional['Enemy']) -> None:
@@ -180,3 +186,23 @@ class CompactBattleWindow(QWidget):
         if event.button() == Qt.LeftButton:
             self.dragging = False
             self.offset = None
+            
+    def keyPressEvent(self, event):
+        """Handle keyboard shortcuts for attacks."""
+        try:
+            if event.key() == Qt.Key_D:
+                if event.modifiers() & Qt.ShiftModifier:
+                    # Shift+D for heavy attack
+                    self.heavy_attack_clicked.emit()
+                    logging.debug("Heavy attack shortcut triggered from compact window")
+                else:
+                    # D for normal attack
+                    self.attack_clicked.emit()
+                    logging.debug("Attack shortcut triggered from compact window")
+            elif event.key() == Qt.Key_NumberSign:  # # key
+                # Toggle pause state
+                self._is_paused = not self._is_paused
+                self.update_pause_state(self._is_paused)
+                logging.debug(f"Pause toggled from compact window: {self._is_paused}")
+        except Exception as e:
+            logging.error(f"Error handling key press in compact window: {e}")

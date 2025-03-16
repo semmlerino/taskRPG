@@ -117,3 +117,12 @@ class GlobalHotkeys(QThread):
                 logging.debug("Next story hotkey disabled")
         except Exception as e:
             logging.error(f"Error in _register_next_story_hotkey: {e}")
+            
+    def enable(self):
+        """Enable all hotkeys."""
+        try:
+            logging.debug("Enabling all hotkeys")
+            self._register_all_hotkeys()
+            self.attack_hotkeys_enabled = True
+        except Exception as e:
+            logging.error(f"Error enabling hotkeys: {e}")
