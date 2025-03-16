@@ -76,6 +76,28 @@ class BattleUIManager:
             logging.error(f"Error setting UI components in BattleUIManager: {e}")
             return False
     
+    def are_components_ready(self) -> bool:
+        """Check if essential UI components are ready."""
+        essential_components = [
+            self.enemy_panel, 
+            self.action_buttons, 
+            self.status_bar
+        ]
+        
+        if not all(essential_components):
+            missing_components = []
+            if not self.enemy_panel:
+                missing_components.append("enemy_panel")
+            if not self.action_buttons:
+                missing_components.append("action_buttons")
+            if not self.status_bar:
+                missing_components.append("status_bar")
+                
+            logging.warning(f"Missing essential UI components: {', '.join(missing_components)}")
+            return False
+            
+        return True
+    
     def batch_ui_update(self, updates: Dict[str, Callable]) -> None:
         """
         Perform multiple UI updates in a single batch.
@@ -172,8 +194,7 @@ class BattleUIManager:
             self.batch_ui_update(updates)
             
             # Trigger victory animation if enabled
-            if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
-                QTimer.singleShot(0, self.main_window.trigger_victory_animation)
+            self.trigger_victory_animation()
             
             logging.info("Victory UI updates completed")
                 
@@ -199,6 +220,11 @@ class BattleUIManager:
         except Exception as e:
             logging.error(f"Error updating tasks left: {e}")
     
+    def append_story_text(self, message: str) -> None:
+        """Append text to the story display."""
+        if self.story_display:
+            self.story_display.append_text(message)
+            
     def update_status(self, message: str, timeout: int = 0) -> None:
         """Update status bar with message."""
         if self.status_bar:
@@ -230,12 +256,55 @@ class BattleUIManager:
             if self.status_bar:
                 self.status_bar.showMessage("Error updating pause state")
                 
+    def validate_pause_state(self, is_paused: bool) -> None:
+        """Validate that pause state is consistent across all components."""
+        try:
+            # Check compact window state
+            if self.compact_window and hasattr(self.compact_window, '_is_paused'):
+                if self.compact_window._is_paused != is_paused:
+                    logging.warning("Pause state mismatch detected in compact window")
+                    self.compact_window.update_pause_state(is_paused)
+        
+            # Check enemy panel state
+            if self.enemy_panel and hasattr(self.enemy_panel, '_is_paused'):
+                if self.enemy_panel._is_paused != is_paused:
+                    logging.warning("Pause state mismatch detected in enemy panel")
+                    self.enemy_panel.update_pause_state(is_paused)
+        
+            # Check action buttons state
+            if self.action_buttons and self.action_buttons.isEnabled() == is_paused:
+                logging.warning("Action buttons state inconsistent with pause state")
+                self.action_buttons.setEnabled(not is_paused)
+            
+            logging.debug(f"Pause state validation complete. Current state: {is_paused}")
+            
+        except Exception as e:
+            logging.error(f"Error validating pause state: {e}")
+                
     def show_error(self, message: str) -> None:
         """Show error message to user in the UI."""
         if self.status_bar:
             self.status_bar.showMessage(message)
         logging.error(message)
         QMessageBox.critical(None, "Error", message)
+
+    def release_keyboard_focus(self) -> None:
+        """Release keyboard focus if in fullscreen mode."""
+        if self.main_window and self.main_window.isFullScreen():
+            self.main_window.releaseKeyboard()
+            logging.debug("Keyboard focus released")
+    
+    def trigger_shake_animation(self) -> None:
+        """Trigger shake animation on main window if available."""
+        if self.main_window and hasattr(self.main_window, 'trigger_shake_animation'):
+            self.main_window.trigger_shake_animation()
+            logging.debug("Shake animation triggered")
+        
+    def trigger_victory_animation(self) -> None:
+        """Trigger victory animation on main window if available."""
+        if self.main_window and hasattr(self.main_window, 'trigger_victory_animation'):
+            QTimer.singleShot(0, self.main_window.trigger_victory_animation)
+            logging.debug("Victory animation triggered")
         
     def show_compact_mode(self, current_enemy: 'Enemy', attack_callback, heavy_attack_callback) -> None:
         """Show compact battle window."""
