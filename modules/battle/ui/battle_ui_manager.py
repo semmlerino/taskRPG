@@ -110,11 +110,11 @@ class BattleUIManager:
                 'tasks_left': lambda: self.update_tasks_left(current_enemy),
                 'action_buttons': lambda: self.action_buttons.show_attack_buttons() if self.action_buttons else None,
                 'story_display': lambda: (
-                    self.story_display.story_text.append(
+                    self.story_display.append_text(
                         "<div class='battle-status' style='margin: 10px 0; padding: 10px; background-color: rgba(255, 0, 0, 0.1); border-left: 4px solid #ff0000;'>"
                         f"<p><b>{current_enemy.name}</b> - HP: {current_enemy.current_hp}/{current_enemy.max_hp}</p>"
                         "</div>"
-                    ) if self.story_display and hasattr(self.story_display, 'story_text') else None
+                    ) if self.story_display else None
                 ),
                 'status_bar': lambda: self.status_bar.showMessage("Battle in progress!") if self.status_bar else None
             }
@@ -126,8 +126,6 @@ class BattleUIManager:
             logging.error(f"Error updating battle UI: {e}")
             if self.status_bar:
                 self.status_bar.showMessage("Error updating battle display")
-    
-
     
     def update_ui_after_attack(self, current_enemy: 'Enemy', was_heavy: bool) -> None:
         """Update UI components after an attack."""
