@@ -1,4 +1,6 @@
-"""Battle state management for TaskRPG.
+"""
+File: modules/battle/battle_state.py
+Battle state management for TaskRPG.
 
 This module contains classes for managing battle state, including
 the BattleState class which tracks the current state of a battle.
@@ -88,9 +90,16 @@ class BattleState:
     
     def start_battle(self, enemy) -> None:
         """Start a battle with the given enemy."""
+        # Always force status to ACTIVE when starting a battle
         self.status = BattleStatus.ACTIVE
         self.update_from_enemy(enemy)
         self.battle_start_time = time.time()
+        self.attacks_performed = 0
+        self.turns_taken = 0
+        self.last_attack_type = ""
+        self.xp_gained = 0
+        self.paused_time = None
+        self.total_pause_duration = 0
         logging.debug(f"Battle started with enemy: {enemy.name}")
     
     def end_battle(self) -> None:
@@ -127,10 +136,11 @@ class BattleState:
     
     def update_enemy_hp(self, new_hp: int) -> None:
         """Update the enemy's HP."""
+        old_hp = self.enemy_hp
         self.enemy_hp = max(0, new_hp)
         if self.enemy_reference:
             self.enemy_reference.current_hp = self.enemy_hp
-        logging.debug(f"Enemy HP updated to {self.enemy_hp}")
+        logging.debug(f"Enemy HP updated from {old_hp} to {self.enemy_hp}")
     
     def pause(self) -> None:
         """Pause the battle."""

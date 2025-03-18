@@ -1,4 +1,5 @@
 """
+File: modules/battle/battle_manager.py
 Battle management system for TaskRPG.
 
 This is the consolidated battle system that combines functionality from both
@@ -77,6 +78,7 @@ class BattleManager:
         # Signal tracking
         self.signals_connected = False
         self.active_timers = []
+        self.hotkey_listener = None
         
         # XP Configuration
         self.xp_base = 100  # Base XP for victories
@@ -156,6 +158,10 @@ class BattleManager:
             # Update battle state
             self.battle_state.start_battle(enemy)
             
+            # Connect battle controls if available
+            if self.hotkey_listener and not self.signals_connected:
+                self._connect_battle_signals()
+            
             # Update UI
             self._update_battle_ui()
             
@@ -189,6 +195,11 @@ class BattleManager:
             bool: True if attack was successful, False otherwise
         """
         try:
+            # First check if a battle is actually in progress to prevent post-battle attacks
+            if not self.battle_state.is_in_battle():
+                logging.debug("Attack attempted but no battle is in progress")
+                return False
+                
             attack_type = "heavy" if is_heavy else "normal"
             logging.debug(f"Processing {attack_type} attack request")
             
@@ -300,6 +311,9 @@ class BattleManager:
             # Record victory in battle state
             self.battle_state.record_victory(xp)
             
+            # Disconnect battle signals to prevent post-battle interactions
+            self._disconnect_battle_signals()
+            
             # Handle window state
             self.hide_compact_mode()
             
@@ -392,31 +406,62 @@ class BattleManager:
             
         return True
 
-    def connect_signals(self, hotkey_listener) -> None:
-        """Connect battle-related hotkey signals."""
+    def _connect_battle_signals(self) -> None:
+        """Connect battle-related hotkey signals for combat."""
         try:
-            # Store hotkey listener reference
+            if self.hotkey_listener:
+                # Connect attack signals directly
+                self.hotkey_listener.normal_attack_signal.connect(
+                    lambda: self.perform_attack(is_heavy=False)
+                )
+                self.hotkey_listener.heavy_attack_signal.connect(
+                    lambda: self.perform_attack(is_heavy=True)
+                )
+                self.hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
+                
+                # Mark signals as connected
+                self.signals_connected = True
+                
+                logging.info("Battle hotkeys connected for combat")
+                
+        except Exception as e:
+            logging.error(f"Error connecting battle signals: {e}")
+
+    def _disconnect_battle_signals(self) -> None:
+        """Disconnect battle-related hotkey signals after battle ends."""
+        try:
+            if self.hotkey_listener and self.signals_connected:
+                # Disconnect all signals cleanly
+                try:
+                    # We can't directly disconnect lambdas, so we'll use a different approach
+                    # that disconnects all connections to our methods
+                    if hasattr(self.hotkey_listener.normal_attack_signal, 'disconnect'):
+                        self.hotkey_listener.normal_attack_signal.disconnect()
+                    if hasattr(self.hotkey_listener.heavy_attack_signal, 'disconnect'):
+                        self.hotkey_listener.heavy_attack_signal.disconnect()
+                    if hasattr(self.hotkey_listener.toggle_pause_signal, 'disconnect'):
+                        self.hotkey_listener.toggle_pause_signal.disconnect()
+                except Exception as e:
+                    logging.warning(f"Error during signal disconnection: {e}")
+                
+                self.signals_connected = False
+                logging.info("Battle hotkeys disconnected after battle end")
+        except Exception as e:
+            logging.error(f"Error disconnecting battle signals: {e}")
+
+    def connect_signals(self, hotkey_listener) -> None:
+        """Store hotkey listener for later use."""
+        try:
+            # Store hotkey listener reference only
             self.hotkey_listener = hotkey_listener
-            
-            # Connect attack signals directly
-            hotkey_listener.normal_attack_signal.connect(
-                lambda: self.perform_attack(is_heavy=False)
-            )
-            hotkey_listener.heavy_attack_signal.connect(
-                lambda: self.perform_attack(is_heavy=True)
-            )
-            hotkey_listener.toggle_pause_signal.connect(self.toggle_pause)
-            
-            # Mark signals as connected
-            self.signals_connected = True
             
             # Update UI if available
             self.ui_manager.update_status("Battle controls ready", 2000)
             
-            logging.info("Battle hotkeys connected successfully")
+            logging.info("Hotkey listener registered with battle manager")
             
         except Exception as e:
-            logging.error(f"Error connecting battle signals: {e}")
+            logging.error(f"Error storing hotkey listener: {e}")
 
     def set_ui_components(self, 
                          story_display=None,
@@ -490,9 +535,8 @@ class BattleManager:
                 )
                 
                 # Enable attack hotkeys for compact mode
-                if hasattr(self, 'hotkey_listener'):
-                    self.hotkey_listener.enable()
-                    logging.debug("Enabled hotkeys for compact mode")
+                if self.hotkey_listener and not self.signals_connected:
+                    self._connect_battle_signals()
                     
                 logging.debug("Compact mode shown via UI manager")
         except Exception as e:
@@ -506,13 +550,13 @@ class BattleManager:
     def toggle_pause(self) -> None:
         """Toggle battle pause state."""
         try:
+            # First check if a battle is actually in progress
+            if not self.battle_state.is_in_battle():
+                logging.debug("Pause attempted but no battle is in progress")
+                return
+                
             # Attempt to repair battle state before toggling pause
             self.repair_battle_state()
-            
-            # Check if we're in a battle
-            if not self.battle_state.is_in_battle():
-                logging.debug("No active battle to pause")
-                return
             
             # Toggle the pause state in battle state
             if self.battle_state.is_paused():
@@ -583,6 +627,9 @@ class BattleManager:
         try:
             logging.debug("Ending battle")
             
+            # Disconnect battle signals to prevent post-battle interactions
+            self._disconnect_battle_signals()
+            
             # Update battle state
             self.battle_state.end_battle()
             
@@ -609,15 +656,14 @@ class BattleManager:
         try:
             logging.info("Starting battle manager cleanup")
             
+            # Disconnect battle signals to prevent post-cleanup interactions
+            self._disconnect_battle_signals()
+            
             # Clean up UI components using the UI manager
             self.ui_manager.cleanup_ui()
             
             # Reset state
             self.battle_state.reset()
-            
-            # Disconnect signals if connected
-            if self.signals_connected:
-                self._disconnect_signals()
             
             # Clear any remaining timers
             if hasattr(self, 'active_timers'):
@@ -641,33 +687,13 @@ class BattleManager:
             # Reset state
             self.battle_state.reset()
             
+            # Ensure signals are disconnected
+            self._disconnect_battle_signals()
+            
             logging.warning("Emergency cleanup performed")
             
         except Exception as e:
             logging.critical(f"Emergency cleanup failed: {e}")
-            
-    def _disconnect_signals(self):
-        """Disconnect all signal connections."""
-        try:
-            # Get action buttons from UI manager
-            action_buttons = self.ui_manager.action_buttons
-            
-            # Disconnect UI signals
-            if action_buttons:
-                try:
-                    action_buttons.attack_clicked.disconnect()
-                    action_buttons.heavy_attack_clicked.disconnect()
-                except Exception:
-                    pass
-                    
-            # Clear callbacks
-            self.callbacks = BattleCallbacks()
-            
-            self.signals_connected = False
-            logging.debug("Battle signals disconnected")
-            
-        except Exception as e:
-            logging.error(f"Error disconnecting signals: {e}")
 
     def register_callbacks(self,
                           on_battle_start: Optional[Callable] = None,

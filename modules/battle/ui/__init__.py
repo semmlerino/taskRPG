@@ -1,4 +1,6 @@
-"""Battle UI components for TaskRPG.
+"""
+File: modules/battle/ui/__init__.py
+Battle UI components for TaskRPG.
 
 This package contains UI-related components for the battle system.
 """

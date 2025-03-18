@@ -1,4 +1,6 @@
-"""Battle UI management for TaskRPG.
+"""
+File: modules/battle/ui/battle_ui_manager.py
+Battle UI management for TaskRPG.
 
 This module contains classes for managing battle UI components,
 including the BattleUIManager class which handles all UI updates
@@ -10,8 +12,8 @@ import logging
 from typing import Optional, Dict, Callable, Any
 
 # PyQt5 imports
-from PyQt5.QtWidgets import QStatusBar, QLabel, QMessageBox
-from PyQt5.QtCore import QTimer
+from PyQt5.QtWidgets import QStatusBar, QLabel, QMessageBox, QApplication, QDesktopWidget
+from PyQt5.QtCore import QTimer, QPoint
 
 # Type checking imports
 from typing import TYPE_CHECKING
@@ -240,12 +242,12 @@ class BattleUIManager:
                 logging.debug("Action buttons pause state updated")
             
             # Update enemy panel
-            if self.enemy_panel:
+            if self.enemy_panel and hasattr(self.enemy_panel, 'update_pause_state'):
                 self.enemy_panel.update_pause_state(paused)
                 logging.debug("Enemy panel pause state updated")
             
             # Update compact window
-            if self.compact_window:
+            if self.compact_window and hasattr(self.compact_window, 'update_pause_state'):
                 self.compact_window.update_pause_state(paused)
                 logging.debug("Compact window pause state updated")
                 
@@ -307,7 +309,7 @@ class BattleUIManager:
             logging.debug("Victory animation triggered")
         
     def show_compact_mode(self, current_enemy: 'Enemy', attack_callback, heavy_attack_callback) -> None:
-        """Show compact battle window."""
+        """Show compact battle window positioned in the top right corner."""
         try:
             # Create compact window if it doesn't exist
             if not self.compact_window:
@@ -326,13 +328,22 @@ class BattleUIManager:
             # Update with current enemy
             if current_enemy:
                 self.compact_window.update_display(current_enemy)
+            
+            # Position in top right corner
+            screen = QDesktopWidget().availableGeometry()
+            window_size = self.compact_window.sizeHint()
+            position = QPoint(
+                screen.right() - window_size.width() - 20,  # 20px margin from right edge
+                screen.top() + 20  # 20px margin from top
+            )
+            self.compact_window.move(position)
                 
             # Show and position window
             self.compact_window.show()
             self.compact_window.raise_()
             self.compact_window.activateWindow()
             
-            logging.info("Compact battle window displayed")
+            logging.info("Compact battle window displayed in top right corner")
             
         except Exception as e:
             logging.error(f"Error showing compact battle window: {e}")

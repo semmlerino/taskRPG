@@ -1,4 +1,7 @@
-"""Battle system module."""
+"""
+File: modules/battle/__init__.py
+Battle system module.
+"""
 
 from modules.battle.battle_manager import BattleManager, BattleEvent
 from modules.battle.enemy import Enemy
