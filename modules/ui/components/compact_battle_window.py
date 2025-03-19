@@ -1,3 +1,4 @@
+# modules/ui/components/compact_battle_window.py
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton, QHBoxLayout
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont
@@ -13,6 +14,7 @@ class CompactBattleWindow(QWidget):
     # Add signal definitions
     attack_clicked = pyqtSignal()
     heavy_attack_clicked = pyqtSignal()
+    pause_toggled = pyqtSignal()  # NEW: Added signal for pause toggle
     
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
@@ -200,9 +202,8 @@ class CompactBattleWindow(QWidget):
                     self.attack_clicked.emit()
                     logging.debug("Attack shortcut triggered from compact window")
             elif event.key() == Qt.Key_NumberSign:  # # key
-                # Toggle pause state
-                self._is_paused = not self._is_paused
-                self.update_pause_state(self._is_paused)
-                logging.debug(f"Pause toggled from compact window: {self._is_paused}")
+                # FIXED: Emit signal instead of handling locally
+                self.pause_toggled.emit()
+                logging.debug("Pause toggle signal emitted from compact window")
         except Exception as e:
             logging.error(f"Error handling key press in compact window: {e}")

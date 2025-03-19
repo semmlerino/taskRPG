@@ -1,3 +1,4 @@
+# modules/ui/main_window.py
 from __future__ import annotations
 
 # Standard library imports
@@ -54,7 +55,7 @@ from modules.players.player import Player
 from modules.tasks.task_manager import TaskManager
 from modules.story import StoryManager, NavigationDirection
 from modules.hotkeys import GlobalHotkeys
-from modules.image_generator import ImageGenerator, ImageQuality  # Updated import
+from modules.image_generator import ImageGenerator, ImageQuality
 from modules.ui.components import (
     PlayerPanel,
     EnemyPanel,
@@ -64,10 +65,13 @@ from modules.ui.components import (
     CompactBattleWindow
 )
 from modules.ui.dialogs.settings.settings_dialog import SettingsDialog
+from modules.ui.dialogs.settings.settings_manager import SettingsManager
 from modules.ui.dialogs.story_selection_dialog import StorySelectionDialog
 from modules.ui.dialogs.image_generation_selection_dialog import ImageGenerationSelectionDialog
 from modules.ui.components.fullscreen_image_viewer import FullscreenImageViewer
 from modules.battle.battle_manager import BattleManager
+from modules.battle.battle_event_system import BattleEventType, BattleEvent, event_dispatcher
+from modules.battle.ui.battle_ui_manager import BattleUIManager
 from modules.ui.managers.font_scaling_manager import FontScalingManager
 
 # Configure logging
@@ -116,6 +120,9 @@ class TaskRPG(QMainWindow):
 
         # Initialize and start global hotkeys listener
         self.init_hotkeys()
+
+        # Connect battle manager to hotkeys after both are initialized
+        self.connect_battle_hotkeys()
 
         # Initialize Shaking Animation
         self.init_animations()
@@ -528,11 +535,18 @@ class TaskRPG(QMainWindow):
             settings = settings_manager.load_settings()
             coin_reward = settings.get('coin_reward', 5)  # Default to 5 if not set
             
-            # Set coin reward in battle manager
-            self.battle_manager.coin_reward = coin_reward
+            # Create UI Manager
+            from modules.battle.ui.battle_ui_manager import BattleUIManager
+            self.battle_ui_manager = BattleUIManager()
             
-            # Set up battle manager UI components
-            self.battle_manager.set_ui_components(
+            # Set coin reward in battle manager
+            self.battle_manager.set_coin_reward(coin_reward)
+            
+            # Set up battle manager's UI manager
+            self.battle_ui_manager.set_battle_manager(self.battle_manager)
+            
+            # Set up UI components in UI manager
+            self.battle_ui_manager.set_ui_components(
                 story_display=self.story_display,
                 enemy_panel=self.enemy_panel,
                 action_buttons=self.action_buttons,
@@ -542,24 +556,26 @@ class TaskRPG(QMainWindow):
                 main_window=self
             )
 
-            # Connect victory callback
-            self.battle_manager.register_callbacks(
-                on_victory=self.player_panel.update_panel
-            )
-
+            # Don't connect hotkeys here - we'll do that after hotkey initialization
             logging.info(f"Managers initialized with UI components. Coin reward set to {coin_reward}")
 
         except Exception as e:
             logging.error(f"Error initializing managers: {e}")
             raise
 
+    def connect_battle_hotkeys(self):
+        """Connect battle manager to hotkeys after both are initialized."""
+        try:
+            if hasattr(self, 'hotkey_listener') and hasattr(self, 'battle_manager'):
+                self.battle_manager.connect_signals(self.hotkey_listener)
+                logging.info("Hotkeys connected to battle manager")
+        except Exception as e:
+            logging.error(f"Error connecting battle hotkeys: {e}")
+
     def init_hotkeys(self):
         """Initialize the global hotkeys system."""
         try:
             self.hotkey_listener = GlobalHotkeys()
-
-            # Connect battle hotkeys through battle manager
-            self.battle_manager.connect_signals(self.hotkey_listener)
 
             # Connect story progression
             self.hotkey_listener.next_story_signal.connect(self.next_story_segment)
@@ -881,7 +897,7 @@ class TaskRPG(QMainWindow):
             if self.isFullScreen():
                 self.showNormal()
                 if self.battle_manager.is_in_battle():
-                    self.battle_manager.hide_compact_mode()
+                    self.battle_ui_manager.hide_compact_mode()
             else:
                 self.showFullScreen()
 
@@ -902,9 +918,15 @@ class TaskRPG(QMainWindow):
                 if (self.battle_manager.is_in_battle() and 
                     self.battle_manager.battle_state.attacks_performed > 0):
                     # Only show compact mode if not already paused
-                    if not self.battle_manager.paused:
+                    if not self.battle_manager.battle_state.is_paused():
                         self.battle_manager.toggle_pause()
-                    self.battle_manager.show_compact_mode()
+                    enemy = self.battle_manager.get_current_enemy()
+                    if enemy:
+                        self.battle_ui_manager.show_compact_mode(
+                            enemy,
+                            lambda: self.battle_manager.perform_attack(is_heavy=False),
+                            lambda: self.battle_manager.perform_attack(is_heavy=True)
+                        )
             # Set window focus
             self.activateWindow()
             self.raise_()
@@ -920,14 +942,10 @@ class TaskRPG(QMainWindow):
     def update_tasks_left(self):
         """Update the tasks left display."""
         try:
-            if self.battle_manager and self.battle_manager.current_enemy:
-                current_hp = self.battle_manager.battle_state.enemy_hp
-                tasks_left = max(0, current_hp)
+            if self.battle_manager and self.battle_manager.get_current_enemy():
+                enemy = self.battle_manager.get_current_enemy()
+                tasks_left = max(0, enemy.current_hp)
                 self.tasks_left_label.setText(str(tasks_left))
-
-                # Update compact window if it exists
-                if self.battle_manager.compact_window:
-                    self.battle_manager.compact_window.update_tasks(tasks_left)
 
         except Exception as e:
             logging.error(f"Error updating tasks left: {e}")
@@ -974,8 +992,8 @@ class TaskRPG(QMainWindow):
                     # Apply coin reward setting
                     coin_reward = settings.get('coin_reward', 5)  # Default to 5 if not set
                     if hasattr(self, 'battle_manager') and self.battle_manager:
-                        old_reward = self.battle_manager.coin_reward
-                        self.battle_manager.coin_reward = coin_reward
+                        old_reward = self.battle_manager.battle_state.coin_reward
+                        self.battle_manager.set_coin_reward(coin_reward)
                         if old_reward != coin_reward:
                             self.story_display.append_text(
                                 f"<p>Coin reward per victory updated from <b>{old_reward}</b> to <b>{coin_reward}</b>.</p>"
@@ -994,8 +1012,6 @@ class TaskRPG(QMainWindow):
         except Exception as e:
             logging.error(f"Error applying settings changes: {e}")
             QMessageBox.critical(self, "Error", "Failed to apply settings changes")
-
-    
 
     def trigger_shake_animation(self):
         """Trigger the shaking animation if enabled."""
@@ -1040,9 +1056,17 @@ class TaskRPG(QMainWindow):
         if obj is self:
             if event.type() == QEvent.WindowDeactivate:
                 if self.battle_manager.is_in_battle():
-                    self.battle_manager.show_compact_mode()
+                    # Use the UI manager to show compact mode
+                    enemy = self.battle_manager.get_current_enemy()
+                    if enemy:
+                        self.battle_ui_manager.show_compact_mode(
+                            enemy,
+                            lambda: self.battle_manager.perform_attack(is_heavy=False),
+                            lambda: self.battle_manager.perform_attack(is_heavy=True)
+                        )
             elif event.type() == QEvent.WindowActivate:
-                self.battle_manager.hide_compact_mode()
+                # Use the UI manager to hide compact mode
+                self.battle_ui_manager.hide_compact_mode()
                 if self.isFullScreen():
                     self.releaseKeyboard()
         return super().eventFilter(obj, event)
@@ -1065,7 +1089,7 @@ class TaskRPG(QMainWindow):
                 if self.isFullScreen():
                     self.showNormal()
                     if self.battle_manager.is_in_battle():
-                        self.battle_manager.hide_compact_mode()
+                        self.battle_ui_manager.hide_compact_mode()
                     self._ensure_focus()
                     return
 
@@ -1100,7 +1124,11 @@ class TaskRPG(QMainWindow):
                 self.player.save_state()
                 logging.info("Player state saved on exit")
             
-            # Cleanup battle manager if it exists
+            # Cleanup battle UI manager first
+            if hasattr(self, 'battle_ui_manager'):
+                self.battle_ui_manager.cleanup()
+            
+            # Cleanup battle manager after UI manager
             if hasattr(self, 'battle_manager'):
                 self.battle_manager.cleanup()
             
@@ -1139,6 +1167,3 @@ if __name__ == "__main__":
     game = TaskRPG()
     game.show()
     sys.exit(app.exec_())
-
-# Project imports
-from modules.ui.dialogs.settings.settings_manager import SettingsManager

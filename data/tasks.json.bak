@@ -87,17 +87,6 @@
         "count": 0,
         "muted_until": null
     },
-    "Gym": {
-        "min": 1,
-        "max": 1,
-        "active": false,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "Walk/Shopping": {
         "min": 1,
         "max": 1,
@@ -189,7 +178,7 @@
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -228,8 +217,7 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null,
-        "activation_time": "21:00"
+        "muted_until": null
     },
     "Beard": {
         "min": 1,
@@ -267,14 +255,13 @@
     "Continue Novelcrafter": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null,
-        "activation_time": "21:00"
+        "muted_until": null
     },
     "Bubble": {
         "min": 1,
@@ -307,7 +294,7 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": 1742292692.14147
+        "muted_until": null
     },
     "Claude": {
         "min": 7,
