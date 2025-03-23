@@ -1,6 +1,6 @@
 {
     "shake_animation": true,
-    "window_geometry": "AdnQywADAAAAAAAHAAAA9QAABQAAAAVnAAAACAAAASIAAAT/AAAFZgAAAAAAAAAACgAAAAAIAAABIgAABP8AAAVm",
+    "window_geometry": "AdnQywADAAAAAALfAAAAxAAAB9gAAAU2AAAC4AAAAPEAAAfXAAAFNQAAAAAAAAAACgAAAALgAAAA8QAAB9cAAAU1",
     "selected_workflow": "newFluxWorkflow",
     "column_widths": [
         537,
@@ -14,6 +14,6 @@
     "coin_reward": 5,
     "window": {
         "width": 1272,
-        "height": 1093
+        "height": 1096
     }
 }

@@ -104,7 +104,7 @@
         "active": false,
         "is_daily": false,
         "is_weekly": true,
-        "next_activation_time": 1742510655.5065045,
+        "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
         "muted_until": null
@@ -178,7 +178,7 @@
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -189,7 +189,7 @@
     "taskRPG (custom rewards;add ToDo;activationTime)": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -277,18 +277,19 @@
     "Tabs": {
         "min": 16,
         "max": 25,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "21:30"
     },
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -311,6 +312,17 @@
         "min": 5,
         "max": 9,
         "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "WorkClaude": {
+        "min": 1,
+        "max": 1,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
