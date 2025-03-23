@@ -65,17 +65,6 @@
         "count": 0,
         "muted_until": null
     },
-    "Gemini": {
-        "min": 2,
-        "max": 5,
-        "active": false,
-        "is_daily": false,
-        "is_weekly": false,
-        "next_activation_time": null,
-        "manually_deactivated": false,
-        "count": 0,
-        "muted_until": null
-    },
     "AWS": {
         "min": 1,
         "max": 1,
@@ -101,7 +90,7 @@
     "Hair": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": true,
         "next_activation_time": null,
@@ -189,7 +178,7 @@
     "taskRPG (custom rewards;add ToDo;activationTime)": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -211,7 +200,7 @@
     "Teeth": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -239,34 +228,36 @@
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "15:00"
     },
     "Continue CurveEditor": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
-        "count": 0,
+        "count": 1,
         "muted_until": null
     },
     "Continue Novelcrafter": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "14:40"
     },
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
@@ -277,7 +268,7 @@
     "Tabs": {
         "min": 16,
         "max": 25,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -289,13 +280,14 @@
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
         "manually_deactivated": false,
         "count": 0,
-        "muted_until": null
+        "muted_until": null,
+        "activation_time": "18:30"
     },
     "Claude": {
         "min": 7,
@@ -320,6 +312,17 @@
         "muted_until": null
     },
     "WorkClaude": {
+        "min": 1,
+        "max": 1,
+        "active": true,
+        "is_daily": false,
+        "is_weekly": false,
+        "next_activation_time": null,
+        "manually_deactivated": false,
+        "count": 0,
+        "muted_until": null
+    },
+    "Continue SlateGallery": {
         "min": 1,
         "max": 1,
         "active": false,
