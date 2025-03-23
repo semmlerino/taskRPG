@@ -81,7 +81,17 @@ class BattleManager:
         """Handle pause toggle events."""
         # Only handle if we're in a battle
         if self.battle_state.is_in_battle():
-            self.battle_state.toggle_pause()
+            # Extract the source of the event to prevent recursive handling
+            source = event.data.get('source', None)
+            
+            # Only process events that didn't come from this instance
+            if source != 'battle_manager':
+                logging.debug(f"Processing pause toggle from external source: {source}")
+                # Set the _toggling_pause flag to prevent recursive event processing
+                self.battle_state._toggling_pause = True
+                self.battle_state.toggle_pause()
+                # Reset the flag after toggling
+                self.battle_state._toggling_pause = False
 
     def _handle_enemy_defeated_event(self, event: BattleEvent):
         """Handle enemy defeated events."""

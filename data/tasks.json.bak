@@ -178,7 +178,7 @@
     "FitRPG": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -189,7 +189,7 @@
     "taskRPG (custom rewards;add ToDo;activationTime)": {
         "min": 1,
         "max": 1,
-        "active": true,
+        "active": false,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -244,7 +244,7 @@
     "Continue CurveEditor": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -255,7 +255,7 @@
     "Continue Novelcrafter": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,
@@ -266,7 +266,7 @@
     "Bubble": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": true,
         "is_weekly": false,
         "next_activation_time": null,
@@ -289,7 +289,7 @@
     "Clean Room (1 Thema des Tages)": {
         "min": 1,
         "max": 1,
-        "active": false,
+        "active": true,
         "is_daily": false,
         "is_weekly": false,
         "next_activation_time": null,

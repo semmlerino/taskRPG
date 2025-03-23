@@ -63,12 +63,14 @@ class BattleState:
     coin_reward: int = 5  # Default coins per victory
     xp_base: int = 100  # Base XP for victories
     xp_multiplier: float = 1.0  # Multiplier for XP calculations
-    
+
     def __post_init__(self):
         """Validate state after initialization."""
         if self.enemy_hp is not None and self.enemy_max_hp is not None:
             self.enemy_hp = max(0, min(self.enemy_hp, self.enemy_max_hp))
-    
+        # Add a flag to prevent recursive toggling
+        self._toggling_pause = False
+
     def reset(self) -> None:
         """Reset battle state to default values."""
         old_status = self.status
@@ -318,17 +320,48 @@ class BattleState:
             logging.debug(f"Battle unpaused. Pause duration: {pause_duration:.2f}s, Total: {self.total_pause_duration:.2f}s")
     
     def toggle_pause(self) -> None:
-        """Toggle pause state."""
-        if self.is_paused():
-            self.unpause()
-        else:
-            self.pause()
-        
-        # Publish toggle event after state change
-        event_dispatcher.publish(BattleEvent(
-            BattleEventType.PAUSE_TOGGLED,
-            {"is_paused": self.is_paused()}
-        ))
+        """Toggle pause state with recursion protection."""
+        # Check if we're already toggling pause (prevents recursion)
+        if hasattr(self, '_toggling_pause') and self._toggling_pause:
+            logging.debug("Ignoring recursive pause toggle")
+            return
+
+        # Set flag to prevent recursive toggling
+        self._toggling_pause = True
+
+        try:
+            # Store previous state for comparison
+            was_paused = self.is_paused()
+
+            # Directly manage state instead of calling self.pause() or self.unpause()
+            # which publish events that can cause recursion
+            if was_paused:
+                # Unpause logic
+                self.status = BattleStatus.ACTIVE
+
+                # Calculate pause duration
+                pause_duration = 0
+                if self.paused_time:
+                    pause_duration = time.time() - self.paused_time
+                    self.total_pause_duration += pause_duration
+                    self.paused_time = None
+            else:
+                # Pause logic
+                self.status = BattleStatus.PAUSED
+                self.paused_time = time.time()
+
+            # Only publish state changed event once
+            event_dispatcher.publish(BattleEvent(
+                BattleEventType.STATE_CHANGED,
+                {"status": self.status.name}
+            ))
+
+            # Log action
+            action = "unpaused" if was_paused else "paused"
+            logging.debug(f"Battle {action}. _toggling_pause flag active.")
+        finally:
+            # Always reset the flag when done
+            self._toggling_pause = False
     
     def mark_battle_complete(self, node_key: str) -> None:
         """Mark a battle node as completed."""

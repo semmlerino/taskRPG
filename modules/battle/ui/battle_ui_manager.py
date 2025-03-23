@@ -362,27 +362,28 @@ class BattleUIManager:
         return True
     
     def show_compact_mode(self, current_enemy: 'Enemy', attack_callback, heavy_attack_callback) -> None:
-        """Show compact battle window positioned in the top right corner."""
+        """Show compact battle window positioned in the top right corner without using timers."""
         try:
             # Create compact window if it doesn't exist
             if not self.compact_window:
                 from modules.ui.components.compact_battle_window import CompactBattleWindow
                 self.compact_window = CompactBattleWindow()
                 
-                # Connect signals
+                # Connect signals directly
                 if attack_callback:
                     self.compact_window.attack_clicked.connect(attack_callback)
                 if heavy_attack_callback:
                     self.compact_window.heavy_attack_clicked.connect(heavy_attack_callback)
                 
-                # Connect pause toggle signal to battle manager
+                # Connect pause toggle signal to battle manager with direct handling
                 if self.battle_manager:
-                    self.compact_window.pause_toggled.connect(self.battle_manager.toggle_pause)
+                    self.compact_window.pause_toggled.connect(
+                        lambda: self._handle_compact_window_pause_toggle()
+                    )
                 
-                # Log creation
                 logging.info("Compact battle window created and signals connected")
                 
-            # Update with current enemy
+            # Update with current enemy - direct update
             if current_enemy:
                 self.compact_window.update_display(current_enemy)
             
@@ -395,17 +396,41 @@ class BattleUIManager:
             )
             self.compact_window.move(position)
                 
-            # Show and position window
+            # Show window using direct calls
             self.compact_window.show()
             self.compact_window.raise_()
-            self.compact_window.activateWindow()
             
             logging.info("Compact battle window displayed in top right corner")
             
         except Exception as e:
             logging.error(f"Error showing compact battle window: {e}")
             self.show_error("Failed to show compact battle window")
-            
+    
+    def _handle_compact_window_pause_toggle(self):
+        """Handle pause toggle from compact window with direct battle state management."""
+        try:
+            if self.battle_manager and self.battle_manager.is_in_battle():
+                # Get current pause state
+                was_paused = self.battle_manager.battle_state.is_paused()
+                
+                # DIRECT manipulation of pause state to avoid event recursion
+                if was_paused:
+                    self.battle_manager.battle_state.unpause()
+                else:
+                    self.battle_manager.battle_state.pause()
+                    
+                # Update UI manually
+                if self.compact_window:
+                    self.compact_window.update_pause_state(not was_paused)
+                    
+                # Update enemy panel if available
+                if self.enemy_panel:
+                    self.enemy_panel.update_pause_state(not was_paused)
+                    
+                logging.debug(f"Pause toggled directly from compact window. New state: {not was_paused}")
+        except Exception as e:
+            logging.error(f"Error handling compact window pause toggle: {e}")
+    
     def hide_compact_mode(self) -> None:
         """Hide compact battle window."""
         if self.compact_window:
@@ -417,7 +442,7 @@ class BattleUIManager:
         try:
             # Update action buttons
             if self.action_buttons:
-                self.action_buttons.setEnabled(not is_paused)  # FIXED: Changed from paused to is_paused
+                self.action_buttons.setEnabled(not is_paused)
                 logging.debug("Action buttons pause state updated")
             
             # Update enemy panel

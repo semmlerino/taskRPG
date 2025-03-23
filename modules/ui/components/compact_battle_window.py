@@ -14,14 +14,14 @@ class CompactBattleWindow(QWidget):
     # Add signal definitions
     attack_clicked = pyqtSignal()
     heavy_attack_clicked = pyqtSignal()
-    pause_toggled = pyqtSignal()  # NEW: Added signal for pause toggle
+    pause_toggled = pyqtSignal()  # For pause toggle
     
     def __init__(self, parent=None):
         super().__init__(parent, Qt.Window | Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint)
         self.setWindowFlag(Qt.Tool)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
         self.setFocusPolicy(Qt.NoFocus)
-        self.setFixedSize(250, 100)  # Reduced height since we're removing buttons
+        self.setFixedSize(250, 100)
         
         # Initialize pause state
         self._is_paused = False
@@ -32,7 +32,7 @@ class CompactBattleWindow(QWidget):
         # Enable window dragging
         self.dragging = False
         self.offset = None
-        
+            
     def init_ui(self):
         """Initialize the user interface."""
         layout = QVBoxLayout()
@@ -79,8 +79,6 @@ class CompactBattleWindow(QWidget):
             }
         """)
         layout.addWidget(self.tasks_label)
-        
-        # Removed attack buttons section
         
         self.setLayout(layout)
         
@@ -202,7 +200,7 @@ class CompactBattleWindow(QWidget):
                     self.attack_clicked.emit()
                     logging.debug("Attack shortcut triggered from compact window")
             elif event.key() == Qt.Key_NumberSign:  # # key
-                # FIXED: Emit signal instead of handling locally
+                # Emit signal for pause toggle
                 self.pause_toggled.emit()
                 logging.debug("Pause toggle signal emitted from compact window")
         except Exception as e:
