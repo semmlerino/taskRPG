@@ -22,4 +22,4 @@ Epic Quest RPG transforms your task management into a fun, interactive text-base
 1. **Clone the Repository**:
 
    ```bash
-   git clone https://github.com/yourusername/EpicQuestRPG.git
+   git clone https://github.com/semmlerino/taskRPG.git
